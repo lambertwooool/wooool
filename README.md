@@ -1,19 +1,20 @@
 # Wooool web UI
 
-Wooool is an AIGC image generator, Refer to the [Stable Diffusion web UI](https://github.com/AUTOMATIC1111/stable-diffusion-webui) 、Midjourney and [Fooocus](https://github.com/lllyasviel/Fooocus) part of the function, support SD1.5 and SDXL model
+Wooool is an AIGC image generator, Refer to the functions from[Stable Diffusion web UI](https://github.com/AUTOMATIC1111/stable-diffusion-webui) 、Midjourney and [Fooocus](https://github.com/lllyasviel/Fooocus). it supports SD1.5 and SDXL model
 
 ![](screenshot.png)
 
 ## Features
 
 ### Prompt
-More use of choice, rather than filling in the blank, the use of photographic description, gradually form a picture description
-- Main Character: provides more than 40 types of protagonists by default. Each refresh displays a group of protagonists. For Girl and Male, different races are displayed according to the selected language, so as to conform to the aesthetics of different regions
-- Integrated [Dynamic Prompts](https://github.com/adieyal/dynamicprompts), supporting rich prompt word functions such as random selection
-- Supports prompt word weights
-- You can choose content such as perspective, emo, location, weather and lighting, which is more suitable for photography
-- SDXL Style selection, with display images configured for each style
-- Weights can be set individually for each prompt content such as Main Character and SDXL style
+given multiple chioces instead of filling the blank to complish the description.
+shaping the whole view gradually by description with photographic words. 
+- Main Character: provides more than 40 types of profiles including female and male by default. Each refresh displays a new group of people.  according to the selected language, different races would be displayed automatically to satisfy different aesthetics from different regions.
+- Integrated [Dynamic Prompts](https://github.com/adieyal/dynamicprompts), the option could be shown by random or in other way if you choose the function
+- Support to setting the weight of options
+- Options have large content of many elements like perspective, emo, location, weather, lighting and so on, which are more logical for photography
+- SDXL Style selection, each sample picture for each style
+- Weights can be set separatlly for each content such as Main Character or SDXL style
 
 ### Reference Image
 Anything is a reference image
@@ -26,6 +27,9 @@ Anything is a reference image
 Integrate the Civitai API to quickly preview and switch trigger words
 
 ### Actions
+
+![](actions.jpeg)
+
 - Vary(Subtle) and Vary(Strong), Midjourney Vary.
 - Zoom(1.5x) and Zoom(2.0x), Midjourney Zoom
 - Change Style, Transfer styles between SDXL styles
@@ -36,16 +40,16 @@ Integrate the Civitai API to quickly preview and switch trigger words
 - Upscale，4x in HD
 
 ### Gallery
-Integrated image browser and generate preview for easier management of generated images
+Integrating image browser with generating preview galleries for easier management of generated images
 
 ### Performance
-- The multi-threading mode enables the CPU and GPU to share the processing power and process prompt words, picture generation and VAE in parallel, thus reducing video memory switching and speeding up the overall speed
+- The multi-threading mode enables the CPU and GPU to help share the processing workload and make the processing of prompt,picture generation and VAE in parallel. therefore,the video memory switching could be reduced and let the whole process speed up.
 
 ### Configuate
 - config/user_paths.json, configure the model and the file directory
 - config/download.json, configures the download address of the model
 - config/localization, multi-language configuration
-- config/sd_styles, Indicates the configuration of SDXL
+- config/sd_styles, SDXL configuration
 
 ### Installation
 
@@ -59,4 +63,4 @@ This project is released under the MIT license.
 
 ### :e-mail: Contact
 
-If you have any question, open an issue or email `kevinwangling@gmail.com`.
+If you have any question, please send an email to the following address:`kevinwangling@gmail.com`.
