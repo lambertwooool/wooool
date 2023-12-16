@@ -1,0 +1,192 @@
+[ 
+    {
+        "name": "cinematic-diva",
+        "prompt": "UHD, 8K, ultra detailed, a cinematic photograph of {prompt}, beautiful lighting, great composition",
+        "negative_prompt": "ugly, deformed, noisy, blurry, NSFW"
+    },
+    {
+        "name": "sai-analog film",
+        "prompt": "analog film photo {prompt} . faded film, desaturated, 35mm photo, grainy, vignette, vintage, Kodachrome, Lomography, stained, highly detailed, found footage",
+        "negative_prompt": "painting, drawing, illustration, glitch, deformed, mutated, cross-eyed, ugly, disfigured"
+    },
+    {
+        "name": "mre-artistic-vision",
+        "prompt": "powerful artistic vision of {prompt}. breathtaking masterpiece made by great artist. best quality, high resolution",
+        "negative_prompt": "insignificant, flawed, made by bad artist. low quality, low resolution"
+    },
+    {
+        "name": "mre-dark-dream",
+        "prompt": "dark and unsettling dream showing {prompt}. best quality, high resolution. created by genius but depressed mad artist. grim beauty",
+        "negative_prompt": "naive, cheerful. comfortable, casual, boring, cliche. low quality, low resolution"
+    },
+    {
+        "name": "mre-cinematic-dynamic",
+        "prompt": "epic cinematic shot of dynamic {prompt} in motion. main subject of high budget action movie. raw photo, motion blur. best quality, high resolution",
+        "negative_prompt": "static, still, motionless, sluggish. drawing, painting, illustration, rendered. low budget. low quality, low resolution"
+    },
+    {
+        "name": "ads-advertising",
+        "prompt": "advertising poster style {prompt} . Professional, modern, product-focused, commercial, eye-catching, highly detailed",
+        "negative_prompt": "noisy, blurry, amateurish, sloppy, unattractive"
+    },
+    {
+        "name": "photo-alien",
+        "prompt": "alien-themed {prompt} . extraterrestrial, cosmic, otherworldly, mysterious, sci-fi, highly detailed",
+        "negative_prompt": "earthly, mundane, common, realistic, simple"
+    },
+    {
+        "name": "photo-film noir",
+        "prompt": "film noir style {prompt} . monochrome, high contrast, dramatic shadows, 1940s style, mysterious, cinematic",
+        "negative_prompt": "ugly, deformed, noisy, blurry, low contrast, realism, photorealistic, vibrant, colorful"
+    },
+    {
+        "name": "photo-glamour",
+        "prompt": "glamorous photo {prompt} . high fashion, luxurious, extravagant, stylish, sensual, opulent, elegance, stunning beauty, professional, high contrast, detailed",
+        "negative_prompt": "ugly, deformed, noisy, blurry, distorted, grainy, sketch, low contrast, dull, plain, modest"
+    },
+    {
+        "name": "photo-iphone photographic",
+        "prompt": "iphone photo {prompt} . large depth of field, deep depth of field, highly detailed",
+        "negative_prompt": "drawing, painting, crayon, sketch, graphite, impressionist, noisy, blurry, soft, deformed, ugly, shallow depth of field, bokeh"
+    },
+    {
+        "name": "photo-long exposure",
+        "prompt": "long exposure photo of {prompt} . Blurred motion, streaks of light, surreal, dreamy, ghosting effect, highly detailed",
+        "negative_prompt": "static, noisy, deformed, shaky, abrupt, flat, low contrast"
+    },
+    {
+        "name": "photo-neon noir",
+        "prompt": "neon noir {prompt} . cyberpunk, dark, rainy streets, neon signs, high contrast, low light, vibrant, highly detailed",
+        "negative_prompt": "bright, sunny, daytime, low contrast, black and white, sketch, watercolor"
+    },
+    {
+        "name": "photo-silhouette",
+        "prompt": "silhouette style {prompt} . high contrast, minimalistic, black and white, stark, dramatic",
+        "negative_prompt": "ugly, deformed, noisy, blurry, low contrast, color, realism, photorealistic"
+    },
+    {
+        "name": "photo-tilt-shift",
+        "prompt": "tilt-shift photo of {prompt} . selective focus, miniature effect, blurred background, highly detailed, vibrant, perspective control",
+        "negative_prompt": "blurry, noisy, deformed, flat, low contrast, unrealistic, oversaturated, underexposed"
+    },
+    {
+        "name": "Dark Moody Atmosphere",
+        "prompt": "Dark Moody Atmosphere, {prompt}, dramatic, mysterious, dark moody atmosphere",
+        "negative_prompt": "ugly, deformed, noisy, blurry, low contrast, vibrant, colorful, bright"
+    },
+    {
+        "name": "Double Exposure",
+        "prompt": "Double Exposure Style, {prompt}, double image ghost effect, image combination, double exposure style",
+        "negative_prompt": "ugly, deformed, noisy, blurry, low contrast"
+    },
+    {
+        "name": "Tranquil Relaxing Atmosphere",
+        "prompt": "Tranquil Relaxing Atmosphere, {prompt}, calming style, soothing colors, peaceful, idealic, Tranquil Relaxing Atmosphere",
+        "negative_prompt": "ugly, deformed, noisy, blurry, low contrast, oversaturated"
+    },
+    {
+        "name": "Faded Polaroid Photo",
+        "prompt": "Faded Polaroid Photo, {prompt}, analog, old faded photo, old polaroid",
+        "negative_prompt": "ugly, deformed, noisy, blurry, low contrast, vibrant, colorful"
+    },
+    {
+        "name": "Knolling Photography",
+        "prompt": "Knolling Photography, {prompt}, flat lay photography, object arrangment, knolling photography",
+        "negative_prompt": "ugly, deformed, noisy, blurry, low contrast"
+    },
+    {
+        "name": "Minimalism",
+        "prompt": "((Minimalism)), abstract, simple geometic shapes, {prompt}, hard edges, sleek contours, Minimalism",
+        "negative_prompt": "ugly, deformed, noisy, blurry, low contrast"
+    },
+    {
+        "name": "Neo-Baroque",
+        "prompt": "Neo-Baroque, {prompt}, ornate and elaborate, dynaimc, Neo-Baroque",
+        "negative_prompt": "ugly, deformed, noisy, blurry, low contrast"
+    },
+    {
+        "name": "Neo-Byzantine",
+        "prompt": "Neo-Byzantine, {prompt}, grand decorative religious style, Orthodox Christian inspired, Neo-Byzantine",
+        "negative_prompt": "ugly, deformed, noisy, blurry, low contrast"
+    },
+    {
+        "name": "Neo-Rococo",
+        "prompt": "Neo-Rococo, {prompt}, curved forms, naturalistic ornamentation, elaborate, decorative, gaudy, Neo-Rococo",
+        "negative_prompt": "ugly, deformed, noisy, blurry, low contrast"
+    },
+    {
+        "name": "Neoclassicism",
+        "prompt": "Neoclassicism, {prompt}, ancient Rome and Greece inspired, idealic, sober colors, Neoclassicism",
+        "negative_prompt": "ugly, deformed, noisy, blurry, low contrast"
+    },
+    {
+        "name": "Medievalism",
+        "prompt": "Medievalism, {prompt}, inspired by The Middle Ages, medieval art, elaborate patterns and decoration, Medievalism",
+        "negative_prompt": "ugly, deformed, noisy, blurry, low contrast"
+    },
+    {
+        "name": "High Fashion",
+        "prompt": "High Fashion, {prompt}, dynamic, dramatic, haute couture, elegant, ornate clothing, High Fashion",
+        "negative_prompt": "ugly, deformed, noisy, blurry, low contrast"
+    },
+    {
+        "name": "Luxurious Elegance",
+        "prompt": "Luxurious Elegance, {prompt}, extravagant, ornate, designer, opulent, picturesque, lavish",
+        "negative_prompt": "ugly, deformed, noisy, blurry, low contrast"
+    },
+    {
+        "name": "misc-disco",
+        "prompt": "disco-themed {prompt} . vibrant, groovy, retro 70s style, shiny disco balls, neon lights, dance floor, highly detailed",
+        "negative_prompt": "minimalist, rustic, monochrome, contemporary, simplistic"
+    },
+    {
+        "name": "misc-dreamscape",
+        "prompt": "dreamscape {prompt} . surreal, ethereal, dreamy, mysterious, fantasy, highly detailed",
+        "negative_prompt": "realistic, concrete, ordinary, mundane"
+    },
+    {
+        "name": "misc-dystopian",
+        "prompt": "dystopian style {prompt} . bleak, post-apocalyptic, somber, dramatic, highly detailed",
+        "negative_prompt": "ugly, deformed, noisy, blurry, low contrast, cheerful, optimistic, vibrant, colorful"
+    },
+    {
+        "name": "misc-macabre",
+        "prompt": "macabre style {prompt} . dark, gothic, grim, haunting, highly detailed",
+        "negative_prompt": "bright, cheerful, light-hearted, cartoonish, cute"
+    },
+    {
+        "name": "misc-minimalist",
+        "prompt": "minimalist style {prompt} . simple, clean, uncluttered, modern, elegant",
+        "negative_prompt": "ornate, complicated, highly detailed, cluttered, disordered, messy, noisy"
+    },
+    {
+        "name": "futuristic-biomechanical",
+        "prompt": "biomechanical style {prompt} . blend of organic and mechanical elements, futuristic, cybernetic, detailed, intricate",
+        "negative_prompt": "natural, rustic, primitive, organic, simplistic"
+    },
+    {
+        "name": "futuristic-retro cyberpunk",
+        "prompt": "retro cyberpunk {prompt} . 80's inspired, synthwave, neon, vibrant, detailed, retro futurism",
+        "negative_prompt": "modern, desaturated, black and white, realism, low contrast"
+    },
+    {
+        "name": "futuristic-retro futurism",
+        "prompt": "retro-futuristic {prompt} . vintage sci-fi, 50s and 60s style, atomic age, vibrant, highly detailed",
+        "negative_prompt": "contemporary, realistic, rustic, primitive"
+    },
+    {
+        "name": "futuristic-sci-fi",
+        "prompt": "sci-fi style {prompt} . futuristic, technological, alien worlds, space themes, advanced civilizations",
+        "negative_prompt": "ugly, deformed, noisy, blurry, low contrast, realism, photorealistic, historical, medieval"
+    },
+    {
+        "name": "futuristic-vaporwave",
+        "prompt": "vaporwave style {prompt} . retro aesthetic, cyberpunk, vibrant, neon colors, vintage 80s and 90s style, highly detailed",
+        "negative_prompt": "monochrome, muted colors, realism, rustic, minimalist, dark"
+    },
+    {
+        "name": "Steampunk 2",
+        "prompt": "Steampunk, {prompt}, retrofuturistic science fantasy, steam-powered tech, vintage industry, gears, neo-victorian, steampunk",
+        "negative_prompt": "ugly, deformed, noisy, blurry, low contrast"
+    }
+]

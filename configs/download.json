@@ -1,0 +1,21 @@
+{
+    "sd_xl_base_1.0_0.9vae.safetensors": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0_0.9vae.safetensors",
+    "sd_xl_refiner_1.0_0.9vae.safetensors": "https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-1.0/resolve/main/sd_xl_refiner_1.0_0.9vae.safetensors",
+    "xlvaeapp.pth": "https://huggingface.co/lllyasviel/misc/resolve/main/xlvaeapp.pth",
+    "sai_xl_canny_128lora.safetensors": "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/sai_xl_canny_128lora.safetensors",
+    "sai_xl_depth_128lora.safetensors": "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/sai_xl_depth_128lora.safetensors",
+    "t2i-adapter_xl_openpose.safetensors": "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/t2i-adapter_xl_openpose.safetensors",
+    "ip-adapter_xl.pth": "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/ip-adapter_xl.pth",
+    "ip-adapter-plus-face_sdxl_vit-h.bin": "https://huggingface.co/h94/IP-Adapter/resolve/main/sdxl_models/ip-adapter-plus-face_sdxl_vit-h.bin",
+    "control_v11p_sd15_canny.pth": "https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/control_v11p_sd15_canny.pth",
+    "control_v11f1p_sd15_depth.pth": "https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/control_v11f1p_sd15_depth.pth",
+    "control_v11p_sd15_openpose.pth": "https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/control_v11p_sd15_openpose.pth",
+    "ip-adapter_sd15_plus.pth": "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/ip-adapter_sd15_plus.pth",
+    "ip-adapter-plus-face_sd15.bin": "https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter-plus-face_sd15.bin",
+    "GFPGANv1.4.pth": "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth",
+    "4x-UltraSharp.pth": "https://huggingface.co/uwg/upscaler/resolve/main/ESRGAN/4x-UltraSharp.pth",
+    "inswapper_128.onnx": "https://huggingface.co/ezioruan/inswapper_128.onnx/resolve/main/inswapper_128.onnx",
+
+    "____sd_xl_base_1.0_0.9vae.safetensors": "https://civitai.work/api/download/models/128078",
+    "____sd_xl_refiner_1.0_0.9vae.safetensors": "https://civitai.work/api/download/models/128080"
+}

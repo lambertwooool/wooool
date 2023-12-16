@@ -1,0 +1,18 @@
+Beagle
+Border Collie
+Boxer
+Chihuahua
+Doberman Pinscher
+French Bulldog
+German Shepherd
+Golden Retriever
+Labrador Retriever
+Miniature Poodle
+Pembroke Welsh Corgi
+Poodle
+Pug
+Rottweiler
+Shiba Inu
+Siberian Husky
+Tibetan Mastiff
+Yorkshire Terrie

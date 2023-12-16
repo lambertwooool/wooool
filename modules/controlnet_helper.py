@@ -1,0 +1,103 @@
+import os
+import torch
+from PIL import Image
+
+import modules.paths
+from modules.model import controlnet, clip_vision
+from modules import util
+from modules.controlnet.processor import Processor as controlnet_processor
+
+@torch.no_grad()
+@torch.inference_mode()
+def processor(controlnets, unet_model, width, height):
+    ctrl_procs = load_controlnets_by_task(controlnets)
+    ctrls = []
+
+    clip_vision_path = os.path.join(modules.paths.clip_vision_models_path, 'clip_vision_vit_h.safetensors')
+    clip_vision_model = None
+    ip_proc = None
+
+    for cn in controlnets:
+        cn_type, cn_img, cn_weight, cn_model_name = cn
+        if cn_type in ctrl_procs.keys():
+            if cn_type in ["ip_adapter", "ip_adapter_face"]:
+                if cn_type == "ip_adapter_face":
+                    _, face_img = util.get_faces(cn_img)
+                    cn_img = face_img if face_img is not None else cn_img
+                # https://github.com/tencent-ailab/IP-Adapter/blob/d580c50a291566bbf9fc7ac0f760506607297e6d/README.md?plain=1#L75
+                ip_img = util.resize_image(cn_img, width=224, height=224) # , resize_mode=0
+                util.save_temp_image(ip_img, f"{cn_type}_224.png")
+                clip_vision_model = clip_vision_model or clip_vision.load(clip_vision_path)
+                ip_proc = ctrl_procs[cn_type].processor
+                ip_proc.preprocess(ip_img, clip_vision_model)
+                # ip_adapters.append((ip_proc.preprocess(ip_img, clip_vision_model), 1, cn_weight))
+                unet_model = ip_proc.patch_model(unet_model, cn_weight)
+            else:
+                cn_img = util.resize_image(cn_img, width=width, height=height)
+                cn_img = util.HWC3(ctrl_procs[cn_type](cn_img))
+                cn_model = ctrl_procs[cn_type].load_controlnet(cn_model_name)
+                ctrls.append((cn_type, cn_img, cn_weight, cn_model, ctrl_procs[cn_type]))
+
+            util.save_temp_image(cn_img, f"{cn_type}.png")
+        else:
+            print(f"unknow controlnet {cn_type}")
+    
+    return ctrls, unet_model
+
+@torch.no_grad()
+@torch.inference_mode()
+def load_controlnets_by_task(cn_types):
+    ctrls = {}
+
+    for cn_type, cn_image, cn_weight, cn_model_name in cn_types:
+        if cn_type not in ctrls:
+            if cn_type in controlnet_processor.model_keys():
+                proc = controlnet_processor(cn_type)
+                if cn_type in ["ip_adapter", "ip_adapter_face"]:
+                    proc.processor.load(cn_type, cn_model_name)
+                ctrls[cn_type] = proc
+
+    return ctrls
+
+@torch.no_grad()
+@torch.inference_mode()
+def apply_controlnets(positive_cond, negative_cond, ctrls):
+    for cn in ctrls:
+        cn_type, cn_img, cn_weight, cn_model, cn_proc = cn
+
+        if cn_model is not None :
+            positive_cond, negative_cond = apply_controlnet(
+                positive_cond, negative_cond,
+                cn_model, util.numpy_to_pytorch(cn_img), cn_weight, 0, 0.5)
+    
+    return positive_cond, negative_cond
+
+@torch.no_grad()
+@torch.inference_mode()
+def apply_controlnet(positive, negative, control_net, image, strength, start_percent, end_percent):
+    if strength == 0:
+        return (positive, negative)
+
+    control_hint = image.movedim(-1,1)
+    cnets = {}
+
+    out = []
+    for conditioning in [positive, negative]:
+        c = []
+        for t in conditioning:
+            d = t[1].copy()
+
+            prev_cnet = d.get('control', None)
+            if prev_cnet in cnets:
+                c_net = cnets[prev_cnet]
+            else:
+                c_net = control_net.copy().set_cond_hint(control_hint, strength, (start_percent, end_percent))
+                c_net.set_previous_controlnet(prev_cnet)
+                cnets[prev_cnet] = c_net
+
+            d['control'] = c_net
+            d['control_apply_to_uncond'] = False
+            n = [t[0], d]
+            c.append(n)
+        out.append(c)
+    return (out[0], out[1])

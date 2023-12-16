@@ -1,0 +1,19 @@
+{
+    "modelfile_path": "/Users/wangling/sadtalker/Wooool/models/checkpoints",
+    "lorafile_path": "/Users/wangling/sadtalker/Wooool-old/models/loras",
+    "embeddings_path": "/Users/wangling/sadtalker/Wooool/models/embeddings",
+    "vae_approx_path": "/Users/wangling/sadtalker/Wooool/models/vae_approx",
+    "upscale_models_path": "/Users/wangling/sadtalker/Wooool/models/upscale",
+    "inpaint_models_path": "/Users/wangling/sadtalker/Wooool/models/inpaint",
+    "controlnet_models_path": "/Users/wangling/sadtalker/Wooool/models/controlnet",
+    "clip_vision_models_path": "/Users/wangling/sadtalker/Wooool/models/clip_vision",
+    "annotator_models_path": "/Users/wangling/sadtalker/Wooool/models/annotator",
+    "temp_outputs_path": "/Users/wangling/sadtalker/Wooool/outputs",
+    "scripts_path": "/Users/wangling/sadtalker/Wooool/web/javascript",
+    "localization_path": "/Users/wangling/sadtalker/Wooool/configs/localization",
+    "css_path": "/Users/wangling/sadtalker/Wooool/web/css",
+    "sd_style_path": "/Users/wangling/sadtalker/Wooool/configs/sd_styles",
+    "wildcard_path": "/Users/wangling/sadtalker/Wooool/configs/wildcard",
+    "wd14tagger_path": "/Users/wangling/sadtalker/Wooool-old/models/wd14tagger",
+    "face_models_path": "/Users/wangling/sadtalker/Wooool/models/faces"
+}

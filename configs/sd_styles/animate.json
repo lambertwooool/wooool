@@ -1,0 +1,142 @@
+[
+    {
+        "name": "sai-anime",
+        "prompt": "anime artwork {prompt} . anime style, key visual, vibrant, studio anime, highly detailed",
+        "negative_prompt": "photo, deformed, black and white, realism, disfigured, low contrast"
+    },
+    {
+        "name": "sai-comic book",
+        "prompt": "comic {prompt} . graphic illustration, comic art, graphic novel art, vibrant, highly detailed",
+        "negative_prompt": "photograph, deformed, glitch, noisy, realistic, stock photo"
+    },
+    {
+        "name": "mre-manga",
+        "prompt": "manga artwork presenting {prompt}. created by japanese manga artist. highly emotional. best quality, high resolution",
+        "negative_prompt": "low quality, low resolution"
+    },
+    {
+        "name": "mre-anime",
+        "prompt": "anime artwork illustrating {prompt}. created by japanese anime studio. highly emotional. best quality, high resolution",
+        "negative_prompt": "low quality, low resolution"
+    },
+    {
+        "name": "mre-comic",
+        "prompt": "breathtaking illustration from adult comic book presenting {prompt}. fabulous artwork. best quality, high resolution",
+        "negative_prompt": "deformed, ugly, low quality, low resolution"
+    },
+    {
+        "name": "Action Figure",
+        "prompt": "Action Figure, {prompt}, plastic collectable action figure, collectable toy action figure",
+        "negative_prompt": "ugly, deformed, noisy, blurry, low contrast"
+    },
+    {
+        "name": "Adorable 3D Character",
+        "prompt": "Adorable 3D Character, {prompt}, 3D render, adorable character, 3D art",
+        "negative_prompt": "ugly, deformed, noisy, blurry, low contrast, grunge, sloppy, unkempt, photograph, photo, realistic"
+    },
+    {
+        "name": "Adorable Kawaii",
+        "prompt": "Adorable Kawaii, {prompt}, pretty, cute, adorable, kawaii",
+        "negative_prompt": "ugly, deformed, noisy, blurry, low contrast, gothic, dark, moody, monochromatic"
+    },
+    {
+        "name": "Caricature",
+        "prompt": "Caricature, {prompt}, exaggerated, comical, caricature",
+        "negative_prompt": "ugly, deformed, noisy, blurry, low contrast, realistic"
+    },
+    {
+        "name": "Cel Shaded Art",
+        "prompt": "Cel Shaded Art, {prompt}, 2D, flat color, toon shading, cel shaded style",
+        "negative_prompt": "ugly, deformed, noisy, blurry, low contrast"
+    },
+    {
+        "name": "Flat 2D Art",
+        "prompt": "Flat 2D Art, {prompt}, simple flat color, 2-dimensional, Flat 2D Art Style",
+        "negative_prompt": "ugly, deformed, noisy, blurry, low contrast, 3D, photo, realistic"
+    },
+    {
+        "name": "Fortnite Art Style",
+        "prompt": "Fortnite Art Style, {prompt}, 3D cartoon, colorful, Fortnite Art Style",
+        "negative_prompt": "ugly, deformed, noisy, blurry, low contrast, photo, realistic"
+    },
+    {
+        "name": "mre-underground",
+        "prompt": "uncanny caliginous vision of {prompt}, created by remarkable underground artist. best quality, high resolution. raw and brutal art, careless but impressive style. inspired by darkness and chaos",
+        "negative_prompt": "photography, mainstream, civilized. low quality, low resolution"
+    },
+    {
+        "name": "game-bubble bobble",
+        "prompt": "Bubble Bobble style {prompt} . 8-bit, cute, pixelated, fantasy, vibrant, reminiscent of Bubble Bobble game",
+        "negative_prompt": "realistic, modern, photorealistic, violent, horror"
+    },
+    {
+        "name": "game-cyberpunk game",
+        "prompt": "cyberpunk game style {prompt} . neon, dystopian, futuristic, digital, vibrant, detailed, high contrast, reminiscent of cyberpunk genre video games",
+        "negative_prompt": "historical, natural, rustic, low detailed"
+    },
+    {
+        "name": "mre-dark-cyberpunk",
+        "prompt": "dark cyberpunk illustration of brutal {prompt} in a world without hope, ruled by ruthless criminal corporations. best quality, high resolution",
+        "negative_prompt": "low quality, low resolution"
+    },
+    {
+        "name": "game-fighting game",
+        "prompt": "fighting game style {prompt} . dynamic, vibrant, action-packed, detailed character design, reminiscent of fighting video games",
+        "negative_prompt": "peaceful, calm, minimalist, photorealistic"
+    },
+    {
+        "name": "game-gta",
+        "prompt": "GTA-style artwork {prompt} . satirical, exaggerated, pop art style, vibrant colors, iconic characters, action-packed",
+        "negative_prompt": "realistic, black and white, low contrast, impressionist, cubist, noisy, blurry, deformed"
+    },
+    {
+        "name": "game-mario",
+        "prompt": "Super Mario style {prompt} . vibrant, cute, cartoony, fantasy, playful, reminiscent of Super Mario series",
+        "negative_prompt": "realistic, modern, horror, dystopian, violent"
+    },
+    {
+        "name": "game-minecraft",
+        "prompt": "Minecraft style {prompt} . blocky, pixelated, vibrant colors, recognizable characters and objects, game assets",
+        "negative_prompt": "smooth, realistic, detailed, photorealistic, noise, blurry, deformed"
+    },
+    {
+        "name": "game-pokemon",
+        "prompt": "Pokémon style {prompt} . vibrant, cute, anime, fantasy, reminiscent of Pokémon series",
+        "negative_prompt": "realistic, modern, horror, dystopian, violent"
+    },
+    {
+        "name": "game-retro arcade",
+        "prompt": "retro arcade style {prompt} . 8-bit, pixelated, vibrant, classic video game, old school gaming, reminiscent of 80s and 90s arcade games",
+        "negative_prompt": "modern, ultra-high resolution, photorealistic, 3D"
+    },
+    {
+        "name": "game-retro game",
+        "prompt": "retro game art {prompt} . 16-bit, vibrant colors, pixelated, nostalgic, charming, fun",
+        "negative_prompt": "realistic, photorealistic, 35mm film, deformed, glitch, low contrast, noisy"
+    },
+    {
+        "name": "game-rpg fantasy game",
+        "prompt": "role-playing game (RPG) style fantasy {prompt} . detailed, vibrant, immersive, reminiscent of high fantasy RPG games",
+        "negative_prompt": "sci-fi, modern, urban, futuristic, low detailed"
+    },
+    {
+        "name": "game-strategy game",
+        "prompt": "strategy game style {prompt} . overhead view, detailed map, units, reminiscent of real-time strategy video games",
+        "negative_prompt": "first-person view, modern, photorealistic"
+    },
+    {
+        "name": "game-streetfighter",
+        "prompt": "Street Fighter style {prompt} . vibrant, dynamic, arcade, 2D fighting game, highly detailed, reminiscent of Street Fighter series",
+        "negative_prompt": "3D, realistic, modern, photorealistic, turn-based strategy"
+    },
+    {
+        "name": "game-zelda",
+        "prompt": "Legend of Zelda style {prompt} . vibrant, fantasy, detailed, epic, heroic, reminiscent of The Legend of Zelda series",
+        "negative_prompt": "sci-fi, modern, realistic, horror"
+    },
+    {
+        "name": "misc-manga",
+        "prompt": "manga style {prompt} . vibrant, high-energy, detailed, iconic, Japanese comic style",
+        "negative_prompt": "ugly, deformed, noisy, blurry, low contrast, realism, photorealistic, Western comic style"
+    }
+]
