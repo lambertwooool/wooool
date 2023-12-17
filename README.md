@@ -46,6 +46,7 @@ Integrating image browser with generating preview galleries for easier managemen
 - The multi-threading mode enables the CPU and GPU to help share the processing workload and make the processing of prompt,picture generation and VAE in parallel. therefore,the video memory switching could be reduced and let the whole process speed up.
 
 ### Configuate
+- The options on UI will be automatically saved and won’t be lost after refreshing.
 - config/user_paths.json, configure the model and the file directory
 - config/download.json, configures the download address of the model
 - config/localization, multi-language configuration

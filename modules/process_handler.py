@@ -428,9 +428,7 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
         callback, sampler_name, scheduler_name,
         latent=None, image=None, denoise=1.0, noise_scale=1.0, cfg_scale=7.0, cfg_scale_to=7.0, batch_size=1, loras=[], controlnets=[],
         tiled=False, single_vae=True, round_batch_size=8, subseed_strength=1.0, clip_skip=0):
-    
-    return
-    
+
     progress_output(task, "load_model")
     
     xl_base, xl_base_patched, xl_refiner = get_sd_model(base_path, refiner_path, steps, loras)
