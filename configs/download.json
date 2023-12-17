@@ -15,6 +15,8 @@
     "GFPGANv1.4.pth": "https://github.com/TencentARC/GFPGAN/releases/download/v1.3.0/GFPGANv1.4.pth",
     "4x-UltraSharp.pth": "https://huggingface.co/uwg/upscaler/resolve/main/ESRGAN/4x-UltraSharp.pth",
     "inswapper_128.onnx": "https://huggingface.co/ezioruan/inswapper_128.onnx/resolve/main/inswapper_128.onnx",
+    "wd-v1-4-moat-tagger-v2.onnx": "https://huggingface.co/SmilingWolf/wd-v1-4-moat-tagger-v2/resolve/main/model.onnx",
+    "wd-v1-4-moat-tagger-v2.csv": "https://huggingface.co/SmilingWolf/wd-v1-4-moat-tagger-v2/resolve/main/selected_tags.csv",
 
     "____sd_xl_base_1.0_0.9vae.safetensors": "https://civitai.work/api/download/models/128078",
     "____sd_xl_refiner_1.0_0.9vae.safetensors": "https://civitai.work/api/download/models/128080"
