@@ -1,7 +1,6 @@
 import os
 import json
 
-from modules.util import load_file_from_url
 from modules import util
 
 config_path = os.path.join("./configs", "user_paths.json")

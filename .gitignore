@@ -1,4 +1,5 @@
 .vscode
+configs/user_paths.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

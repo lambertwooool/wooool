@@ -1,0 +1,6 @@
+{
+	"Natural lighting": "",
+	"Rim lighting": {"prompt": "rim light, (ray tracing:0.8), ({dynamic lighting|}:0.6)", "negative_prompt": "(lantern:0.4)"},
+	"Volume Lighting": "volumetric lighting, (beautiful lighting, dramatic atmospheric lighting, dynamic lighting:0.8)",
+	"Cold lighting": "(high contrast, hdr, (dark moody atmosphere, dark color, amazing shadows:1.2))"
+}

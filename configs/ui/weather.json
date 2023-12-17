@@ -1,0 +1,9 @@
+{
+	"Any Weather": "",
+	"Sunny": "Sunny",
+	"Rain day": "({2$$Raining|Heavy rain|dark clouds|lightning}), (Dark Moody Atmosphere)",
+	"Snow day": "(winter, snow), {(strom-snowfall)|}",
+	"Night": "night, {moon|full moon|night sky|milky way sky|}, late at night,",
+	"Rain Night": "night, late at night, ({2$$Raining|Heavy rain|dark clouds|lightning}), (Dark Moody Atmosphere)",
+	"Snow Night": "night, {moon|full moon|}, late at night, (winter, snow), {(strom-snowfall)|}"
+}

@@ -1,3 +1,9 @@
+import os
+from modules import util
+
+def load_ui_config(name):
+	return util.load_json(os.path.join("./configs/ui", f"{name}.json"))
+
 title = {
 	"prompt_placeholder": "Input prompt.",
 	"ref_image": "Ref Image",
@@ -10,50 +16,7 @@ default_base_name = "sd_xl_base_1.0_0.9vae.safetensors"
 default_refiner_name = "sd_xl_refiner_1.0_0.9vae.safetensors"
 
 # Main Character
-options['mc'] = {
-	"Girl": "a beautiful {gril|famale}, solo, {lang} girl, light eyes, {20yo|30yo|40yo|}, {__girl_hair__|}, {sexy|cute|}, {2$$earrings|tattoo|fair-skinned|choker|bowknot|pendant|ring|bracelet|bra|bare shoulders|||scarf}",
-	"Male": "a handsome {male|guy|boy}, solo, {lang} boy, light eyes, {20yo|30yo|}, {__boy_hair__|}, {muscleman|tattoo|}",
-	"Cat": "a {white|black|orange|} __cat_breed__ cat",
-	"Dog": "a {__dog_breed__|}, dog",
-	"Dragon": "a {lang} dragon",
-	"Monster": "a monster",
-	"Cyborg": "a cyborg",
-    "Robot": "a transformer",
-    "Wonder Woman": "Wonder Woman",
-	"Thanos": "Thanos",
-	"Spider-Man": "Spider-Man",
-	"Harley Quinn": "Harley Quinn",
-	"Marilyn Dream": "Marilyn Dream",
-    "Catwoman": "Catwoman",
-    "Cat girl": "Cat girl",
-	"Skeleton": "Skeleton",
-	"Zombie": "Zombie",
-	"Elf": "Elf",
-	"Unicorn": "Unicorn",
-    "Brown Bear": "Brown Bear",
-	"Tank": "Tank",
-	"Gundam": "Gundam",
-	"Sports Car": "Sports Car",
-	"Roman warrior": "Roman warrior",
-	"Dancer": "Dancer",
-	"Rabbit": "Rabbit",
-	"Tiger": "Tiger",
-	"Cleopatra": "Cleopatra",
-	"Pikachu": "Pikachu",
-	"Raccoon": "Raccoon",
-	"Fox": "Fox",
-	"Batman": "Batman",
-	"Astronaut": "Astronaut",
-	"Panda": "Panda",
-	"Penguin": "Penguin",
-    "Audrey Hepburn": "Audrey Hepburn",
-    "Sophie Marceau": "Sophie Marceau",
-    "Leo Messi": "Leo Messi",
-    "Dwayne Johnson": "Dwayne Johnson",
-    "Elon Musk": "Elon Musk",
-    "Snow White": "Snow White",
-    "Mickey Mouse": "Mickey Mouse",
-    "Fan Bing Bing": "Fan Bing Bing",
+options['mc'] = load_ui_config("mc") | {
 	"Other": ""
 } 
 title['mc'] = "Main Character"
@@ -73,86 +36,32 @@ title['ratios'] = "Aspect ratio"
 default['ratios'] = "16:9"
 
 # Style
-options['style'] = {
-	"Cinematic & Photographic": "cinematic",
-	"Animate & Game": "animate",
-	"Art": "art",
-    "Sai": "sdxl_styles_sai",
-    "Mre": "sdxl_styles_mre",
-    "Diva": "sdxl_styles_diva",
-    "Twri": "sdxl_styles_twri",
-}
+options['style'] = load_ui_config("style")
 title['style'] = "Style"
 default['style'] = "Cinematic & Photographic"
 
 # View
-view_global = "beautiful depth of field"
-options['view'] = {
-	"Default view": "",
-	"Close-Up": f"close-up, detail face, super telephoto field, 200mm photograph, {view_global}",
-    "Upper body": f"upper body, telephoto field, 85mm photograph, {view_global}",
-    "Full body": f"full body, wide angle field, 35mm photograph, {view_global}",
-	"Medium": f"medium view, telephoto field, 50mm photograph, {view_global}",
-	"Long": f"long View, wide angle field, 24mm photograph, wide field, {view_global}",
-	"Panorama": f"panorama, ultra wide field, 16mm photograph, exaggerated perspective, {view_global}",
-	"Bird's Eye View": f"bird's-eye view, ultra wide field, 14mm photograph, exaggerated perspective, {view_global}",
-}
+options['view'] = load_ui_config("view")
 title['view'] = "View"
 default['view'] = "Default view"
 
 # Emo
-options['emo'] = {
-	"Default Emo": "",
-	"Happy": "happy, smile",
-	# "Excited": "excited",
-	# "Shy": "shy",
-	# "Acting cute": "acting cute, {pout|Sticking tongue out|Close one eye|stare}",
-	"Sad": "sad, cry, (teardrop)",
-	# "Angry": "angry",
-	# "Fear": "fear",
-	# "Surprise": "surprise",
-	# "Disgust": "disgust",
-	# "Puzzled": "puzzled",
-	# "Calm": "calm",
-}
+options['emo'] = load_ui_config("emo")
 title['emo'] = "Emo"
 default['emo'] = "Happy"
 
 # Location
-options['location'] = {
-	"Any Where": "",
-	"Room": "indoor, {bedroom,on the bed|living room|on the sofa|by the fireplace|do the cooking|read a book|take a bath,bathtub}", 
-	"Swimming pool": "swimming pool",
-	"Street": "on the {city|food|business|flavor|} street, {2$$skyscraper|shop|pedestrian|vehicle|bus|car|neon light|footpath|night sky}", 
-	"Tavern": "in the tavern, {white wine|red wine|beer|champagne|goblet|drink|toast|}, {wine rack|}",
-	"Beach": "beach, (ocean, blue water:1.1), tropical tree, sexy, {yacht|sailboat|surfing|}",
-	"Ruins": "in the ruins, {broken building|charred house|the destroyed city}",
-}
+options['location'] = load_ui_config("location")
 title['location'] = "Location"
 default['location'] = "Any Where"
 
 # Weather
-weather_rain = "({2$$Raining|Heavy rain|dark clouds|lightning}), (Dark Moody Atmosphere)"
-weather_snow = "(winter, snow), {(strom-snowfall)|}"
-options['weather'] = {
-	"Any Weather": "",
-	"Sunny": "Sunny",
-	"Rain day": f"{weather_rain}",
-	"Snow day": f"{weather_snow}",
-	"Night": "night, {moon|full moon|night sky|milky way sky|}, late at night,",
-	"Rain Night": "night, late at night," + weather_rain,
-	"Snow Night": "night, {moon|full moon|}, late at night," + weather_snow,
-}
+options['weather'] = load_ui_config("weather")
 title['weather'] = "Weather"
 default['weather'] = "Any Weather"
 
 # Lighting
-options['hue'] = {
-	"Natural lighting": "",
-	"Rim lighting": {"prompt": "rim light, (ray tracing:0.8), ({dynamic lighting|}:0.6)", "negative_prompt": "(lantern:0.4)"},
-	"Volume Lighting": "volumetric lighting, (beautiful lighting, dramatic atmospheric lighting, dynamic lighting:0.8)",
-	"Cold lighting": "(high contrast, hdr, (dark moody atmosphere, dark color, amazing shadows:1.2))",
-}
+options['hue'] = load_ui_config("lighting")
 title['hue'] = "Lighting"
 default['hue'] = "Rim lighting"
 
@@ -216,44 +125,12 @@ options["ref_mode"] = {
 default['ref_mode'] = "Ref All"
 
 # Simpler
-options['simpler'] = {
-	"Default Simpler": "",
-	"Euler": "euler",
-	"Euler Ancestral": "euler_ancestral",
-	"Heun": "heun",
-    "Heun++": "heunpp2",
-	"DPM 2": "dpm_2",
-	"DPM 2 Ancestral": "dpm_2_ancestral",
-	"LMS": "lms",
-	"DPM Fast": "dpm_fast",
-	"DPM Adaptive": "dpm_adaptive",
-	"DPM++ 2s Ancestral": "dpmpp_2s_ancestral",
-	"DPM++ SDE": "dpmpp_sde",
-	"DPM++ SDE GPU": "dpmpp_sde_gpu",
-	"DPM++ 2m": "dpmpp_2m",
-	"DPM++ 2m SDE": "dpmpp_2m_sde",
-	"DPM++ 2m SDE GPU": "dpmpp_2m_sde_gpu",
-    "DPM++ 3m SDE": "dpmpp_3m_sde",
-    "DPM++ 3m SDE GPU": "dpmpp_3m_sde_gpu",
-	"DDIM": "ddim",
-	"DDPM": "ddpm",
-	"LCM": "lcm",
-	"Uni Pc": "uni_pc",
-	"Uni Pc Bh2": "uni_pc_bh2",
-}
+options['simpler'] = { "Default Simpler": "" } | load_ui_config("simpler")
 title['simpler'] = "Sampler"
 default['simpler'] = "Default Simpler"
 
 # scheduler
-options['scheduler'] = {
-	"Default Scheduler": "",
-	"Normal": "normal",
-	"Karras": "karras",
-	"Exponential": "exponential",
-	"Simple": "simple",
-	"DDIM Uniform": "ddim_uniform",
-    "LCM": "lcm"
-}
+options['scheduler'] = { "Default Scheduler": "" } | load_ui_config("scheduler")
 title['scheduler'] = "Scheduler"
 default['scheduler'] = "Default Scheduler"
 
@@ -321,14 +198,7 @@ title['sample_pagesize'] = "Sample Pagesize"
 default['sample_pagesize'] = 256
 
 # Negative
-options['recommend_negative'] = {
-    "Default": "(low quality, worst quality), lowres, jpeg artifacts",
-	"Watermark": "watermark, signature",
-	"Ugly body": "ugly, deformed, bad anatomy, bad hands, bad eyes, missing fingers",
-	"Anime": "anime, comic, 2d, 3d, cartoon",
-	"Realistic": "photograph, realistic, realism",
-	"Monochrome": "monochrome, black and white",
-}
+options['recommend_negative'] = load_ui_config("negative")
 title['recommend_negative'] = "Negative"
 default['recommend_negative'] = ["Default", "Watermark", "Ugly body"]
 

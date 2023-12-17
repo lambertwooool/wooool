@@ -1,0 +1,8 @@
+{
+	"Normal": "normal",
+	"Karras": "karras",
+	"Exponential": "exponential",
+	"Simple": "simple",
+	"DDIM Uniform": "ddim_uniform",
+    "LCM": "lcm"
+}

@@ -1,0 +1,9 @@
+{
+	"Any Where": "",
+	"Room": "indoor, {bedroom,on the bed|living room|on the sofa|by the fireplace|do the cooking|read a book|take a bath,bathtub}", 
+	"Swimming pool": "swimming pool",
+	"Street": "on the {city|food|business|flavor|} street, {2$$skyscraper|shop|pedestrian|vehicle|bus|car|neon light|footpath|night sky}", 
+	"Tavern": "in the tavern, {white wine|red wine|beer|champagne|goblet|drink|toast|}, {wine rack|}",
+	"Beach": "beach, (ocean, blue water:1.1), tropical tree, sexy, {yacht|sailboat|surfing|}",
+	"Ruins": "in the ruins, {broken building|charred house|the destroyed city}"
+}
