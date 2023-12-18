@@ -63,7 +63,7 @@ default['weather'] = "Any Weather"
 # Lighting
 options['hue'] = load_ui_config("lighting")
 title['hue'] = "Lighting"
-default['hue'] = "Rim lighting"
+default['hue'] = "Natural lighting"
 
 options['pic_num'] = {
 	"1 Sample": 1,
