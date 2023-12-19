@@ -18,7 +18,7 @@ def MakeOpts(items, opt_type="Dropdown", show_label=True, container=True, visibl
     for item in items:
         opt = gr_class[opt_type][0](
                 opts.options[item].keys(),
-                # value=opts.default[item],
+                value=opts.default[item],
                 label=opts.title[item],
                 show_label=show_label,
                 container=container,
