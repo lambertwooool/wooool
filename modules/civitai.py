@@ -57,11 +57,15 @@ def refresh_base_url():
 
 threading.Thread(target=refresh_base_url).start()
 
-def get_image_url(url):
+def get_url(url):
     if base_host is not None:
-        image_host = re.search(re_host, url).groups(0)[0]
-        url = url.replace(image_host, f"image.{base_host}")
+        # host = re.search(re_host, url).groups(0)[0]
+        url = url.replace("civitai.com", base_host)
     return url
+
+def exists_info(model_path):
+    config_file = f"{model_path}{suffix}"
+    return os.path.exists(config_file)
 
 def get_model_versions(
         model_path: str
@@ -80,5 +84,11 @@ def get_model_versions(
                 file.write(json.dumps(data, indent=4))
         else:
             data = None
+
+    if data and not data.get("model_homepage"):
+        model_id = data["modelId"]
+        version_id = data["id"]
+        url = get_url(f"https://civitai.com/models/{model_id}?modelVersionId={version_id}")
+        data["model_homepage"] = url
 
     return data

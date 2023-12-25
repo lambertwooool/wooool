@@ -1,6 +1,12 @@
 {
-	"Girl": "a beautiful {gril|famale}, solo, {lang} girl, light eyes, {20yo|30yo|40yo|}, {__girl_hair__|}, {sexy|cute|}, {2$$earrings|tattoo|fair-skinned|choker|bowknot|pendant|ring|bracelet|bra|bare shoulders|||scarf}",
-	"Male": "a handsome {male|guy|boy}, solo, {lang} boy, light eyes, {20yo|30yo|}, {__boy_hair__|}, {muscleman|tattoo|}",
+	"Girl": {
+		"prompt": "a beautiful {gril|famale}, solo, {lang} girl, light eyes, {20yo|30yo|40yo|}, {__girl_hair__|}, {sexy|cute|}, {2$$earrings|tattoo|fair-skinned|choker|bowknot|pendant|ring|bracelet|bra|bare shoulders|||scarf}",
+		"negative_prompt": "boy"
+	},
+	"Male": {
+		"prompt": "a handsome {male|guy|boy}, solo, {lang} boy, light eyes, {20yo|30yo|}, {__boy_hair__|}, {muscleman|tattoo|}",
+		"negative_prompt": "girl"
+	},
 	"Cat": "a {white|black|orange|} __cat_breed__ cat",
 	"Dog": "a {__dog_breed__|}, dog",
 	"Dragon": "a {lang} dragon",

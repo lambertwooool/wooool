@@ -23,20 +23,16 @@ def handler(task):
     round_batch_size = min(8, batch_size)
 
     seed = int(task.get("seed", 0))
-    seed = (seed if seed > 0 else random.randint(1, 1024 ** 3)) % (1024 ** 3)
+    max_seed = 2 ** 63 - 1
+    seed = (seed if seed > 0 else random.randint(1, max_seed)) % max_seed
     subseed = int(task.get("subseed", 0))
-    subseed = (subseed if subseed > 0 else seed) % (1024 ** 3)
+    subseed = (subseed if subseed > 0 else seed) % max_seed
     fixed_seed = task.get("fixed_seed", False)
     subseed_strength = task.get("subseed_strength", 1) if fixed_seed else 1
     seeds = [seed + (0 if subseed_strength < 1 else i) for i in range(round_batch_size)]
     subseeds = [subseed + i for i in range(round_batch_size)]
 
     loras = task.get("lora", [])
-
-    skip_prompt = task.get("skip_prompt", False)
-
-    positive, negative, loras = prompt_helper.generate(task.get("main_character", ("", "")), task.get("prompt_main", ""), task.get("prompt_negative", ""),
-                                                        round_batch_size, style, task.get("style_weight", 1.0), task.get("options", {}), loras, task.get("lang", ""), seeds, skip_prompt)
 
     base_name = task.get("base_name", "") or model_helper.default_base_name
     base_path = model_helper.base_files[base_name]
@@ -48,13 +44,19 @@ def handler(task):
     else:
         base_hash = ""
         sd_type = "sd15" if "sd15" in base_name else "sdxl"
+
+    skip_prompt = task.get("skip_prompt", False)
+
+    positive, negative, style, loras = prompt_helper.generate(task.get("main_character", ("", "")), task.get("prompt_main", ""), task.get("prompt_negative", ""),
+                                                        round_batch_size, style, task.get("style_weight", 1.0), task.get("options", {}), loras, task.get("lang", ""), seeds, sd_type, skip_prompt)
     
     quality = opts.options["quality_setting"][str(task.get("quality", 1))][sd_type]
-    pixels, default_base_step, default_refiner_step, default_simpler, default_scheduler = quality
+    pixels, default_base_step, default_refiner_step, default_sampler, default_scheduler = quality
     
-    base_step_scale, refiner_step_scale = task.get("step_scale", 1.0), task.get("refiner_step_scale", 1.0)
+    # base_step_scale, refiner_step_scale = task.get("step_scale", 1.0), task.get("refiner_step_scale", 1.0)
     steps = task.get("steps", (default_base_step, default_refiner_step))
-    steps = (int(steps[0] * base_step_scale), int(steps[1] * refiner_step_scale))
+    # steps = (int(steps[0] * base_step_scale), int(steps[1] * refiner_step_scale))
+    steps = (int(steps[0] or default_base_step), int(steps[1] or default_refiner_step))
     base_step, refiner_step = steps
     skip_step = task.get("skip_step", 0)
     skip_step = max(0, int(round(skip_step if skip_step >= 1 else base_step * skip_step)))
@@ -70,10 +72,15 @@ def handler(task):
     size = task.get("size", util.ratios2size(task.get("aspect_ratios", None), pixels ** 2))
     cfg_scale = task.get("cfg_scale", 7.0)
     cfg_scale_to = task.get("cfg_scale_to", cfg_scale)
-    clip_skip = task.get("clip_skip", -2)
-    noise_scale = task.get("noise_scale", 1.0)
+    clip_skip = int(task.get("clip_skip", -2))
+
+    detail = float(task.get("detail", 0))
+    noise_scale = 1 + detail * 0.05
+    if detail != 0:
+        detail_lora = { "sd15": "add_detail.safetensors", "sdxl": "add-detail-xl.safetensors" }[sd_type]
+        loras.append((detail_lora, detail, ""))
     denoise = task.get("denoise", 1.0)
-    simpler = task.get("simpler", "") or default_simpler
+    sampler = task.get("sampler", "") or default_sampler
     scheduler = task.get("scheduler", "") or default_scheduler
     file_format = task.get("file_format", "jpeg").lower()
     image, mask = task.get("image", (None, None))
@@ -82,8 +89,8 @@ def handler(task):
     width, height = size
     size = (width // 8 * 8, height // 8 * 8)
     single_vae = task.get("single_vae", True)
-    controlnets = [[ref_mode, image_refer, sl_rate, opts.options["ref_mode"][opt_type][1][sd_type]] \
-                    for opt_type, ref_mode, image_refer, sl_rate in task.get("controlnet", []) \
+    controlnets = [[ref_mode, image_refer, sl_rate, (args[0] if len(args) >0 else None) or opts.options["ref_mode"][opt_type][1][sd_type]] \
+                    for opt_type, ref_mode, image_refer, sl_rate, *args in task.get("controlnet", []) \
                         if opts.options["ref_mode"][opt_type][1][sd_type] is not None]
 
     tiled = False
@@ -91,6 +98,7 @@ def handler(task):
 
     task["prompt"] = positive
     task["negative"] = negative
+    task["style"] = style
     task["base_model"] = base_name
     task["base_hash"] = base_hash
     task["refiner_model"] = refiner_name
@@ -100,7 +108,7 @@ def handler(task):
     task["noise_scale"] = noise_scale
     task["denoise"] = denoise
     task["seed"] = seeds
-    task["simpler"] = simpler
+    task["sampler"] = sampler
     task["scheduler"] = scheduler
     task["size"] = size
     task["steps"] = steps
@@ -125,7 +133,7 @@ def handler(task):
             '\n[quality]:', quality, \
             '\n[steps]:', steps, \
             '\n[skip_step]:', skip_step, \
-            '\n[simpler, scheduler]', [simpler, scheduler], \
+            '\n[sampler, scheduler]', [sampler, scheduler], \
             '\n[seeds]:', seeds, \
             '\n[subseeds]:', subseeds, \
             '\n[subseed strength]:', subseed_strength, \
@@ -154,7 +162,7 @@ def handler(task):
                 seeds=seeds,
                 subseeds=subseeds,
                 callback=callback,
-                sampler_name=simpler,
+                sampler_name=sampler,
                 scheduler_name=scheduler,
                 latent=initial_latent,
                 image=(image, mask),
@@ -235,7 +243,8 @@ def get_sd_model(base_path, refiner_path, steps, loras):
 
     if steps[1] > 0:
         xl_refiner = get_refiner_model(refiner_path)
-        xl_refiner = get_loras(xl_refiner, loras)
+        # xl_refiner.clip = xl_base.clip
+        # xl_refiner = get_loras(xl_refiner, loras)
     else:
         xl_refiner = None
     
@@ -276,8 +285,9 @@ def get_loras(model, loras):
     xl_base_patched = model
 
     for name, weight, prompt in loras:
-        lora_path = os.path.join(modules.paths.lorafile_path, name)
-        if os.path.exists(lora_path):
+        # lora_path = os.path.join(modules.paths.lorafile_path, name)
+        lora_path = lora.get_lora_path(name)
+        if lora_path and os.path.exists(lora_path):
             xl_base_patched = core.load_sd_lora(xl_base_patched, lora_path, strength_model=weight, strength_clip=weight)
             print(f'[LoRA loaded] {name}, weight ({weight})')
         else:
@@ -385,18 +395,19 @@ def create_infotext(task, prompt, negative_prompt, seed, subseed, batch_index=0)
     # style_type, sytle_name = task.get("style", ("", ""))
     re_line = r"[\n\r\s]"
     re_s = r"[\s,]"
+    loras = task.get("lora", [])
+    prompt = ",".join(prompt)
+    prompt += " " + ", ".join([f"<lora:{lo_name}:{lo_weight}>" for lo_name, lo_weight, lo_trained_words in loras])
     
     generation_params = {
         "Prompt": prompt,
         "Negative prompt": negative_prompt,
-        "Main character": task.get("main_character", None),
-        "SDXL style": task.get("style", None),
         "Steps": step_base + step_refiner,
         "Refiner Steps": step_refiner,
-        "Sampler": task["simpler"],
+        "Sampler": task["sampler"],
         "Scheduler": task["scheduler"],
         "CFG scale": task["cfg_scale"],
-        "Clip skip": task.get("clip_skip", None),
+        "Clip skip": abs(task.get("clip_skip", 2)),
         "Seed": seed,
         "Sub seed": subseed,
         "Size": f'{width}x{height}',
@@ -405,15 +416,17 @@ def create_infotext(task, prompt, negative_prompt, seed, subseed, batch_index=0)
         "Refiner model": (task.get("refiner_model", None) and os.path.split(task["refiner_model"])[1]) or "",
         "Refiner model hash": task.get("refiner_hash", None) or "",
         "Denoising strength": task.get("denoise", 1.0),
-        "Loras": task.get("lora", []),
+        # "Loras": task.get("lora", []),
         "Controlnets": [[x[0], x[2]] for x in task.get("controlnet", [])],
+        "Main character": task.get("main_character", None),
+        "SDXL style": task.get("style", None),
         "Options": task.get("options", {}),
         "Version": "Wooool",
     }
 
     generation_params = { k: v for k, v in generation_params.items() if v }
 
-    prompt_text = re.sub(re_line, " ", util.listJoin(generation_params.pop("Prompt")))
+    prompt_text = generation_params.pop("Prompt")
     negative_prompt_text = re.sub(re_line, " ", f'Negative prompt: {util.listJoin(generation_params.pop("Negative prompt"))}')
     generation_params_text = ", \n".join([f'{k}: {re.sub(re_s, " ", str(v))}' for k, v in generation_params.items() if v is not None])
     
@@ -475,16 +488,17 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
             min_y, min_x, max_y, max_x = np.min(p[0]), np.min(p[1]), np.max(p[0]), np.max(p[1])
             w, h = max_x - min_x, max_y - min_y
             pad_scale = 0.2
-            min_x = max(0, int((min_x - w * pad_scale) / 8)) * 8
-            min_y = max(0, int((min_y - h * pad_scale) / 8)) * 8
-            max_x = min(image_mask.shape[1], round((max_x + w * pad_scale) / 8)) * 8
-            max_y = min(image_mask.shape[0], round((max_y + h * pad_scale) / 8)) * 8
+            min_x = max(0, int((min_x - w * pad_scale) / 8) * 8)
+            min_y = max(0, int((min_y - h * pad_scale) / 8) * 8)
+            max_x = min(image_mask.shape[1], round((max_x + w * pad_scale) / 8) * 8)
+            max_y = min(image_mask.shape[0], round((max_y + h * pad_scale) / 8) * 8)
             w, h = max_x - min_x, max_y - min_y
             re_zoom = math.sqrt(w * h / 1024 ** 2)
             if re_zoom < 1.0:
                 re_zoom_point = (min_x, min_y, max_x, max_y)
                 image_mask = image_mask[min_y:max_y, min_x:max_x, :]
-                w, h = [round(x / 8) * 8 for x in util.ratios2size(util.size2ratio(w, h), 1024 ** 2)]
+                # w, h = [round(x / 8) * 8 for x in util.ratios2size(util.size2ratio(w, h), 1024 ** 2)]
+                w, h = [round(x / re_zoom / 8) * 8 for x in [w, h]]
                 image_mask = util.resize_image(image_mask, w, h, resize_mode=0)
                 height, width = image_mask.shape[:2]
 

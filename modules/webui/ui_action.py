@@ -10,24 +10,24 @@ import modules.paths
 import modules.options as opts
 from modules import prompt_helper, util, wd14tagger
 
+def UseControlnet(ref_type, ref_image, weight):
+    ref_mode, _ = opts.options["ref_mode"][ref_type]
+    return [ref_type, ref_mode, ref_image, weight, None]
 
-def VarySubtle(ref_image, params, pnginfo, gen_opts):
-    weight = 0.6
+def VarySubtle(ref_image, params, pnginfo, gen_opts, weight=0.6, skip_step=0.3):
     # subseed_strength = 0.05
 
+    weight = max(0.3, weight)
     params["action"] = "generate"
-    # params["cfg_scale"] = 5.0
-    # params["batch"] = gen_opts.get("pic_num")
-    # params["quality"] = gen_opts.get("quality")
     params["seed"] = 0
-    params["skip_step"] = 0.3
+    params["skip_step"] = skip_step
     params["aspect_ratios"] = gen_opts.get("ratios")
     # params["fixed_seed"] = True
     # params["subseed"] = random.randint(1, 1024 ** 3)
     # params["subseed_strength"] = subseed_strength
 
-    ref_mode, _ = opts.options["ref_mode"]["Ref All"]
-    params["controlnet"].append(["Ref All", ref_mode, ref_image, weight])
+    # ref_mode, _ = opts.options["ref_mode"]["Ref All"]
+    params["controlnet"].append(UseControlnet("Ref All", ref_image, weight))
 
     params["image"] = (ref_image, None)
 
@@ -37,20 +37,67 @@ def VaryStrong(ref_image, params, pnginfo, gen_opts):
     weight = round(random.uniform(0.3, 0.5), 2)
 
     params["action"] = "generate"
-    # params["cfg_scale"] = 5.0
-    # params["batch"] = gen_opts.get("pic_num")
-    # params["quality"] = gen_opts.get("quality")
     params["aspect_ratios"] = gen_opts.get("ratios")
     params["seed"] = 0
     params["skip_step"] = 0.2
     # params["fixed_seed"] = False
 
-    ref_mode, _ = opts.options["ref_mode"]["Ref All"]
-    params["controlnet"].append(["Ref All", ref_mode, ref_image, weight])
+    # ref_mode, _ = opts.options["ref_mode"]["Ref All"]
+    params["controlnet"].append(UseControlnet("Ref All", ref_image, weight))
 
     params["image"] = (ref_image, None)
     
     return params
+
+def VaryCustom(ref_image, params, pnginfo, gen_opts, img_vary_editor):
+    vary_strength = round(gen_opts.get("vary_custom_strength", 0.4), 2)
+    weight = 1 - vary_strength
+    skip_step = max(0, round(0.5 - vary_strength / 2, 2))
+    params = VarySubtle(ref_image, params, pnginfo, gen_opts, weight=weight, skip_step=skip_step)
+    ref_image = img_vary_editor["image"]
+    mask = img_vary_editor["mask"]
+    mask = mask if (mask > 0).any() else None
+
+    if mask is not None:
+        if not gen_opts.get("vary_custom_area", True):
+            mask = 255 - mask
+        mask = util.blur(mask, 16)
+        util.save_temp_image(mask, "vary_custom_mask.png")
+    util.save_temp_image(ref_image, "vary_custom_image.png")
+    
+    params["image"] = (ref_image, mask)
+
+    return params
+
+def image_pad(image, top=0, bottom=0, left=0, right=0):
+    pad_image = image.copy()
+    pad_step = 128
+    blur_scale = 8
+    step = 1
+
+    while True:
+        pad_top, pad_bottom, pad_left, pad_right = [ max(0, min(pad_step, x - pad_step * step)) for x in [top, bottom, left, right] ]
+        step += 1
+        if pad_top + pad_bottom + pad_left + pad_right == 0:
+            break
+        
+        pad_mark = np.ones((pad_image.shape[1], pad_image.shape[0], 3), dtype=np.uint8)
+        pad_mark = np.pad(pad_mark, [[pad_top, pad_bottom], [pad_left, pad_right], [0, 0]], mode="constant", constant_values=255)
+        pad_mark = util.blur(pad_mark, step * blur_scale)
+        util.save_temp_image(pad_mark, f"pad_mark_{step}.png")
+        pad_mark = pad_mark[:,:,0].astype(np.float32) / 255
+        pad_mark = pad_mark.reshape(pad_mark.shape[0], pad_mark.shape[1], 1)
+        
+        pad_image = np.pad(pad_image, [[pad_top, pad_bottom], [pad_left, pad_right], [0, 0]], mode="edge")
+        blur_pad_image = util.blur(pad_image, step * blur_scale)
+
+        pad_image = (pad_image * (1 - pad_mark) + blur_pad_image * pad_mark).astype(np.uint8)
+        util.save_temp_image(pad_image, f"pad_image_{step}.png")
+
+
+    util.save_temp_image(pad_image, "pad_image.png")
+
+    return pad_image
 
 def ZoomOut(ref_image, params, pnginfo, gen_opts, zoom = 1.5):
     subseed_strength = 1.0
@@ -81,6 +128,8 @@ def ZoomOut(ref_image, params, pnginfo, gen_opts, zoom = 1.5):
     ref_image = orgin_image[mask_pad:(orgin_image.shape[0] - mask_pad), mask_pad:(orgin_image.shape[1] - mask_pad)]
     width_mask, height_mask = ref_image.shape[1], ref_image.shape[0]
 
+    image_pad(ref_image, height // 2, height // 2, width // 2, width // 2)
+
     ref_image = np.pad(ref_image, [[(height - height_mask) // 2, 0], [0, 0], [0, 0]], mode="edge")
     ref_image = np.pad(ref_image, [[0, 0], [(width - width_mask) // 2] * 2, [0, 0]], mode="edge") # random.choice(["edge", "mean"])
     
@@ -99,9 +148,6 @@ def ZoomOut(ref_image, params, pnginfo, gen_opts, zoom = 1.5):
 
     style = params.get("style", "")
     params["action"] = "generate"
-    # params["cfg_scale"] = 5.0
-    # params["batch"] = gen_opts.get("pic_num")
-    # params["quality"] = gen_opts.get("quality")
     params["sample"] = "dpmpp_3m_sde_gpu"
     params["prompt_main"] = params.get("prompt_main", "") or ",".join(wd14tagger.tag(orgin_image)[:12])
     params["prompt_negative"] = params.get("prompt_negative", "") or gen_opts.get("prompt_negative")
@@ -114,13 +160,15 @@ def ZoomOut(ref_image, params, pnginfo, gen_opts, zoom = 1.5):
         params["denoise"] = 0.9
         params["skip_step"] = 0.1
 
-        ref_mode, _ = opts.options["ref_mode"]["Ref Depth"]
-        params["controlnet"].append(["Ref Depth", ref_mode, ref_image, 0.6])
+        # ref_mode, _ = opts.options["ref_mode"]["Ref Depth"]
+        # params["controlnet"].append(["Ref Depth", ref_mode, ref_image, 0.6])
+        params["controlnet"].append(UseControlnet("Ref Depth", ref_image, 0.6))
     else:
         params["skip_step"] = 0.1
         
-        ref_mode, _ = opts.options["ref_mode"]["Ref All"]
-        params["controlnet"].append(["Ref All", ref_mode, orgin_image, 0.9])
+        # ref_mode, _ = opts.options["ref_mode"]["Ref All"]
+        # params["controlnet"].append(["Ref All", ref_mode, orgin_image, 0.9])
+        params["controlnet"].append(UseControlnet("Ref All", orgin_image, 0.9))
     
     params["image"] = (ref_image, ref_mask)
     params["size"] = (width, height)
@@ -134,9 +182,16 @@ def ZoomOut(ref_image, params, pnginfo, gen_opts, zoom = 1.5):
 def ZoomOut20(ref_image, params, pnginfo, gen_opts):
     return ZoomOut(ref_image, params, pnginfo, gen_opts, zoom=2.0)
 
+def ZoomOutCustom(ref_image, params, pnginfo, gen_opts):
+    zoom = gen_opts.get("zoom_custom", 2.0)
+    return ZoomOut(ref_image, params, pnginfo, gen_opts, zoom=zoom)
+
 def ChangeStyle(ref_image, params, pnginfo, gen_opts, gl_style_list, num_selected_style):
     seed = random.randint(1, 1024 ** 3)
     style = gl_style_list[int(num_selected_style)][1]
+    if style == "random-style":
+        style = f"__style_{gen_opts.get('style')}__"
+
     simple_styles = [   "sai-line art", "sai-origami", "Pencil Sketch Drawing",
                         "papercraft-collage", "papercraft-flat papercut", "papercraft-kirigami", "papercraft-paper mache", "papercraft-paper quilling", "papercraft-papercut collage",
                         "papercraft-papercut shadow box", "papercraft-stacked papercut", "papercraft-thick layered papercut",
@@ -167,17 +222,15 @@ def ChangeStyle(ref_image, params, pnginfo, gen_opts, gl_style_list, num_selecte
     params["style"] = style
     params["style_weight"] = 1.1
     params["skip_prompt"] = False
-    # params["batch"] = gen_opts.pop("pic_num")
-    # params["quality"] = gen_opts.pop("quality")
-    # params["cfg_scale"] = 7.0
     params["sample"] = "dpmpp_3m_sde_gpu"
     params["seed"] = seed
     params["size"] = (width, height)
 
     if style not in orgin_style:
         if orgin_style not in simple_styles:
-            ref_mode, _ = opts.options["ref_mode"]["Ref Depth"]
-            params["controlnet"].append(["Ref Depth", ref_mode, np.array(ref_image), random.randint(50, 80) / 100])
+            # ref_mode, _ = opts.options["ref_mode"]["Ref Depth"]
+            # params["controlnet"].append(["Ref Depth", ref_mode, np.array(ref_image), random.randint(50, 80) / 100])
+            params["controlnet"].append(UseControlnet("Ref Depth", ref_image, random.randint(50, 80) / 100))
 
             if random.randint(0, 100) > 30 and style not in simple_styles: # random use img2img
                 params["image"] = (ref_image, None)
@@ -185,11 +238,13 @@ def ChangeStyle(ref_image, params, pnginfo, gen_opts, gl_style_list, num_selecte
         else:
             params["prompt_main"] = re.sub(r"((simple|grey|white) background|spot color)", "", params["prompt_main"], flags=re.IGNORECASE)
             if random.randint(0, 100) > 50:
-                ref_stuct, _ = opts.options["ref_mode"]["Ref Stuct"]
-                params["controlnet"].append(["Ref Stuct", ref_stuct, np.array(ref_image), 0.4])
+                # ref_stuct, _ = opts.options["ref_mode"]["Ref Stuct"]
+                # params["controlnet"].append(["Ref Stuct", ref_stuct, np.array(ref_image), 0.4])
+                params["controlnet"].append(UseControlnet("Ref Stuct", ref_image, 0.4))
             else:
-                ref_mode, _ = opts.options["ref_mode"]["Ref Depth"]
-                params["controlnet"].append(["Ref Depth", ref_mode, np.array(ref_image), 0.7])
+                # ref_mode, _ = opts.options["ref_mode"]["Ref Depth"]
+                # params["controlnet"].append(["Ref Depth", ref_mode, np.array(ref_image), 0.7])
+                params["controlnet"].append(UseControlnet("Ref Depth", ref_image, 0.7))
     else:
         params["image"] = (ref_image, None)
         params["denoise"] = 0.70
@@ -200,12 +255,12 @@ def Resize(ref_image, params, pnginfo, gen_opts):
     params["action"] = "generate"
     # params["batch"] = gen_opts.pop("pic_num")
     # params["quality"] = gen_opts.pop("quality")
-    params["cfg_scale"] = gen_opts.pop("cfg")
+    params["cfg_scale"] = gen_opts.pop("cfg_scale")
     params["sample"] = "dpmpp_3m_sde_gpu"
     params["seed"] = 0
 
-    # ratios_width, ratios_height = gen_opts.pop("ratios")
-    ratios_width, ratios_height = opts.options["ratios"][gen_opts.pop("resize_ratios")]
+    ratios_width, ratios_height = gen_opts.pop("resize_ratios")
+    # ratios_width, ratios_height = opts.options["ratios"][gen_opts.pop("resize_ratios")]
     ratios_target = ratios_width / ratios_height
     height_orgin, width_orgin = ref_image.shape[:2]
     ratios_orgin = width_orgin / height_orgin
@@ -250,13 +305,15 @@ def Resize(ref_image, params, pnginfo, gen_opts):
         params["denoise"] = 0.9
         params["skip_step"] = 0.1
 
-        ref_mode, _ = opts.options["ref_mode"]["Ref Depth"]
-        params["controlnet"].append(["Ref Depth", ref_mode, ref_image, 0.6])
+        # ref_mode, _ = opts.options["ref_mode"]["Ref Depth"]
+        # params["controlnet"].append(["Ref Depth", ref_mode, ref_image, 0.6])
+        params["controlnet"].append(UseControlnet("Ref Depth", ref_image, 0.6))
     else:
         params["skip_step"] = 0.2
         
-        ref_mode, _ = opts.options["ref_mode"]["Ref All"]
-        params["controlnet"].append(["Ref All", ref_mode, orgin_image, 0.6])
+        # ref_mode, _ = opts.options["ref_mode"]["Ref All"]
+        # params["controlnet"].append(["Ref All", ref_mode, orgin_image, 0.6])
+        params["controlnet"].append(UseControlnet("Ref All", ref_image, 0.6))
     
     util.save_temp_image(ref_image, "change_size.png")
     util.save_temp_image(ref_mask, "change_size_mask.png")
@@ -308,8 +365,9 @@ def Refiner(ref_image, params, pnginfo, gen_opts, mask=None):
     
     params["image"] = (ref_image, mask)
 
-    ref_mode, _ = opts.options["ref_mode"]["Ref Stuct"]
-    params["controlnet"].append(["Ref Stuct", ref_mode, ref_image, 0.75])
+    # ref_mode, _ = opts.options["ref_mode"]["Ref Stuct"]
+    # params["controlnet"].append(["Ref Stuct", ref_mode, ref_image, 0.75])
+    params["controlnet"].append(UseControlnet("Ref Stuct", ref_image, 0.75))
 
     return params
 

@@ -8,18 +8,19 @@ import numpy as np
 import shutil
 import time
 import random
+import traceback
 from PIL import Image
 
 import modules.paths
 import modules.options as opts
 import modules.worker as worker
-from modules import devices, lora, shared, util
+from modules import civitai, devices, lora, shared, util
 from modules.model import model_helper
 
 progress_html = "<progress value='{}' max='100'></progress><div class='progress_text'>{}</div>"
 opt_dict = []
 ref_image_count = [5, 3]
-lora_count = [4, 4]
+lora_count = [3, 3]
 cur_taskid = None
 action_btns = []
 page_size = 128
@@ -39,10 +40,11 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
     fixed_seed = gen_opts.pop("fixed_seed", False)
 
     prompt_negative = gen_opts.pop("prompt_negative")
-    for x in ["mc", "style", "view", "emo", "weather", "hue"]:
-        if isinstance(gen_opts[x], dict):
-            prompt_negative += ", " + gen_opts[x].get("negative_prompt", "")
-            gen_opts[x] = gen_opts[x].get("prompt", "")
+    style_item = gen_opts.pop("style_item")
+    loras = []
+
+    if style_item == "random-style":
+        style_item = f"__style_{gen_opts.get('style')}__"
 
     params = {
         "action": "generate",
@@ -53,56 +55,63 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
         "prompt_main": gen_opts.pop('prompt_main'),
         # "prompt_negative": ",".join(x for x in ([gen_opts.pop("negative")] + [v for n in gen_opts.pop("prompt_negative") for v in n.values() ]) if x != ""),
         "prompt_negative": prompt_negative,
-        "cfg_scale": gen_opts.pop("cfg"),
-        "cfg_scale_to": gen_opts.pop("cfg_to"),
+        "cfg_scale": gen_opts.pop("cfg_scale"),
+        "cfg_scale_to": gen_opts.pop("cfg_scale_to"),
         "aspect_ratios": gen_opts.pop("ratios"),
         "batch": gen_opts.pop("pic_num"),
-        "style": gen_opts.pop("style_item"),
-        "simpler": gen_opts.pop("simpler"),
+        "style": style_item,
+        "sampler": gen_opts.pop("sampler"),
         "scheduler": gen_opts.pop("scheduler"),
         "seed": seed,
         "fixed_seed": fixed_seed,
         "subseed_strength": gen_opts.pop("subseed_strength"),
         "quality": gen_opts.pop("quality"),
-        "step_scale": gen_opts.pop("step_scale", 1.0),
-        "refiner_step_scale": gen_opts.pop("refiner_step_scale", 1.0),
+        # "step_scale": gen_opts.pop("step_scale", 1.0),
+        # "refiner_step_scale": gen_opts.pop("refiner_step_scale", 1.0),
+        "steps": (gen_opts.pop("step_base"), gen_opts.pop("step_refiner")) if gen_opts.pop("custom_step") else (None, None),
         "clip_skip": gen_opts.pop("clip_skip"),
-        "noise_scale": gen_opts.pop("detail"),
+        "detail": gen_opts.pop("detail"),
         "denoise": gen_opts.pop("denoise"),
         "file_format": gen_opts.pop("file_format"),
         "single_vae": gen_opts.pop("single_vae"),
         "options": {
-            k: v for k, v in gen_opts.items() if k in ["view", "emo", "location", "weather", "hue"]
+            k: v if isinstance(v, dict) else { "prompt": v } \
+                for k, v in gen_opts.items() if k in ["view", "emo", "location", "weather", "hue"]
         },
         "controlnet": [],
-        # "lora": [('sd_xl_offset_example-lora_1.0', 0.5, '')]
-        "lora": [],
+        "lora": loras,
     }
+
+    if gen_opts.pop("custom_size", False):
+        params["size"] = (int(gen_opts.pop("image_width")), int(gen_opts.pop("image_height")))
 
     for x in ["mc", "style", "view", "emo", "location", "weather", "hue", "prompt_negative"]:
         pm_weight = gen_opts.pop(f'{x}_weight', 1.0)
         if pm_weight != 1.0:
             if x == "mc":
                 mc_name, mc_prompt = params["main_character"]
-                params["main_character"] = (mc_name, f"({mc_prompt}:{pm_weight})")
+                if isinstance(mc_prompt, dict):
+                    params["main_character"][1]["weight"] = pm_weight
+                else:
+                    params["main_character"]["weight"] = pm_weight
             elif x == "style":
                 params["style_weight"] = pm_weight
             elif x == "prompt_negative":
                 params["prompt_negative"] = f"({params['prompt_negative']}:{pm_weight})"
-            elif x in params["options"] and params["options"].get(x, "") != "":
-                params["options"][x] = f"({params['options'][x]}:{pm_weight})"
+            elif x in params["options"]:
+                params["options"][x]["weight"] = pm_weight
     
-    # Ref Image, ControlNet, Lora
+    # Base Image, ControlNet, Lora
     if not ckb_pro:
         if img_refer is not None:
             ref_mode, _ = opts.options["ref_mode"]["Ref All"]
             params["controlnet"].append(["Ref All", ref_mode, img_refer, 0.5])
     else:
-        len_ref_ctrl = 4
+        len_ref_ctrl = 5
         ref_image_args = args[: ref_image_count[0] * len_ref_ctrl]
         args = args[ref_image_count[0] * len_ref_ctrl :]
         for i in range(ref_image_count[0]):
-            opt_type, image_refer, sl_rate, ckb_words = ref_image_args[i * len_ref_ctrl : (i + 1) * len_ref_ctrl]
+            opt_type, image_refer, sl_rate, ckb_words, opt_model = ref_image_args[i * len_ref_ctrl : (i + 1) * len_ref_ctrl]
             ref_mode, _ = opts.options["ref_mode"][opt_type]
             if ref_mode == "base_image":
                 params["image"] = (image_refer, None)
@@ -112,7 +121,7 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
                 params["prompt_main"] += f",({','.join(ckb_words)}:{sl_rate / 100.0 / 0.8:.2f})"
             else:
                 if image_refer is not None:
-                    params["controlnet"].append([opt_type, ref_mode, image_refer, sl_rate / 100.0])
+                    params["controlnet"].append([opt_type, ref_mode, image_refer, sl_rate / 100.0, opt_model])
 
         len_lora_ctrl = 3
         lora_args = args[: lora_count[0] * len_lora_ctrl]
@@ -242,16 +251,28 @@ def SkipBatch():
 
 def ChangeSeed(ckb_seed):
     if not ckb_seed:
-        seed = random.randint(1, 1024 ** 3)
+        seed = random.randint(1, 2 ** 31 - 1)
         return gr.Number(value=seed)
     else:
         return gr.Number()
+
+def GetModelInfo(opt_model):
+    model_file = os.path.join(modules.paths.modelfile_path, model_helper.base_files[opt_model])
+    url = None
+    if os.path.exists(model_file) or civitai.exists_info(model_file):
+        info = civitai.get_model_versions(model_file)
+        url = info["model_homepage"]
+
+    if url:
+        return gr.Button(link=url, interactive=True)
+    else:
+        return gr.Button(interactive=False)
 
 def GetSampleList(show_count=0, page=0, end_time=None, return_page_count=False):
     page = int(page)
     show_count = show_count if show_count > 0 else page_size
     excludes = ["temp.png"]
-    files = util.list_files(modules.paths.temp_outputs_path, excludes=excludes)
+    files = util.list_files(modules.paths.temp_outputs_path, ["jpg", "jpeg", "png"], excludes=excludes)
     files = sorted(files, key=lambda x: os.path.getmtime(x), reverse=True)
     if end_time is not None:
         files = filter(lambda x: os.path.getmtime(x) < end_time, files)
@@ -264,15 +285,24 @@ def GetSampleList(show_count=0, page=0, end_time=None, return_page_count=False):
 
 def GetStyleList(style):
     fliename = f"{modules.paths.sd_style_path}/{opts.options['style'][style]}.json"
-    data = util.load_json(fliename)
+    data = [{ "name": "random-style" }] + util.load_json(fliename)
     files = []
+    random_covers = []
 
     for x in data:
         cover = "cover_default"
         picture_path =  f"{modules.paths.sd_style_path}/{cover}/{x['name']}." + "{}"
         picture = [picture_path.format(ext) for ext in ["png", "jpg", "jpeg"] if os.path.exists(picture_path.format(ext))]
         picture = picture[0] if picture else f"{modules.paths.sd_style_path}/default.png"
-        files.append((picture, x['name']))
+        files.append([picture, x['name']])
+
+        if len(random_covers) < 4 and x["name"] != "random-style":
+            random_covers.append(cv2.cvtColor(cv2.imread(picture), cv2.COLOR_BGR2RGB))
+
+    if len(random_covers) > 0:
+        random_cover = util.concat_images(random_covers)
+        files[0][0] = random_cover
+
     return files
 
 def RefreshModels():
@@ -289,7 +319,7 @@ def GetRefinerModels(base_model):
     return renfiner_models
 
 def GetSelectSamplePath(gl_sample_list, num_selected_sample):
-    selected_index = int(num_selected_sample)
+    selected_index = max(0, int(num_selected_sample))
     file_path = None
 
     if selected_index >= 0:
@@ -298,6 +328,82 @@ def GetSelectSamplePath(gl_sample_list, num_selected_sample):
         file_path = os.path.join(modules.paths.temp_outputs_path, filename)
     
     return file_path
+
+def GetImageGenerateData(img_generate_data):
+    if img_generate_data is not None:
+        image = img_generate_data
+        geninfo, items = util.read_info_from_image(image)
+
+        return gr.Textbox(value=geninfo)
+    else:
+        return gr.Textbox()
+
+def ParseGenerateData(txt_generate_data):
+    alias = {
+        "prompt": "prompt_main",
+        # "negative": "prompt_negative",
+    }
+    info = util.parse_generation_parameters(txt_generate_data)
+    info = { alias.get(k, k.replace(" ", "_")) : v for k, v in info.items() }
+
+    if info.get("size"):
+        size = [int(x) for x in info.get("size").split("x")]
+    elif info.get("width") and info.get("height"):
+        size = [int(info.get("width")), int(info.get("height"))]
+    else:
+        size = None
+
+    if size:
+        # ratios = util.size2ratio(size[0], size[1])
+        width, height = [int(x / 8) * 8 for x in size]
+        src_ratio = width / height
+        ratios = sorted([(k, v) for k, v in opts.options["ratios"].items()], key=lambda x: abs((x[1][0] / x[1][1]) - src_ratio))[0][1]
+        info["ratios"] = f"{ratios[0]}:{ratios[1]}"
+        info["image_width"] = width
+        info["image_height"] = height
+        info["custom_size"] = True
+
+    if info.get("cfg_scale"):
+        info["cfg_scale"] = round(float(info["cfg_scale"]) / 0.5) * 0.5
+
+    if info.get("steps"):
+        step_all = int(info.pop("steps", 0))
+        step_refiner = int(info.pop("refiner_steps", 0))
+        info["step_base"] = max(0, step_all - step_refiner)
+        info["step_refiner"] = max(0, step_refiner)
+        info["custom_step"] = True
+
+    if info.get("seed"):
+        info["fixed_seed"] = True
+
+    sampler = info.get("sampler", "").lower()
+    scheduler = info.get("scheduler", "").lower()
+    if scheduler:
+        scheduler = ([k for k, v in opts.options["scheduler"].items() if k.lower() == scheduler or v.lower() == scheduler] + [None])[0]
+    elif sampler:
+        scheduler = ([k for k, v in opts.options["scheduler"].items() if sampler.endswith(f" {k.lower()}") or sampler.endswith(f" {v.lower()}")] + [None])[0]
+    info["scheduler"] = scheduler
+    sampler = sampler[:-(len(scheduler) + 1)] if scheduler else sampler
+
+    if sampler:
+        sampler = ([k for k, v in opts.options["sampler"].items() if f"{k.lower()}".startswith(sampler) or f"{v.lower()}".startswith(sampler)] + [None])[0]
+    info["sampler"] = sampler
+    info["recommend_negative"] = []
+
+    if info.get("clip_skip"):
+        info["clip_skip"] = abs(int(info.get("clip_skip")))
+
+    # if info.get("main_character"):
+    #     mc = re.search(r"\('(\w+)' .*", info.get("main_character"))
+    #     if mc is not None:
+    #         mc = mc.groups()[0]
+    #     info["mc"] = mc
+    # else:
+    #     info["mc"] = "Other"
+    info["mc"] = "Other"
+    info["mc_other"] = ""
+
+    return gr.Textbox(json.dumps(info))
 
 def ParseImageToTask(image, return_pnginfo=False):
     params = {}
@@ -316,7 +422,7 @@ def ParseImageToTask(image, return_pnginfo=False):
         "style": info.get("sdxl style", ""),
         "cfg_scale": float(info.get("cfg scale", 7.0)),
         "batch": 1,
-        "simpler": info.get("sampler", ""),
+        "sampler": info.get("sampler", ""),
         "scheduler": info.get("scheduler", ""),
         "seed": int(info.get("seed", -1)),
         # "steps": (max(step_refiner, step_all - step_refiner), step_refiner),
@@ -361,6 +467,16 @@ def ChangePageSize(sl_sample_pagesize):
 def SetPageSize(sl_sample_pagesize):
     global page_size
     page_size = int(sl_sample_pagesize)
+
+def VaryCustomInterface(gl_sample_list, num_selected_sample):
+    file_path, image = GetSampleImage(gl_sample_list, num_selected_sample)
+
+    return  gr.Column(visible=False), \
+            gr.Column(visible=True), \
+            gr.Row(visible=True), \
+            gr.Column(visible=False), \
+            gr.Column(visible=True), \
+            gr.Image(value=file_path)
 
 def TopSample(gl_sample_list, num_selected_sample, num_page_sample):
     file_path = GetSelectSamplePath(gl_sample_list, num_selected_sample)
@@ -414,12 +530,12 @@ def GetSettingJson(gl_style_list, *args):
             else:
                 # print(opt_name, opt_key)
                 if opt_name in opts.mul:
-                    opt_value = round(int(opt_key) * opts.mul[opt_name], 2)
+                    opt_value = round(float(opt_key) * opts.mul[opt_name], 2)
                     gen_opts[opt_name] = { opt_key: opt_value }
                 else:
                     gen_opts[opt_name] = opt_key
         except:
-            pass
+            traceback.print_exc()
 
         # opts.default[item]
     
@@ -427,7 +543,17 @@ def GetSettingJson(gl_style_list, *args):
 
     return json.dumps(gen_opts)
 
-def InitSetting(txt_setting):
+def ResetSetting():
+    data = {
+        "prompt_main": "",
+        "negative": "",
+        "fixed_seed": False,
+        "custom_step": False,
+        "custom_size": False,
+    }
+    return InitSetting(json.dumps(data), reset=True)
+
+def InitSetting(txt_setting, reset=False):
     config = json.loads(txt_setting)
     gr_contorls = {
         "dropdown": gr.Dropdown,
@@ -440,26 +566,42 @@ def InitSetting(txt_setting):
     }
     objs = []
     others = []
+    # print(config)
     for k, v in opt_dict.items():
         try:
-            if k in ["mc", "mc_other", "prompt_main", "lang", "style_index"]:
+            if k in ["lang", "style_index"]:
                 objs.append(gr_contorls.get(str(v), gr.update)())
             else:
-                if isinstance(config[k], list):
+                if isinstance(config.get(k), list):
                     v1 = [list(x)[0] if isinstance(x, dict) else x for x in config[k]]
+                elif isinstance(config.get(k), dict):
+                    v1 = list(config.get(k))[0]
                 else:
-                    v1 = list(config[k])[0] if isinstance(config[k], dict) else config[k]
-                # print(k, v, str(v) in ["dropdown", "slider"], config[k], v1)
+                    v1 = config.get(k)
+
+                # print(k, v, v1, v.value, opts.default.get(k))
+                if (not v1 and not v.value) or reset:
+                    v1 = opts.default.get(k, v1)
+
                 if str(v) in ["dropdown", "radio"]:
                     if v1 not in [x[0] for x in v.choices]:
                         objs.append(gr_contorls.get(str(v), gr.update)())
                         continue
-                objs.append(gr_contorls.get(str(v), gr.update)(value=v1))
+                
+                if v1 is not None:
+                    objs.append(gr_contorls.get(str(v), gr.update)(value=v1))
+                else:
+                    objs.append(gr_contorls.get(str(v), gr.update)())
                 
         except:
+            traceback.print_exc()
             objs.append(gr_contorls.get(str(v), gr.update)())
             
     return objs
+
+def LoadSetting(btn_load_setting):
+    data = json.dumps(util.load_json(btn_load_setting.name))
+    return gr.Text(value=data)
 
 def GetNegativeText(ckb_grp_negative):
     return ','.join([opts.options["recommend_negative"].get(k, "") for k in ckb_grp_negative])
@@ -467,9 +609,37 @@ def GetNegativeText(ckb_grp_negative):
 def ChangeRefBlockNum(sl_refNum):
     return [gr.Column(visible=True)] * sl_refNum + [gr.Column(visible=False)] * (5 - sl_refNum)
 
-def GetControlnets():
+def GetControlnets(ref_mode, model_type):
+    re_sdxl = r"\b(xl|sdxl)\b"
+    re_sd15 = r"\b(15|sd15)\b"
+    re_ref_mode = opts.options["ref_mode"][ref_mode][1].get("keyword")
+    default_model = opts.options["ref_mode"][ref_mode][1].get(model_type)
+
+    def model_filter(filename, ref_mode, model_type):
+        if filename == default_model:
+            return False
+
+        filename = re.sub(r"[\-_]", " ", filename)
+        if model_type == "sdxl":
+            if re.search(re_sdxl, filename) is None:
+                return False
+        elif model_type == "sd15":
+            if re.search(re_sd15, filename) is None:
+                return False
+        else:
+            return False
+        
+        if re_ref_mode is not None and re.search(re_ref_mode, filename) is None:
+            return False
+
+        return True
+            
     files = util.list_files(modules.paths.controlnet_models_path)
-    files = [os.path.split(os.path.splitext(x)[0])[-1] for x in files]
+    # files = [os.path.split(os.path.splitext(x)[0])[-1] for x in files if model_filter(x, ref_mode, model_type)]
+    # files = [os.path.split(os.path.splitext(default_model)[0])[-1]] + files
+    files = [x for x in files if model_filter(x, ref_mode, model_type)]
+    files = [default_model] + files
+    
     return files
 
 def GetGenOptions(txt_setting):

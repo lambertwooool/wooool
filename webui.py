@@ -16,66 +16,63 @@ ref_image_count = ui_process.ref_image_count
 ui_extensions.render_ui()
 
 with gr.Blocks(theme=my_theme, title=app_name).queue() as wooool:
-    opt_lang = gr.Dropdown(choices=localization.urls().keys(), value="en", container=False, filterable=False, min_width=50, elem_id=f"opt_lang", elem_classes="gr_drapdown")
+    opt_lang = gr.Dropdown(choices=localization.urls().keys(), value="en", container=False, filterable=False, min_width=50, elem_id=f"opt_lang", elem_classes="gr_dropdown")
     with gr.Column(visible=False) as main_ui:
         with gr.Column(elem_id="panel_header") as panel_header:
             title = gr.Button(f"{app_name}", visible=True, elem_id="title")
             
             with gr.Row(elem_id="panel_gallery", visible=False) as panel_gallery:
-                gl_sample_list, num_selected_sample, txt_sample_info = ui_compent.SampleGallery()
+                with gr.Column(scale=85, visible=True) as panel_sample_gallery:
+                    gl_sample_list, num_selected_sample, txt_sample_info = ui_compent.SampleGallery()
+                with gr.Column(scale=85, visible=False) as panel_editor:
+                    img_vary_editor = gr.Image(label="Vary(Custom)", source="upload", tool="sketch", interactive=True, height=444, brush_radius=80, brush_color="#4338CA", elem_id="img_very_editor")
 
-                with gr.Column(elem_id="panel_action", min_width=260) as panel_action:
+                with gr.Column(elem_id="panel_action_menu", scale=15, min_width=260) as panel_action_menu:
                     with gr.Row():
-                        ckb_fullscreen = gr.Checkbox(label="Full Screen", min_width=100, scale=3)
+                        ckb_fullscreen = gr.Checkbox(label="Full Screen", min_width=100, container=False, scale=3)
                         btn_close_gallery = gr.Button("Close", size="sm", min_width=80, elem_id="btn_close_gallery", scale=1)
-                    with gr.Tab("Action"):
-                        with gr.Column() as panel_action_btns:
-                            with gr.Row():
-                                btn_vary_subtle = gr.Button("Vary(Subtle)", min_width=100, elem_id="btn_vary_subtle", elem_classes="btn_action")
-                                btn_vary_strong = gr.Button("Vary(Strong)", min_width=100, elem_id="btn_vary_strong", elem_classes="btn_action")
-                                btn_zoom_out15 = gr.Button("Zoom(1.5x)", min_width=100, elem_id="btn_zoom_out15", elem_classes="btn_action")
-                                btn_zoom_out20 = gr.Button("Zoom(2.0x)", min_width=100, elem_id="btn_zoom_out20", elem_classes="btn_action")
-                                btn_change_style = gr.Button("Change Style", min_width=100, elem_id="btn_change_style", elem_classes="btn_action")
-                                btn_resize_interface = gr.Button("ReSize", min_width=100, elem_id="btn_resize", elem_classes="btn_action")
-                                btn_refiner = gr.Button("Refiner Image", min_width=100, elem_id="btn_refiner", elem_classes="btn_action")
-                                btn_refiner_face = gr.Button("Refiner Face", min_width=100, elem_id="btn_refiner_face", elem_classes="btn_action")
-                                btn_reface_interface = gr.Button("ReFace", min_width=100, elem_id="btn_reface_interface", elem_classes="btn_action")
 
-                                btn_upscale = gr.Button("Upscale", min_width=100, elem_classes="btn_action")
-                                # gr.Button("Change BG", min_width=100, elem_classes="btn_action"
-                            
-                            with gr.Row():
-                                btn_delete = gr.Button("Delete", min_width=100, size="sm", elem_id="btn_delete", elem_classes="btn_action")
-                                btn_top = gr.Button("Set to top", min_width=100, size="sm", elem_id="btn_top", elem_classes="btn_action")
+                    with gr.Column(elem_id="panel_action") as panel_action:
+                        with gr.Tab("Action"):
+                            with gr.Column() as panel_action_btns:
+                                with gr.Row():
+                                    btn_vary_subtle = gr.Button("Vary(Subtle)", min_width=100, elem_id="btn_vary_subtle", elem_classes="btn_action")
+                                    btn_vary_strong = gr.Button("Vary(Strong)", min_width=100, elem_id="btn_vary_strong", elem_classes="btn_action")
+                                    btn_vary_custom_interface = gr.Button("Vary(Custom)", min_width=200, elem_id="btn_vary_custom_interface", elem_classes="btn_action")
 
-                            with gr.Row():
-                                btn_first = gr.Button("First page", min_width=60, size="sm", elem_id="btn_prev", elem_classes="btn_action")
-                                btn_prev = gr.Button("Prev page", min_width=60, size="sm", elem_id="btn_prev", elem_classes="btn_action")
-                                btn_next = gr.Button("Next page", min_width=60, size="sm", elem_id="btn_next", elem_classes="btn_action")
-                                num_page_sample = gr.Number(step=1, minimum=0, min_width=100, visible=False, elem_id="btn_next")
-                        
-                        with gr.Row(visible=False) as panel_reface:
-                            img_face = gr.Image(label="ReFace", show_label=False, width=200, height=160, min_width=200, elem_id="img_face")
-                            btn_reface = gr.Button("ReFace", min_width=100, variant="primary", interactive=False, elem_id="btn_reface", elem_classes="btn_action")
-                            btn_reface_cancel = gr.Button("Close", min_width=100, elem_id="btn_reface_cancel", elem_classes="btn_action")
+                                    btn_zoom_out15 = gr.Button("Zoom(1.5x)", min_width=100, elem_id="btn_zoom_out15", elem_classes="btn_action")
+                                    btn_zoom_out20 = gr.Button("Zoom(2.0x)", min_width=100, elem_id="btn_zoom_out20", elem_classes="btn_action")
+                                    btn_zoom_custom_interface = gr.Button("Zoom(Custom)", min_width=200, elem_id="btn_zoom_custom_interface", elem_classes="btn_action", visible=False)
 
-                        img_face.change(lambda x: gr.Button(interactive=x is not None), img_face, btn_reface)
-                        btn_reface_interface.click(lambda:(gr.Column(visible=False), gr.Row(visible=True)), None, [panel_action_btns, panel_reface], queue=False)
-                        btn_reface_cancel.click(lambda:(gr.Column(visible=True), gr.Row(visible=False)), None, [panel_action_btns, panel_reface], queue=False)
+                                    btn_change_style = gr.Button("Change Style", min_width=100, elem_id="btn_change_style", elem_classes="btn_action")
+                                    btn_resize_interface = gr.Button("ReSize", min_width=100, elem_id="btn_resize_interface", elem_classes="btn_action")
+                                    btn_refiner = gr.Button("Refiner Image", min_width=100, elem_id="btn_refiner", elem_classes="btn_action")
+                                    btn_refiner_face = gr.Button("Refiner Face", min_width=100, elem_id="btn_refiner_face", elem_classes="btn_action")
+                                    btn_reface_interface = gr.Button("ReFace", min_width=100, elem_id="btn_reface_interface", elem_classes="btn_action")
 
-                        with gr.Row(visible=False) as panel_resize:
-                            opt_dict["resize_ratios"] = ui_compent.MakeOpts(["ratios"], min_width=160)["ratios"]
-                            opt_resize = opt_dict["resize_ratios"]
-                            btn_resize = gr.Button("ReSize", min_width=100, variant="primary", elem_id="btn_resize", elem_classes="btn_action")
-                            btn_resize_cancel = gr.Button("Close", min_width=100, elem_id="btn_reface_cancel", elem_classes="btn_action")
-                        
-                        btn_resize_interface.click(lambda:(gr.Column(visible=False), gr.Row(visible=True)), None, [panel_action_btns, panel_resize], queue=False)
-                        btn_resize_cancel.click(lambda:(gr.Column(visible=True), gr.Row(visible=False)), None, [panel_action_btns, panel_resize], queue=False)
+                                    btn_upscale = gr.Button("Upscale", min_width=100, elem_id="btn_upscale", elem_classes="btn_action")
+                                    # gr.Button("Change BG", min_width=100, elem_classes="btn_action"
+                                
+                                with gr.Row():
+                                    btn_delete = gr.Button("Delete", min_width=100, size="sm", elem_id="btn_delete", elem_classes="btn_action")
+                                    btn_top = gr.Button("Set to top", min_width=100, size="sm", elem_id="btn_top", elem_classes="btn_action")
 
-                    with gr.Tab("Setting"):
-                        opt_vary_model = gr.Dropdown(choices=ui_process.GetRefinerModels("sdxl"), value=model_helper.default_base_name, label="Vary & Zoom Model", filterable=False, elem_id=f"opt_vary_model", elem_classes="gr_drapdown")
-                        opt_dict = opt_dict | ui_compent.MakeSlider(["sample_pagesize"])
-                        sl_sample_pagesize = opt_dict["sample_pagesize"]
+                                with gr.Row():
+                                    btn_first = gr.Button("First page", min_width=60, size="sm", elem_id="btn_prev", elem_classes="btn_action")
+                                    btn_prev = gr.Button("Prev page", min_width=60, size="sm", elem_id="btn_prev", elem_classes="btn_action")
+                                    btn_next = gr.Button("Next page", min_width=60, size="sm", elem_id="btn_next", elem_classes="btn_action")
+                                    num_page_sample = gr.Number(step=1, minimum=0, min_width=100, visible=False, elem_id="btn_next")
+
+                        with gr.Tab("Setting"):
+                            opt_vary_model = gr.Dropdown(choices=ui_process.GetRefinerModels("sdxl"), value=model_helper.default_base_name, label="Vary & Zoom Model", filterable=False, elem_id=f"opt_vary_model", elem_classes="gr_dropdown")
+                            opt_dict = opt_dict | ui_compent.MakeSlider(["sample_pagesize"])
+                            sl_sample_pagesize = opt_dict["sample_pagesize"]
+
+                    with gr.Column(elem_id="panel_action_interface", visible=False) as panel_action_interface:
+                        btn_reface, img_face = ui_compent.ReFaceUI(panel_action, panel_action_interface, btn_reface_interface, opt_dict)
+                        btn_resize = ui_compent.ReSizeUI(panel_action, panel_action_interface, btn_resize_interface, opt_dict)
+                        btn_vary_custom = ui_compent.VaryCustomUI(panel_action, panel_action_interface, btn_vary_custom_interface, opt_dict, gl_sample_list, num_selected_sample, panel_sample_gallery, panel_editor, img_vary_editor)
+                        btn_zoom_custom = ui_compent.ZoomCustomUI(panel_action, panel_action_interface, btn_zoom_custom_interface, opt_dict)
         
         with gr.Column(elem_id="panel_main") as panel_main:
             with gr.Row(elem_id="panel_prompt") as panel_prompt:
@@ -115,26 +112,38 @@ with gr.Blocks(theme=my_theme, title=app_name).queue() as wooool:
                     with gr.Row(elem_id="panel_pro_general") as panel_pro_general:
                         with gr.Column(scale=20, min_width=200):
                             base_models = list(model_helper.base_files)
-                            opt_base_model = gr.Dropdown(choices=base_models, value=model_helper.default_base_name, label="Draw Model", filterable=False, elem_id=f"opt_base_model", elem_classes="gr_drapdown")
+                            opt_base_model = gr.Dropdown(choices=base_models, label="Draw Model", filterable=False, elem_id=f"opt_base_model", elem_classes="gr_dropdown") # value=model_helper.default_base_name,
+                            # html_base_model_info = gr.HTML(show_progress="hidden")
+                            btn_base_model_info = gr.Button("Model details", link="#", size="sm", elem_id="btn_base_model_info")
                             opt_dict = opt_dict | {
                                 "base_model": opt_base_model,
-                            } | ui_compent.MakeSlider(['ref_num']) | ui_compent.MakeOpts(["quality"])
+                            }   | ui_compent.MakeSlider(["ref_num"]) \
+                                | ui_compent.MakeOpts(["quality"]) \
+                                | ui_compent.MakeSlider(["detail"])
                             sl_refNum = opt_dict['ref_num']
 
                         with gr.Column(scale=80):
                             with gr.Row():
-                                ref_blocks, ref_list = ui_compent.RefBlock(*ui_process.ref_image_count)
+                                ref_blocks, ref_list = ui_compent.RefBlock(opt_base_model, opt_dict, *ui_process.ref_image_count)
                             with gr.Row():
                                 gr.CheckboxGroup(container=False)
                                 gr.CheckboxGroup(container=False)
                 with gr.Tab("Fine tune"):
                     with gr.Row():
-                        lora_blocks, lora_list = ui_compent.LoraBlock(*ui_process.lora_count)
+                        with gr.Column(scale=60):
+                            with gr.Row():
+                                lora_blocks, lora_list = ui_compent.LoraBlock(opt_dict, *ui_process.lora_count)
+                        with gr.Column(scale=20, min_width=200):
+                            opt_weights = opt_weights | ui_compent.MakeSlider(["mc_weight", "style_weight", "view_weight", "emo_weight"])
+                        with gr.Column(scale=20, min_width=200):
+                            opt_weights = opt_weights | ui_compent.MakeSlider(["location_weight", "weather_weight", "hue_weight"])
+                            opt_dict = opt_dict | opt_weights
+                            btn_weight_reset = gr.Button("Weight Reset", elem_id="btn_weight_reset")
                 with gr.Tab("Advanced"):
                     with gr.Row(elem_id="panel_pro_advanced") as panel_pro_advanced:
                         with gr.Column(scale=20, min_width=200):
-                            opt_dict = opt_dict | ui_compent.MakeOpts(["simpler", "scheduler", "detail"])
-                            opt_dict = opt_dict | ui_compent.MakeSlider(["cfg", "cfg_to", "clip_skip"])
+                            opt_dict = opt_dict | ui_compent.MakeOpts(["sampler", "scheduler"])
+                            opt_dict = opt_dict | ui_compent.MakeSlider(["cfg_scale", "cfg_scale_to", "clip_skip"])
                             opt_dict = opt_dict | ui_compent.MakeOpts(["file_format"], opt_type="Radio")
                         with gr.Column(scale=20, min_width=200):
                             with gr.Row():
@@ -143,11 +152,10 @@ with gr.Blocks(theme=my_theme, title=app_name).queue() as wooool:
                             opt_dict = opt_dict | ui_compent.MakeSlider(["subseed_strength"], visible=False)
                             sl_subseed_strength = opt_dict["subseed_strength"]
                             
-                            opt_refiner_model = gr.Dropdown(choices=[opts.title["disable_refiner"]] + ui_process.GetRefinerModels("sdxl"), value=model_helper.default_refiner_name or opts.title["disable_refiner"], label="Refiner Model", filterable=False, elem_id=f"opt_refiner_model", elem_classes="gr_drapdown")
+                            opt_refiner_model = gr.Dropdown(choices=[opts.title["disable_refiner"]] + ui_process.GetRefinerModels("sdxl"), value=model_helper.default_refiner_name or opts.title["disable_refiner"], label="Refiner Model", filterable=False, elem_id=f"opt_refiner_model", elem_classes="gr_dropdown")
                             btn_refresh_model = gr.Button("🔄 Refresh Models", elem_id="btn_refresh_model")
                             opt_dict = opt_dict | ui_compent.MakeSlider(["denoise"])
                             btn_refresh_model.click(ui_process.RefreshModels, None, [opt_base_model, opt_vary_model, opt_refiner_model])
-                            opt_dict = opt_dict | ui_compent.MakeSlider(["step_scale", "refiner_step_scale"])
                             opt_dict = opt_dict | ui_compent.MakeOpts(["single_vae"], opt_type="Radio")
                         with gr.Column(scale=20, min_width=200):
                             txt_prompt_negative = gr.Textbox(label="Negative Prompt", lines=3, placeholder="Input negative.", elem_id="txt_prompt_negative", elem_classes="prompt")
@@ -156,24 +164,44 @@ with gr.Blocks(theme=my_theme, title=app_name).queue() as wooool:
                             txt_sel_negative = gr.Textbox(label="Selected Negative Prompt", lines=5, max_lines=7)
                             opt_dict = opt_dict | ui_compent.MakeSlider(["prompt_negative_weight"])
                         with gr.Column(scale=20, min_width=200):
-                            opt_weights = ui_compent.MakeSlider(["mc_weight", "style_weight", "view_weight", "emo_weight", "location_weight", "weather_weight", "hue_weight"])
-                            opt_dict = opt_dict | opt_weights
-                            btn_weight_reset = gr.Button("Weight Reset", elem_id="btn_weight_reset")
+                            ckb_step = gr.Checkbox(label="Custom Steps", elem_id="ckb_step")
+                            opt_dict = opt_dict | ui_compent.MakeSlider(["step_base", "step_refiner"], interactive=False)
+                            sl_step_base, sl_step_refiner = opt_dict["step_base"], opt_dict["step_refiner"]
+                            ckb_size = gr.Checkbox(label="Custom Size", elem_id="ckb_size")
+                            opt_dict = opt_dict | ui_compent.MakeSlider(["image_width", "image_height"], interactive=False)
+                            sl_image_width, sl_image_height = opt_dict["image_width"], opt_dict["image_height"]
                     opt_dict = opt_dict | {
                         "lang": opt_lang,
                         "seed": txt_seed,
                         "fixed_seed": ckb_seed,
+                        "custom_step": ckb_step,
+                        "custom_size": ckb_size,
                         "vary_model": opt_vary_model,
                         "refiner_model": opt_refiner_model,
                         "negative": txt_prompt_negative,
                     }
-                with gr.Column(visible=False):
-                # with gr.Tab("Setting JSON"):
-                    txt_setting = gr.Textbox(show_label=False, lines=7, elem_id="txt_setting")
+                # with gr.Column(visible=False):
+                with gr.Tab("Setting File"):
+                    txt_setting = gr.Textbox(show_label=False, lines=7, elem_id="txt_setting", visible=False)
+
+                    with gr.Row(elem_id="panel_setting_btns") as panel_setting_btns:
+                        btn_download_setting = gr.Button("Download Setting", elem_id="btn_download_setting")
+                        btn_load_setting = gr.UploadButton("Load Setting", file_types=[".json"])
+                        btn_reset_setting = gr.Button("Reset Setting", elem_id="btn_reset_setting")
+
+                    with gr.Column(visible=False):
+                        with gr.Row():
+                            img_generate_data = gr.Image(source="upload", interactive=True, type="pil", elem_id="img_generate_data")
+                            txt_generate_data = gr.Textbox(label="Generate Data", lines=7, elem_id="txt_generate_data")
+                        btn_parse_generate_data = gr.Button("Parse")
+
+                        img_generate_data.change(ui_process.GetImageGenerateData, img_generate_data, txt_generate_data)
 
             with gr.Row():
                 ckb_pro = gr.Checkbox(label="Professional Mode", container=False, elem_id="ckb_pro", scale=20)
                 gr.CheckboxGroup(scale=80, container=False)
+
+                opt_dict["ckb_pro"] = ckb_pro
 
     opt_list = [v for k, v in opt_dict.items()]
     opt_pic_num = opt_dict['pic_num']
@@ -193,26 +221,29 @@ with gr.Blocks(theme=my_theme, title=app_name).queue() as wooool:
     opt_lang.change(None, [opt_lang], None, _js="(x) => changeLanguage(x)", queue=False)
     btn_close_gallery.click(lambda: (gr.Button(visible=True), gr.Row(visible=False), gr.Checkbox(value=False)), None, [title, panel_gallery, ckb_fullscreen], queue=False)
     gl_sample_list.select(ui_process.SelectSample, [gl_sample_list, ckb_fullscreen], [gl_sample_list, num_selected_sample, txt_sample_info], queue=False)
-    ckb_fullscreen.change(lambda x: (gr.Column(visible=not x), gr.Gallery(height=866 if x else 444), gr.Text(visible=x)), ckb_fullscreen, [panel_main, gl_sample_list, txt_sample_info], queue=False)
+    ckb_fullscreen.change(lambda x: (gr.Column(visible=not x), gr.Gallery(height=866 if x else 444), gr.Text(visible=x), gr.Image(height=866 if x else 444)), ckb_fullscreen, [panel_main, gl_sample_list, txt_sample_info, img_vary_editor], queue=False)
     # img_refer.change(lambda x: (gr.Image(show_label=x is None)), inputs=img_refer, outputs=[img_refer], queue=False)
     opt_dict['style'].change(lambda x: gr.Gallery(ui_process.GetStyleList(x), selected_index=0), [opt_dict['style']], gl_style_list, queue=False)
     opt_pic_num.change(None, opt_pic_num, btn_generate, _js=f"(x) => getTranslation('Generate x ' + x )", queue=False)
     sl_refNum.release(ui_process.ChangeRefBlockNum, sl_refNum, ref_blocks, queue=False)
     ckb_pro.change(lambda x: (gr.Row(visible=x), gr.Row(visible=not x)), ckb_pro, [panel_pro, panel_refer], queue=False)
     title.click(lambda: (gr.Button(visible=False), gr.Row(visible=True), gr.Gallery(value=ui_process.GetSampleList())), None, [title, panel_gallery, gl_sample_list], queue=False)
-    btn_weight_reset.click(lambda: [gr.Slider(value=100)] * len(opt_weights.keys()) , None, [v for _, v in opt_weights.items()], queue=False)
-    # opt_base_model.change(lambda x: gr.Dropdown(choices=ui_process.GetRefinerModels(x)), [opt_base_model], [opt_refiner_model])
+    btn_weight_reset.click(lambda: [gr.Slider(value=opts.default[x]) for x in opt_weights.keys()] , None, [v for _, v in opt_weights.items()], queue=False)
+    opt_base_model.change(ui_process.GetModelInfo, [opt_base_model], [btn_base_model_info], _js="x => model_link(x)", queue=False)
     ckb_seed.change(lambda x: (gr.Textbox(interactive=x), gr.Slider(visible=x)), ckb_seed, [txt_seed, sl_subseed_strength], queue=False)
+    ckb_step.change(lambda x: (gr.Slider(interactive=x), gr.Slider(interactive=x)), ckb_step, [sl_step_base, sl_step_refiner], queue=False)
+    ckb_size.change(lambda x: (gr.Slider(interactive=x), gr.Slider(interactive=x)), ckb_size, [sl_image_width, sl_image_height], queue=False)
     ckb_grp_negative.change(ui_process.GetNegativeText, ckb_grp_negative, txt_sel_negative, queue=False)
     sl_sample_pagesize.release(ui_process.ChangePageSize, sl_sample_pagesize, [gl_sample_list, num_page_sample], queue=False)
 
     for x in opt_list:
-        x.change(ui_process.GetSettingJson, [gl_style_list] + opt_list, txt_setting, queue=False) \
+        opt_evt = x.release if str(x) in ["slider"] else x.change
+        opt_evt(ui_process.GetSettingJson, [gl_style_list] + opt_list, txt_setting, queue=False) \
             .then(None, txt_setting, None, _js="(x) => save_ui_settings(x)", queue=False)
 
     generate_inputs = [img_refer, ckb_pro, txt_setting] + ref_list + lora_list
     action_inputs = [gl_sample_list, num_selected_sample, txt_setting]
-    action_btns = [btn_vary_subtle, btn_vary_strong, btn_zoom_out15, btn_zoom_out20, btn_change_style, btn_resize_interface, btn_resize, btn_reface_interface, btn_refiner, btn_refiner_face, btn_upscale]
+    action_btns = [btn_vary_subtle, btn_vary_strong, btn_vary_custom, btn_vary_custom_interface, btn_zoom_out15, btn_zoom_out20, btn_zoom_custom_interface, btn_change_style, btn_resize_interface, btn_resize, btn_reface_interface, btn_refiner, btn_refiner_face, btn_upscale]
     generate_outpus = [title, html_proccbar, gl_sample_list, panel_gallery, panel_generate, panel_process, btn_skip, btn_stop, btn_delete] + action_btns
     ui_process.action_btns = action_btns
 
@@ -220,16 +251,15 @@ with gr.Blocks(theme=my_theme, title=app_name).queue() as wooool:
         .then(fn=ui_process.GetSettingJson, inputs=[gl_style_list] + opt_list, outputs=txt_setting, queue=False) \
         .then(fn=ui_process.Generate, inputs=generate_inputs, outputs=generate_outpus)
     
-    # btn_more_generate.click(fn=ui_process.ChangeSeed, inputs=ckb_seed, outputs=txt_seed, queue=False) \
-    #     .then(fn=ui_process.Generate, inputs=generate_inputs, outputs=generate_outpus)
-    
     btn_skip.click(fn=ui_process.SkipBatch, inputs=None, outputs=[btn_skip], queue=False)
     btn_stop.click(fn=ui_process.StopProcess, inputs=None, outputs=[btn_skip, btn_stop], queue=False)
 
     btn_vary_subtle.click(ui_process.Process(ui_action.VarySubtle), action_inputs, generate_outpus)
     btn_vary_strong.click(ui_process.Process(ui_action.VaryStrong), action_inputs, generate_outpus)
+    btn_vary_custom.click(ui_process.Process(ui_action.VaryCustom), action_inputs + [img_vary_editor], generate_outpus)
     btn_zoom_out15.click(ui_process.Process(ui_action.ZoomOut), action_inputs, generate_outpus)
     btn_zoom_out20.click(ui_process.Process(ui_action.ZoomOut20), action_inputs, generate_outpus)
+    btn_zoom_custom.click(ui_process.Process(ui_action.ZoomOutCustom), action_inputs, generate_outpus)
     btn_change_style.click(ui_process.Process(ui_action.ChangeStyle), action_inputs + [gl_style_list, num_selected_style], generate_outpus)
     btn_resize.click(ui_process.Process(ui_action.Resize), action_inputs, generate_outpus)
     btn_reface.click(ui_process.Process(ui_action.ReFace), action_inputs + [img_face], generate_outpus)
@@ -244,6 +274,13 @@ with gr.Blocks(theme=my_theme, title=app_name).queue() as wooool:
     btn_prev.click(ui_process.PrevPageSample, [num_page_sample], [gl_sample_list, num_page_sample], queue=False)
     btn_next.click(ui_process.NextPageSample, [num_page_sample], [gl_sample_list, num_page_sample], queue=False)
 
+    btn_download_setting.click(None, txt_setting, None, _js="(x => download_ui_settings(x))", queue=False)
+    btn_load_setting.upload(ui_process.LoadSetting, btn_load_setting, txt_setting, queue=False) \
+        .then(ui_process.InitSetting, txt_setting, opt_list, queue=False)
+    btn_reset_setting.click(ui_process.ResetSetting, None, opt_list, _js="(x => reset_ui_settings(x))", queue=False)
+
+    btn_parse_generate_data.click(ui_process.ParseGenerateData, txt_generate_data, txt_setting, queue=False) \
+        .then(ui_process.InitSetting, txt_setting, opt_list, queue=False)
 
 wooool.launch(
     server_name=shared.args.listen,

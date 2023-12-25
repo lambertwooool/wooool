@@ -182,7 +182,7 @@ document.addEventListener("DOMContentLoaded", async function() {
     }
 
     onUiUpdate(function(m) {
-        dp_inputs = document.querySelectorAll(".gr_drapdown input", gradioApp());
+        dp_inputs = document.querySelectorAll(".gr_dropdown input", gradioApp());
         dp_inputs.forEach(function(dp_input) {
             dp_input.addEventListener("blur", updateValue);
 

@@ -46,6 +46,7 @@ gradio-app {
 #gl_sample_list img[alt="Waiting"] { animation: blink 3s infinite; }
 #gl_sample_list .grid-wrap .grid-container button:has(img[alt="Initializing"], img[alt="Waiting"], img[alt="Generating"], img[alt="Encoding"]) .caption-label { animation: blink 3s infinite; background-color: var(--block-title-background-fill); font-weight: bold; }
 #gl_sample_list .thumbnail-small img { object-fit: cover; }
+#img_very_editor button[aria-label="Remove Image"] { display: none; }
 #opt_lang { position: fixed; top:5px; right: 5px; width: 80px; display: block; z-index: 999; }
 #opt_lang .wrap-inner { padding: 1px; }
 #opt_lang * { font-size: 10px; }
@@ -78,8 +79,13 @@ div:has(#radio_mc, #ckb_mc_other), #radio_mc, #ckb_mc_other { background-color: 
 #gl_style_list .grid-wrap { overflow-y: auto; }
 #gl_style_list .grid-wrap .grid-container { display: block; /* white-space: nowrap;*/ }
 #gl_style_list .grid-wrap .grid-container .caption-label { font-size: 10px;}
+#btn_close_gallery { padding: inherit; }
+#panel_action_menu.gap { gap: 8px; }
+
 .lora_preview button { height: 200px; width: 100%; }
 .refer_words span { font-size: 12px; }
 #panel_action, button.btn_action { font-size:14px !important; font-weight: normal !important; }
 #panel_action div:has(>button) { gap: 5px; }
 #ckb_seed { padding-top: 55px }
+
+.gr_slider > div:has(input[disabled]), #txt_seed > label:has(input[disabled]) { opacity: 0.3 }

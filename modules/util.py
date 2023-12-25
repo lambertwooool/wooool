@@ -636,16 +636,22 @@ def parse_generation_parameters(x: str):
 
     res = {}
     lines = x.strip().splitlines()
-    negative_prfix = "Negative prompt:"
+    prompts = []
+    negative_prfix = "negative prompt:"
+    params_prefix = ["steps:", "size:", "seed:", "model:", "sampler:", "cfg_scale:"]
     if lines:
-        res["prompt"] = lines.pop(0).strip()
-        if res["prompt"] == negative_prfix:
-            res["prompt"] = ""
-            lines.insert(0, res["prompt"])
-        if lines[0].startswith(negative_prfix):
-            res["negative"] = lines.pop(0)[len("Negative prompt:"):].strip()
+        while lines:
+            line = lines[0].strip().lower()
+            if not line.startswith(negative_prfix) and not [x for x in params_prefix if line.startswith(x)]:
+                prompts.append(lines.pop(0).strip())
+            else:
+                break
+        res["prompt"] = "\n".join(prompts)
+        
+        if lines[0].lower().startswith(negative_prfix):
+            res["negative"] = lines.pop(0)[len(negative_prfix):].strip()
+        
         param_index = 1
-
         for line in lines:
             line = line.strip()
             params = line.split(",")
@@ -758,3 +764,20 @@ def face_mask(input_image, face_landmarks, blur_size=None):
     save_temp_image(mask, "face_mask.png")
 
     return mask
+
+def concat_images(images, cols=None):
+    image_count = len(images)
+    cols = max(1, int(math.sqrt(image_count) if cols is None else cols))
+    rows = math.ceil(image_count / cols)
+    # print(cols, rows, image_count)
+    h, w = images[0].shape[:2]
+    target = Image.new("RGB", (w * cols, h * rows))
+    for row in range(rows):
+        for col in range(cols):
+            img = images.pop(0)
+            if img is not None:
+                img = resize_image(img, w, h)
+                target.paste(Image.fromarray(img), box=(w * col, h * row))
+
+    save_temp_image(np.array(target), "concat.png")
+    return target

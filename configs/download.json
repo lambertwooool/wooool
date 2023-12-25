@@ -18,6 +18,6 @@
     "wd-v1-4-moat-tagger-v2.onnx": "https://huggingface.co/SmilingWolf/wd-v1-4-moat-tagger-v2/resolve/main/model.onnx",
     "wd-v1-4-moat-tagger-v2.csv": "https://huggingface.co/SmilingWolf/wd-v1-4-moat-tagger-v2/resolve/main/selected_tags.csv",
 
-    "____sd_xl_base_1.0_0.9vae.safetensors": "https://civitai.work/api/download/models/128078",
-    "____sd_xl_refiner_1.0_0.9vae.safetensors": "https://civitai.work/api/download/models/128080"
+    "add_detail.safetensors": "https://civitai.com/api/download/models/62833",
+    "add-detail-xl.safetensors": "https://civitai.com/api/download/models/135867"
 }
