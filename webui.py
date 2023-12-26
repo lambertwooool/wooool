@@ -36,22 +36,22 @@ with gr.Blocks(theme=my_theme, title=app_name).queue() as wooool:
                         with gr.Tab("Action"):
                             with gr.Column() as panel_action_btns:
                                 with gr.Row():
-                                    btn_vary_subtle = gr.Button("Vary(Subtle)", min_width=100, elem_id="btn_vary_subtle", elem_classes="btn_action")
-                                    btn_vary_strong = gr.Button("Vary(Strong)", min_width=100, elem_id="btn_vary_strong", elem_classes="btn_action")
-                                    btn_vary_custom_interface = gr.Button("Vary(Custom)", min_width=200, elem_id="btn_vary_custom_interface", elem_classes="btn_action")
+                                    btn_vary_subtle = gr.Button("Vary(Subtle)", min_width=100, elem_id="btn_vary_subtle", variant="primary", elem_classes="btn_action")
+                                    btn_vary_strong = gr.Button("Vary(Strong)", min_width=100, elem_id="btn_vary_strong", variant="primary", elem_classes="btn_action")
+                                    btn_vary_custom_interface = gr.Button("Vary(Custom)", min_width=200, elem_id="btn_vary_custom_interface", variant="primary", elem_classes="btn_action")
 
-                                    btn_zoom_out15 = gr.Button("Zoom(1.5x)", min_width=100, elem_id="btn_zoom_out15", elem_classes="btn_action")
-                                    btn_zoom_out20 = gr.Button("Zoom(2.0x)", min_width=100, elem_id="btn_zoom_out20", elem_classes="btn_action")
-                                    btn_zoom_custom_interface = gr.Button("Zoom(Custom)", min_width=200, elem_id="btn_zoom_custom_interface", elem_classes="btn_action", visible=False)
+                                    btn_zoom_out15 = gr.Button("Zoom(1.5x)", min_width=100, elem_id="btn_zoom_out15", variant="primary", elem_classes="btn_action")
+                                    btn_zoom_out20 = gr.Button("Zoom(2.0x)", min_width=100, elem_id="btn_zoom_out20", variant="primary", elem_classes="btn_action")
+                                    btn_zoom_custom_interface = gr.Button("Zoom(Custom)", min_width=200, elem_id="btn_zoom_custom_interface", variant="primary", elem_classes="btn_action", visible=False)
 
-                                    btn_change_style = gr.Button("Change Style", min_width=100, elem_id="btn_change_style", elem_classes="btn_action")
-                                    btn_resize_interface = gr.Button("ReSize", min_width=100, elem_id="btn_resize_interface", elem_classes="btn_action")
-                                    btn_refiner = gr.Button("Refiner Image", min_width=100, elem_id="btn_refiner", elem_classes="btn_action")
-                                    btn_refiner_face = gr.Button("Refiner Face", min_width=100, elem_id="btn_refiner_face", elem_classes="btn_action")
-                                    btn_reface_interface = gr.Button("ReFace", min_width=100, elem_id="btn_reface_interface", elem_classes="btn_action")
+                                    btn_change_style = gr.Button("Change Style", min_width=100, elem_id="btn_change_style", variant="primary", elem_classes="btn_action")
+                                    btn_resize_interface = gr.Button("ReSize", min_width=100, elem_id="btn_resize_interface", variant="primary", elem_classes="btn_action")
+                                    btn_refiner = gr.Button("Refiner Image", min_width=100, elem_id="btn_refiner", variant="primary", elem_classes="btn_action")
+                                    btn_refiner_face = gr.Button("Refiner Face", min_width=100, elem_id="btn_refiner_face", variant="primary", elem_classes="btn_action")
+                                    btn_reface_interface = gr.Button("ReFace", min_width=100, elem_id="btn_reface_interface", variant="primary", elem_classes="btn_action")
 
-                                    btn_upscale = gr.Button("Upscale", min_width=100, elem_id="btn_upscale", elem_classes="btn_action")
-                                    # gr.Button("Change BG", min_width=100, elem_classes="btn_action"
+                                    btn_upscale = gr.Button("Upscale", min_width=100, elem_id="btn_upscale", variant="primary", elem_classes="btn_action")
+                                    # gr.Button("Change BG", min_width=100, variant="primary", elem_classes="btn_action"
                                 
                                 with gr.Row():
                                     btn_delete = gr.Button("Delete", min_width=100, size="sm", elem_id="btn_delete", elem_classes="btn_action")

@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 
+import version
 from modules import shared
 
 print(f"[Launch] {str(sys.argv)}")
@@ -25,6 +26,8 @@ re_requirement = re.compile(r"\s*([-_a-zA-Z0-9]+)\s*(?:==\s*([-+_.a-zA-Z0-9]+))?
 python = sys.executable
 default_command_live = (os.environ.get('LAUNCH_LIVE_OUTPUT') == "1")
 index_url = os.environ.get('INDEX_URL', "")
+
+print("Wooool Version:", version.version)
 
 def prepare_environment():
     torch_index_url = os.environ.get('TORCH_INDEX_URL', "https://download.pytorch.org/whl/cu121")

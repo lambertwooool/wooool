@@ -637,10 +637,10 @@ def GetControlnets(ref_mode, model_type):
     files = util.list_files(modules.paths.controlnet_models_path)
     # files = [os.path.split(os.path.splitext(x)[0])[-1] for x in files if model_filter(x, ref_mode, model_type)]
     # files = [os.path.split(os.path.splitext(default_model)[0])[-1]] + files
-    files = [x for x in files if model_filter(x, ref_mode, model_type)]
-    files = [default_model] + files
+    files = [os.path.split(x)[-1] for x in files if model_filter(x, ref_mode, model_type)]
+    files = [default_model] + files if default_model not in files else files
     
-    return files
+    return files, default_model
 
 def GetGenOptions(txt_setting):
     gen_opts = {}

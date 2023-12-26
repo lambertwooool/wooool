@@ -103,7 +103,7 @@ options["ref_mode"] = {
 	"Ref Stuct": ("canny", { "sdxl": "sai_xl_canny_128lora.safetensors", "sd15": "control_v11p_sd15_canny.pth", "keyword": "canny" }),
     "Ref Depth": ("depth_leres", { "sdxl": "sai_xl_depth_128lora.safetensors", "sd15": "control_v11f1p_sd15_depth.pth", "keyword": "depth" }),
     "Ref Face": ("ip_adapter_face", { "sdxl": "ip-adapter-plus-face_sdxl_vit-h.bin", "sd15": "ip-adapter-plus-face_sd15.bin", "keyword": "ip_adapter_face" }),
-	"Ref Pose": ("dwpose", { "sdxl": "t2i-adapter_xl_openpose.safetensors", "sd15": "control_v11p_sd15_openpose.pth", "keyword": "openpose" }), # thibaud_xl_openpose_256lora.safetensors
+	"Ref Pose": ("dwpose", { "sdxl": "thibaud_xl_openpose_256lora.safetensors", "sd15": "control_v11p_sd15_openpose.pth", "keyword": "openpose" }), # thibaud_xl_openpose_256lora.safetensors
 	"Base Image": ("base_image", { "sdxl": None, "sd15": None, "keyword": None }),
 }
 default["ref_mode"] = "Ref All"

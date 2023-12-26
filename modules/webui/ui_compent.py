@@ -185,10 +185,10 @@ def RefBlock(opt_base_model, opt_dict, refCount=5, showCount=3):
             return gr.Dropdown(visible=False)
         else:
             model_type = "sd15" if "(sd15)" in opt_base_model else "sdxl"
-            ctrl_models = ui_process.GetControlnets(opt_type, model_type)
-            return gr.Dropdown(choices=ctrl_models, value=ctrl_models[0], visible=len(ctrl_models) > 1)
+            ctrl_models, default_model = ui_process.GetControlnets(opt_type, model_type)
+            return gr.Dropdown(choices=ctrl_models, value=default_model, visible=len(ctrl_models) > 1)
 
-    ctrl_models = ui_process.GetControlnets(opts.default["ref_mode"], "sdxl")
+    ctrl_models, default_model = ui_process.GetControlnets(opts.default["ref_mode"], "sdxl")
 
     for i in range(refCount):
         with gr.Column(min_width=100, visible=i < showCount) as block:
@@ -200,7 +200,7 @@ def RefBlock(opt_base_model, opt_dict, refCount=5, showCount=3):
             opt_type_list = [x for x in opt_type_list if i == 0 or x != "Base Image"]
             opt_type = gr.Dropdown(choices=opt_type_list, value=opts.default["ref_mode"], container=False, filterable=False, min_width=80, elem_id=f"refer_type_{i}", elem_classes="gr_dropdown")
 
-            opt_model = gr.Dropdown(choices=ctrl_models, value=ctrl_models[0], visible=(len(ctrl_models) > 1),  container=False, filterable=False, min_width=80, elem_id=f"ref_model_{i}", elem_classes="gr_dropdown")
+            opt_model = gr.Dropdown(choices=ctrl_models, value=default_model, visible=(len(ctrl_models) > 1),  container=False, filterable=False, min_width=80, elem_id=f"ref_model_{i}", elem_classes="gr_dropdown")
 
         opt_dict[f"refer_type_{i}"] = opt_type
 

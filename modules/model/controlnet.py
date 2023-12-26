@@ -128,7 +128,7 @@ class ControlNet(ControlBase):
     def __init__(self, control_model, global_average_pooling=False, device=None):
         super().__init__(device)
         self.control_model = control_model
-        self.control_model_wrapped = model_patcher.ModelPatcher(self.control_model, load_device=device.get_torch_device(), offload_device=device.unet_offload_device())
+        self.control_model_wrapped = model_patcher.ModelPatcher(self.control_model, load_device=model_loader.run_device("controlnet"), offload_device=model_loader.offload_device("controlnet"))
         self.global_average_pooling = global_average_pooling
         self.model_sampling_current = None
 
@@ -302,7 +302,7 @@ def load_controlnet(ckpt_path, model=None):
 
     controlnet_config = None
     if "controlnet_cond_embedding.conv_in.weight" in controlnet_data: #diffusers format
-        unet_dtype = devices.unet_dtype()
+        unet_dtype = devices.dtype()
         controlnet_config = model_detection.unet_config_from_diffusers_unet(controlnet_data, unet_dtype)
         diffusers_keys = model_helper.unet_to_diffusers(controlnet_config)
         diffusers_keys["controlnet_mid_block.weight"] = "middle_block_out.0.weight"
@@ -363,7 +363,7 @@ def load_controlnet(ckpt_path, model=None):
         return net
 
     if controlnet_config is None:
-        unet_dtype = devices.unet_dtype()
+        unet_dtype = devices.dtype()
         controlnet_config = model_detection.model_config_from_unet(controlnet_data, prefix, unet_dtype, True).unet_config
     controlnet_config.pop("out_channels")
     controlnet_config["hint_channels"] = controlnet_data["{}input_hint_block.0.weight".format(prefix)].shape[1]
@@ -472,7 +472,7 @@ def load_t2i_adapter(t2i_data):
 
     if "body.0.in_conv.weight" in keys:
         cin = t2i_data['body.0.in_conv.weight'].shape[1]
-        model_ad = t2i_adapter.adapter.Adapter_light(cin=cin, channels=[320, 640, 1280, 1280], nums_rb=4)
+        model_ad = t2i_adapter.Adapter_light(cin=cin, channels=[320, 640, 1280, 1280], nums_rb=4)
     elif 'conv_in.weight' in keys:
         cin = t2i_data['conv_in.weight'].shape[1]
         channel = t2i_data['conv_in.weight'].shape[0]
@@ -484,7 +484,7 @@ def load_t2i_adapter(t2i_data):
         xl = False
         if cin == 256 or cin == 768:
             xl = True
-        model_ad = t2i_adapter.adapter.Adapter(cin=cin, channels=[channel, channel*2, channel*4, channel*4][:4], nums_rb=2, ksize=ksize, sk=True, use_conv=use_conv, xl=xl)
+        model_ad = t2i_adapter.Adapter(cin=cin, channels=[channel, channel*2, channel*4, channel*4][:4], nums_rb=2, ksize=ksize, sk=True, use_conv=use_conv, xl=xl)
     else:
         return None
     missing, unexpected = model_ad.load_state_dict(t2i_data)

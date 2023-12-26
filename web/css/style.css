@@ -84,7 +84,7 @@ div:has(#radio_mc, #ckb_mc_other), #radio_mc, #ckb_mc_other { background-color: 
 
 .lora_preview button { height: 200px; width: 100%; }
 .refer_words span { font-size: 12px; }
-#panel_action, button.btn_action { font-size:14px !important; font-weight: normal !important; }
+#panel_action, button.btn_action { font-size:13px !important; padding-left: 3px !important; padding-right: 3px !important; }
 #panel_action div:has(>button) { gap: 5px; }
 #ckb_seed { padding-top: 55px }
 
