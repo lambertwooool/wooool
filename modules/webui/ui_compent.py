@@ -184,7 +184,7 @@ def RefBlock(opt_base_model, opt_dict, refCount=5, showCount=3):
         if opt_type in ["Ref Content", "Base Image"]:
             return gr.Dropdown(visible=False)
         else:
-            model_type = "sd15" if "(sd15)" in opt_base_model else "sdxl"
+            model_type = "sd15" if opt_base_model and "(sd15)" in opt_base_model else "sdxl"
             ctrl_models, default_model = ui_process.GetControlnets(opt_type, model_type)
             return gr.Dropdown(choices=ctrl_models, value=default_model, visible=len(ctrl_models) > 1)
 

@@ -96,6 +96,7 @@ def get_base_list():
     base_name = os.path.splitext(options.default_base_name)[0]
     default_base_name = ([k for k in files if base_name in k] + list(base_files.keys()) + [f"{base_name} (sdxl)"])[0]
     # default_base_name = base_name if base_name in base_files else list(base_files.keys())[0]
+    options.default["base_model"] = default_base_name
 
     refiner_name = os.path.splitext(options.default_refiner_name)[0]
     default_refiner_name = ([k for k in files if refiner_name in k] + [f"{refiner_name} (sdxl)"])[0]

@@ -94,7 +94,7 @@ options["quality_setting"] = {
 options["detail"] = (-200, 200, 5)
 mul["detail"] = 0.01
 title["detail"] = "Detail Enhance %"
-default["detail"] = 0
+default["detail"] = 80
 
 # Ref Mode
 options["ref_mode"] = {
