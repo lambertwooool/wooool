@@ -8,7 +8,7 @@ from insightface.app import FaceAnalysis
 
 import modules.paths
 import modules.options as opts
-from modules import prompt_helper, util, wd14tagger
+from modules import lora, prompt_helper, util, wd14tagger
 
 def UseControlnet(ref_type, ref_image, weight):
     ref_mode, _ = opts.options["ref_mode"][ref_type]
@@ -128,7 +128,7 @@ def ZoomOut(ref_image, params, pnginfo, gen_opts, zoom = 1.5):
     ref_image = orgin_image[mask_pad:(orgin_image.shape[0] - mask_pad), mask_pad:(orgin_image.shape[1] - mask_pad)]
     width_mask, height_mask = ref_image.shape[1], ref_image.shape[0]
 
-    image_pad(ref_image, height // 2, height // 2, width // 2, width // 2)
+    # image_pad(ref_image, height // 2, height // 2, width // 2, width // 2)
 
     ref_image = np.pad(ref_image, [[(height - height_mask) // 2, 0], [0, 0], [0, 0]], mode="edge")
     ref_image = np.pad(ref_image, [[0, 0], [(width - width_mask) // 2] * 2, [0, 0]], mode="edge") # random.choice(["edge", "mean"])
@@ -367,7 +367,7 @@ def Refiner(ref_image, params, pnginfo, gen_opts, mask=None):
 
     # ref_mode, _ = opts.options["ref_mode"]["Ref Stuct"]
     # params["controlnet"].append(["Ref Stuct", ref_mode, ref_image, 0.75])
-    params["controlnet"].append(UseControlnet("Ref Stuct", ref_image, 0.75))
+    # params["controlnet"].append(UseControlnet("Ref Stuct", ref_image, 0.75))
 
     return params
 
