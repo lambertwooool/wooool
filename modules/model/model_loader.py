@@ -111,7 +111,7 @@ def load_models_gpu(models, memory_required=0):
                 if use_memory > (free_vram - extra_mem) and not free_memory(use_memory + extra_mem, device, models_already_loaded):
                     # lowvram_model_memory = int(max(256 * (1024 ** 2), (current_free_mem - 1024 ** 3) / 1.3 ))
                     # device_to = device_cpu
-                    print("memory lower ...")
+                    print("memory lower ...", [(x.real_model.__class__.__name__, sys.getrefcount(x)) for x in current_loaded_models])
 
             cur_loaded_model = loaded_model.model_load(device_to)
 
@@ -136,8 +136,8 @@ def free_memory(memory_required, device, keep_loaded=[], gc=True):
         free_ram, free_vram = devices.get_free_memory(get_all=True)
         if shift_model not in keep_loaded:
             if shift_model.device == device and device != device_cpu:
-                shift_model_ram = shift_model.model_memory_required(device_cpu)
-                if free_ram > shift_model_ram or free_memory(shift_model_ram, device_cpu, keep_loaded, False):
+                # shift_model_ram = shift_model.model_memory_required(device_cpu)
+                # if free_ram > shift_model_ram or free_memory(shift_model_ram, device_cpu, keep_loaded, False):
                     m = current_loaded_models.pop(i)
                     if hasattr(m, "model"):
                         print(f"[Free memery] Unload {m.real_model.__class__.__name__} from {m.model.current_device}, free memory {m.model_memory() / (1024 ** 3):.2f}G")

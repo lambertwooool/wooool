@@ -62,9 +62,12 @@ def get_vae_approx(model):
 @torch.inference_mode()
 def decode_vae(vae, latent_image, tiled=False, tile_size=512):
     if tiled:
-        return vae.decode_tiled(latent_image, tile_x=tile_size // 8, tile_y=tile_size // 8, )
+        decoded_latent = vae.decode_tiled(latent_image, tile_x=tile_size // 8, tile_y=tile_size // 8, )
     else:
-        return vae.decode(latent_image)
+        decoded_latent = vae.decode(latent_image)
+    devices.torch_gc()
+
+    return decoded_latent
 
 @torch.no_grad()
 @torch.inference_mode()
@@ -104,7 +107,7 @@ def encode_vae(vae, pixels, tiled=False, tile_size=512):
 
 @torch.no_grad()
 @torch.inference_mode()
-def encode_vae_mask(vae, pixels, mask, grow_mask_by=0):
+def encode_vae_mask(vae, pixels, mask, grow_mask_by=0, tiled=False):
     assert mask.ndim == 3 and pixels.ndim == 4
     # assert mask.shape[-1] == pixels.shape[-2]
     # assert mask.shape[-2] == pixels.shape[-3]
@@ -134,10 +137,13 @@ def encode_vae_mask(vae, pixels, mask, grow_mask_by=0):
     #     pixels[:,:,:,i] -= 0.5
     #     pixels[:,:,:,i] *= m
     #     pixels[:,:,:,i] += 0.5
-    t = vae.encode(pixels)
+    t = encode_vae(vae, pixels, tiled=tiled)
     n = mask_erosion[:,:,:x,:y].round()
+    t["noise_mask"] = None if (n == 1).all() else n
 
-    return t, n
+    devices.torch_gc()
+
+    return t
 
 def parse(x, model):
     vae_approx_model = get_vae_approx(model)

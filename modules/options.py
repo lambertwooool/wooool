@@ -91,19 +91,19 @@ options["quality_setting"] = {
 }
 
 # Detail
-options["detail"] = (-200, 200, 5)
+options["detail"] = (0, 120, 5)
 mul["detail"] = 0.01
 title["detail"] = "Detail Enhance %"
-default["detail"] = 80
+default["detail"] = 30
 
 # Ref Mode
 options["ref_mode"] = {
-	"Ref All": ("ip_adapter",  { "sdxl": "ip-adapter-plus_sdxl_vit-h.bin", "sd15": "ip-adapter_sd15_plus.pth", "keyword": "ip_adapter" }),
+	"Ref All": ("ip_adapter",  { "sdxl": "ip-adapter-plus_sdxl_vit-h.bin", "sd15": "ip-adapter_sd15_plus.pth", "keyword": r"ip adapter plus (?!face)" }),
 	"Ref Content": ("content", { "sdxl": None, "sd15": None, "keyword": None }),
-	"Ref Stuct": ("canny", { "sdxl": "sai_xl_canny_128lora.safetensors", "sd15": "control_v11p_sd15_canny.pth", "keyword": "canny" }),
-    "Ref Depth": ("depth_leres", { "sdxl": "sai_xl_depth_128lora.safetensors", "sd15": "control_v11f1p_sd15_depth.pth", "keyword": "depth" }),
-    "Ref Face": ("ip_adapter_face", { "sdxl": "ip-adapter-plus-face_sdxl_vit-h.bin", "sd15": "ip-adapter-plus-face_sd15.bin", "keyword": "ip_adapter_face" }),
-	"Ref Pose": ("dwpose", { "sdxl": "thibaud_xl_openpose_256lora.safetensors", "sd15": "control_v11p_sd15_openpose.pth", "keyword": "openpose" }), # thibaud_xl_openpose_256lora.safetensors
+	"Ref Stuct": ("canny", { "sdxl": "sai_xl_canny_128lora.safetensors", "sd15": "control_v11p_sd15_canny.pth", "keyword": r"canny" }),
+    "Ref Depth": ("depth_leres", { "sdxl": "sai_xl_depth_128lora.safetensors", "sd15": "control_v11f1p_sd15_depth.pth", "keyword": r"depth" }),
+    "Ref Face": ("ip_adapter_face", { "sdxl": "ip-adapter-plus-face_sdxl_vit-h.bin", "sd15": "ip-adapter-plus-face_sd15.bin", "keyword": r"ip adapter plus face" }),
+	"Ref Pose": ("dwpose", { "sdxl": "thibaud_xl_openpose_256lora.safetensors", "sd15": "control_v11p_sd15_openpose.pth", "keyword": r"openpose" }), # thibaud_xl_openpose_256lora.safetensors
 	"Base Image": ("base_image", { "sdxl": None, "sd15": None, "keyword": None }),
 }
 default["ref_mode"] = "Ref All"
@@ -147,7 +147,7 @@ title["single_vae"] = "VAE Mode"
 default["single_vae"] = "CPU and GPU"
 
 # Base Step
-options["step_base"] = (0, 50, 1)
+options["step_base"] = (0, 80, 1)
 mul["step_base"] = 1
 title["step_base"] = "Base Steps"
 default["step_base"] = 25
@@ -174,7 +174,7 @@ default["image_height"] = 1152
 options["subseed_strength"] = (0, 100, 1)
 mul["subseed_strength"] = 0.01
 title["subseed_strength"] = "Subseed Strength %"
-default["subseed_strength"] = 2
+default["subseed_strength"] = 100
 
 # Clip Skip
 options["clip_skip"] = (0, 10, 1)
@@ -213,6 +213,12 @@ for x in ["mc", "style", "view", "emo", "location", "weather", "hue"]:
 	default[k] = 100
 default["style_weight"] = 110
 
+# More Art Weight
+options["more_art_weight"] = (0, 100, 5)
+mul["more_art_weight"] = 0.01
+title["more_art_weight"] = "More Art Weight %"
+default["more_art_weight"] = 10
+
 # Vary Custom Area
 options["vary_custom_area"] = {
 	"Mask": True,
@@ -232,3 +238,21 @@ options["zoom_custom"] = (150, 400, 50)
 mul["zoom_custom"] = 0.01
 title["zoom_custom"] = "Zoom %"
 default["zoom_custom"] = 200
+
+# Zoom Denoise
+options["zoom_denoise"] = (0, 100, 1)
+mul["zoom_denoise"] = 0.01
+title["zoom_denoise"] = "Denoise %"
+default["zoom_denoise"] = 98
+
+# Zoom Blur Alpha
+options["zoom_blur_alpha"] = (0, 100, 1)
+mul["zoom_blur_alpha"] = 0.01
+title["zoom_blur_alpha"] = "Blur alpha %"
+default["zoom_blur_alpha"] = 50
+
+# Refiner Face Denoise
+options["refiner_face_denoise"] = (0, 100, 5)
+mul["refiner_face_denoise"] = 0.01
+title["refiner_face_denoise"] = "Refiner Weight %"
+default["refiner_face_denoise"] = 30

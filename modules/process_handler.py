@@ -40,10 +40,10 @@ def handler(task):
         civitai.get_model_versions(base_path)
         base_info = model_helper.get_model_info(base_path)
         base_hash = base_info.get("sha256")[:10]
-        sd_type = base_info["base_model"]
+        sd_type = "sd15" if base_info["base_model"] == "sd15" else "sdxl"
     else:
         base_hash = ""
-        sd_type = "sd15" if "sd15" in base_name else "sdxl"
+        sd_type = "sd15" if "(sd15)" in base_name else "sdxl"
 
     skip_prompt = task.get("skip_prompt", False)
 
@@ -72,13 +72,17 @@ def handler(task):
     size = task.get("size", util.ratios2size(task.get("aspect_ratios", None), pixels ** 2))
     cfg_scale = task.get("cfg_scale", 7.0)
     cfg_scale_to = task.get("cfg_scale_to", cfg_scale)
-    clip_skip = int(task.get("clip_skip", -2))
+    clip_skip = int(task.get("clip_skip") or -2)
 
     detail = float(task.get("detail", 0))
     noise_scale = 1 + detail * 0.05
     if detail != 0:
         detail_lora = { "sd15": "add_detail.safetensors", "sdxl": "add-detail-xl.safetensors" }[sd_type]
         loras.append((detail_lora, detail, ""))
+    more_art = float(task.get("more_art_weight", 0))
+    if more_art != 0:
+        more_art_lora = { "sd15": "", "sdxl": "xl_more_art-full_v1.safetensors" }[sd_type]
+        loras.append((more_art_lora, more_art, ""))
     denoise = task.get("denoise", 1.0)
     sampler = task.get("sampler", "") or default_sampler
     scheduler = task.get("scheduler", "") or default_scheduler
@@ -193,11 +197,11 @@ def update_model_info_base(model_path, model):
     config_file = f"{model_path}.wooool"
     
     if os.path.exists(config_file):
-        base_model = "sd15"
-
         data = util.load_json(config_file)
+        base_model = data.get("base_model")
         if isinstance(model.unet.model, SDXL):
-            base_model = "sdxl"
+            if base_model == "sd15":
+                base_model = "sdxl"
         elif isinstance(model.unet.model, SDXLRefiner):
             base_model = "sdxl refiner"
 
@@ -330,31 +334,6 @@ def vae_sampled(sampled_latent, vae_model, tiled, task, cur_batch, cur_seed, cur
         print(filename)
         progress_output(task, "save", picture=image)
 
-
-def calculate_sigmas_all(sampler, model, scheduler, steps):
-    from modules.model.samplers import calculate_sigmas_scheduler
-
-    discard_penultimate_sigma = False
-    if sampler in ['dpm_2', 'dpm_2_ancestral']:
-        steps += 1
-        discard_penultimate_sigma = True
-
-    sigmas = calculate_sigmas_scheduler(model, scheduler, steps)
-
-    if discard_penultimate_sigma:
-        sigmas = torch.cat([sigmas[:-2], sigmas[-1:]])
-    return sigmas
-
-
-def calculate_sigmas(sampler, model, scheduler, steps, denoise):
-    if denoise is None or denoise > 0.9999:
-        sigmas = calculate_sigmas_all(sampler, model, scheduler, steps)
-    else:
-        new_steps = int(steps / denoise)
-        sigmas = calculate_sigmas_all(sampler, model, scheduler, new_steps)
-        sigmas = sigmas[-(steps + 1):]
-    return sigmas
-
 def generate_empty_latent(width=1024, height=1024, batch_size=1):
     latent = torch.zeros([batch_size, 4, height // 8, width // 8])
     return {"samples":latent}
@@ -397,7 +376,7 @@ def create_infotext(task, prompt, negative_prompt, seed, subseed, batch_index=0)
     re_s = r"[\s,]"
     loras = task.get("lora", [])
     prompt = ",".join(prompt)
-    prompt += " " + ", ".join([f"<lora:{lo_name}:{lo_weight}>" for lo_name, lo_weight, lo_trained_words in loras])
+    prompt += " " + ", ".join([f"<lora:{lo_name}:{lo_weight}>" for lo_name, lo_weight, lo_trained_words in loras if lo_name])
     
     generation_params = {
         "Prompt": prompt,
@@ -442,6 +421,7 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
         latent=None, image=None, denoise=1.0, noise_scale=1.0, cfg_scale=7.0, cfg_scale_to=7.0, batch_size=1, loras=[], controlnets=[],
         tiled=False, single_vae=True, round_batch_size=8, subseed_strength=1.0, clip_skip=0):
 
+    devices.torch_gc()
     progress_output(task, "load_model")
     
     xl_base, xl_base_patched, xl_refiner = get_sd_model(base_path, refiner_path, steps, loras)
@@ -487,13 +467,13 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
             p = np.where(image_mask > 0)
             min_y, min_x, max_y, max_x = np.min(p[0]), np.min(p[1]), np.max(p[0]), np.max(p[1])
             w, h = max_x - min_x, max_y - min_y
-            pad_scale = 0.2
+            pad_scale = 0.5
             min_x = max(0, int((min_x - w * pad_scale) / 8) * 8)
             min_y = max(0, int((min_y - h * pad_scale) / 8) * 8)
             max_x = min(image_mask.shape[1], round((max_x + w * pad_scale) / 8) * 8)
             max_y = min(image_mask.shape[0], round((max_y + h * pad_scale) / 8) * 8)
             w, h = max_x - min_x, max_y - min_y
-            re_zoom = math.sqrt(w * h / 1024 ** 2)
+            re_zoom = math.sqrt(w * h / 1152 ** 2)
             if re_zoom < 1.0:
                 re_zoom_point = (min_x, min_y, max_x, max_y)
                 image_mask = image_mask[min_y:max_y, min_x:max_x, :]
@@ -507,11 +487,12 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
                     image_pixel = image_pixel[min_y:max_y, min_x:max_x, :]
                     image_pixel = util.resize_image(image_pixel, w, h, resize_mode=0)
                 
-                for ctrl in controlnets:
-                    if ctrl[1] is not None \
-                            and image_pixel_orgin.shape == ctrl[1].shape \
-                            and not np.any(image_pixel_orgin - ctrl[1]):
-                        ctrl[1] = image_pixel.copy()
+            for ctrl in controlnets:
+                if ctrl[1] is None:
+                    ctrl[1] = image_pixel.copy()
+                elif image_pixel_orgin is not None and image_pixel_orgin.shape == ctrl[1].shape and not np.any(image_pixel_orgin - ctrl[1]):
+                    ctrl[1] = image_pixel.copy()
+                    
         else:
             image_mask = np.ones((height, width, 3), dtype=np.uint8) * 255
         
@@ -523,11 +504,7 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
         else:
             image_pixel_torch = util.numpy_to_pytorch(image_pixel)
             image_mask_torch = util.numpy_to_pytorch(image_mask)
-            latent_pixel, latent_mask = vae_helper.encode_vae_mask(vae_model_unet, image_pixel_torch, image_mask_torch)
-            latent = {
-                "samples": latent_pixel,
-                "noise_mask": None if (latent_mask == 1).all() else latent_mask,
-            }
+            latent = vae_helper.encode_vae_mask(vae_model_unet, image_pixel_torch, image_mask_torch, tiled=tiled)
 
     ctrls, unet_model = controlnet_helper.processor(controlnets, unet_model, width, height)
     
@@ -657,6 +634,8 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
                 refiner_negative = clip_helper.clip_separate(cur_negative_cond, target_model=refiner_unet_model.model, target_clip=clip_model)
                 del cur_negative_cond
 
+                model_loader.free_memory(1024 ** 4, devices.get_torch_device())
+
                 sampled_latent = sample.sample(
                     model=refiner_unet_model,
                     positive=refiner_positive,
@@ -680,6 +659,8 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
                 del refiner_positive, refiner_negative
             else:
                 del cur_positive_cond, cur_negative_cond
+            
+            model_loader.free_memory(1024 ** 4, devices.get_torch_device())
 
             pool_low_limit = 4
             if batch_size > round_batch_size and len(positive_cond) < pool_low_limit:
@@ -707,14 +688,15 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
         except UserStopException:
             if 'cur_positive_cond' in vars(): del cur_positive_cond, cur_negative_cond
             if 'refiner_positive' in vars(): del refiner_positive, refiner_negative
-            model_loader.free_memory(1024 ** 4, torch.device(torch.cuda.current_device()))
         finally:
-            devices.torch_gc()
+            model_loader.free_memory(1024 ** 4, devices.get_torch_device())
 
         if task.get("stop", False):
             break
 
+    del ctrls, unet_model
     left_vae(sampled_latents, True)
     thread_vae.join()
 
-    devices.torch_gc()
+    model_loader.free_memory(1024 ** 4, devices.get_torch_device())
+    model_loader.current_loaded_models.clear()

@@ -82,6 +82,9 @@ def dynamic_prompt(positive, num_images=1, seeds=None, lang=None):
         return [[""] for _ in range(num_images)]
 
 def apply_style(style, style_weight, positive, negative, sd_type="sdxl", seeds=None):
+    style_name = None
+    style_loras = []
+    
     if style is not None:
         template, style_name = find_style(style, seeds)
         if template is not None:

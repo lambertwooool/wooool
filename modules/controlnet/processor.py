@@ -18,7 +18,7 @@ from .shuffle import ContentShuffleDetector
 from .ipadapter import IPAdapterDetector
 
 import modules.paths
-from modules.model import controlnet
+from modules.model import controlnet, model_loader, model_patcher
 
 LOGGER = logging.getLogger(__name__)
 
@@ -127,5 +127,6 @@ class Processor:
     
     def load_controlnet(self, filename: str):
         filename = os.path.join(modules.paths.controlnet_models_path, filename)
-        self.controlnet = controlnet.load_controlnet(filename)
+        controlnet_model = controlnet.load_controlnet(filename)
+        self.controlnet = controlnet_model
         return self.controlnet

@@ -191,6 +191,31 @@ class VAE:
         self.vae_dtype = devices.dtype(device, use_bf16=True)
         self.first_stage_model.to(self.vae_dtype)
 
+    def decode_tiled_(self, samples, tile_x=64, tile_y=64, overlap = 16):
+        steps = samples.shape[0] * model_helper.get_tiled_scale_steps(samples.shape[3], samples.shape[2], tile_x, tile_y, overlap)
+        steps += samples.shape[0] * model_helper.get_tiled_scale_steps(samples.shape[3], samples.shape[2], tile_x // 2, tile_y * 2, overlap)
+        steps += samples.shape[0] * model_helper.get_tiled_scale_steps(samples.shape[3], samples.shape[2], tile_x * 2, tile_y // 2, overlap)
+
+        decode_fn = lambda a: (self.first_stage_model.decode(a.to(self.vae_dtype).to(self.device)) + 1.0).float()
+        output = torch.clamp((
+            (model_helper.tiled_scale(samples, decode_fn, tile_x // 2, tile_y * 2, overlap, upscale_amount = 8) +
+            model_helper.tiled_scale(samples, decode_fn, tile_x * 2, tile_y // 2, overlap, upscale_amount = 8) +
+             model_helper.tiled_scale(samples, decode_fn, tile_x, tile_y, overlap, upscale_amount = 8))
+            / 3.0) / 2.0, min=0.0, max=1.0)
+        return output
+
+    def encode_tiled_(self, pixel_samples, tile_x=512, tile_y=512, overlap = 64):
+        steps = pixel_samples.shape[0] * model_helper.get_tiled_scale_steps(pixel_samples.shape[3], pixel_samples.shape[2], tile_x, tile_y, overlap)
+        steps += pixel_samples.shape[0] * model_helper.get_tiled_scale_steps(pixel_samples.shape[3], pixel_samples.shape[2], tile_x // 2, tile_y * 2, overlap)
+        steps += pixel_samples.shape[0] * model_helper.get_tiled_scale_steps(pixel_samples.shape[3], pixel_samples.shape[2], tile_x * 2, tile_y // 2, overlap)
+
+        encode_fn = lambda a: self.first_stage_model.encode((2. * a - 1.).to(self.vae_dtype).to(self.device)).float()
+        samples = model_helper.tiled_scale(pixel_samples, encode_fn, tile_x, tile_y, overlap, upscale_amount = (1/8), out_channels=4)
+        samples += model_helper.tiled_scale(pixel_samples, encode_fn, tile_x * 2, tile_y // 2, overlap, upscale_amount = (1/8), out_channels=4)
+        samples += model_helper.tiled_scale(pixel_samples, encode_fn, tile_x // 2, tile_y * 2, overlap, upscale_amount = (1/8), out_channels=4)
+        samples /= 3.0
+        return samples
+
     def decode(self, samples_in):
         self.first_stage_model = self.first_stage_model.to(self.device)
         try:

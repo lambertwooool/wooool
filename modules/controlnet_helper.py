@@ -3,8 +3,8 @@ import torch
 from PIL import Image
 
 import modules.paths
-from modules.model import controlnet, clip_vision
-from modules import util
+from modules.model import controlnet, clip_vision, model_loader
+from modules import devices, util
 from modules.controlnet.processor import Processor as controlnet_processor
 
 @torch.no_grad()
@@ -36,7 +36,8 @@ def processor(controlnets, unet_model, width, height):
                 cn_img = util.resize_image(cn_img, width=width, height=height)
                 cn_img = util.HWC3(ctrl_procs[cn_type](cn_img))
                 cn_model = ctrl_procs[cn_type].load_controlnet(cn_model_name)
-                ctrls.append((cn_type, cn_img, cn_weight, cn_model, ctrl_procs[cn_type]))
+                # ctrls.append((cn_type, cn_img, cn_weight, cn_model, ctrl_procs[cn_type]))
+                ctrls.append((cn_type, cn_img, cn_weight, cn_model))
 
             util.save_temp_image(cn_img, f"{cn_type}.png")
         else:
@@ -63,7 +64,7 @@ def load_controlnets_by_task(cn_types):
 @torch.inference_mode()
 def apply_controlnets(positive_cond, negative_cond, ctrls):
     for cn in ctrls:
-        cn_type, cn_img, cn_weight, cn_model, cn_proc = cn
+        cn_type, cn_img, cn_weight, cn_model = cn
 
         if cn_model is not None :
             positive_cond, negative_cond = apply_controlnet(
@@ -92,6 +93,7 @@ def apply_controlnet(positive, negative, control_net, image, strength, start_per
                 c_net = cnets[prev_cnet]
             else:
                 c_net = control_net.copy().set_cond_hint(control_hint, strength, (start_percent, end_percent))
+                # c_net.device = devices.get_torch_device()
                 c_net.set_previous_controlnet(prev_cnet)
                 cnets[prev_cnet] = c_net
 

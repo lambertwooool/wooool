@@ -19,5 +19,6 @@
     "wd-v1-4-moat-tagger-v2.csv": "https://huggingface.co/SmilingWolf/wd-v1-4-moat-tagger-v2/resolve/main/selected_tags.csv",
 
     "add_detail.safetensors": "https://civitai.com/api/download/models/62833",
-    "add-detail-xl.safetensors": "https://civitai.com/api/download/models/135867"
+    "add-detail-xl.safetensors": "https://civitai.com/api/download/models/135867",
+    "xl_more_art-full_v1.safetensors": "https://civitai.com/api/download/models/152309"
 }

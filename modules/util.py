@@ -691,6 +691,15 @@ def slerp(val, low, high):
 def diagonal_fov(focal_length, sensor_diagonal=43.27):
   return 2 * math.atan(sensor_diagonal / (2 * focal_length)) * (180 / math.pi)
 
+def shuffle(input_image, f=256):
+    h, w, c = input_image.shape
+    x = make_noise_disk(h, w, 1, f) * float(w - 1)
+    y = make_noise_disk(h, w, 1, f) * float(h - 1)
+    flow = np.concatenate([x, y], axis=2).astype(np.float32)
+    detected_map = cv2.remap(input_image, flow, None, cv2.INTER_LINEAR)
+
+    return detected_map
+
 def blur(image, k):
     image = Image.fromarray(image)
     image = image.filter(ImageFilter.BoxBlur(k))
@@ -759,7 +768,7 @@ def face_mask(input_image, face_landmarks, blur_size=None):
             min_y, min_x = min(y, min_y), min(x, min_x)
         blur_size = max(5, math.sqrt((max_x - min_x) * (max_y - min_y)) / 16)
     mask = blur(mask, blur_size)
-    mask[mask > 32] = 255
+    mask[mask > 16] = 255
     mask = blur(mask, blur_size)
     save_temp_image(mask, "face_mask.png")
 

@@ -1,6 +1,6 @@
 {
 	"Girl": {
-		"prompt": "a beautiful {gril|famale}, solo, {lang} girl, light eyes, {20yo|30yo|40yo|}, {__girl_hair__|}, {sexy|cute|}, {2$$earrings|tattoo|fair-skinned|choker|bowknot|pendant|ring|bracelet|bra|bare shoulders|||scarf}",
+		"prompt": "a beautiful {gril|famale}, solo, {lang} girl, light eyes, {20yo|30yo|40yo|}, {__girl_hair__|}, {sexy|cute|}, {2$$earrings|tattoo|evening dress|sweater|fair-skinned|choker|bowknot|pendant|ring|bracelet|bra|bare shoulders|||scarf}",
 		"negative_prompt": "boy"
 	},
 	"Male": {
@@ -10,7 +10,7 @@
 	"Cat": "a {white|black|orange|} __cat_breed__ cat",
 	"Dog": "a {__dog_breed__|}, dog",
 	"Dragon": "a {lang} dragon",
-	"Monster": "a monster",
+	"Monster": "devious monster, intricate gills around its body, armor with engraved as intricate details",
 	"Cyborg": "a cyborg",
     "Robot": "a transformer",
     "Wonder Woman": "Wonder Woman",
@@ -47,5 +47,9 @@
     "Elon Musk": "Elon Musk",
     "Snow White": "Snow White",
     "Mickey Mouse": "Mickey Mouse",
-    "Fan Bing Bing": "Fan Bing Bing"
+    "Fan Bing Bing": "Fan Bing Bing",
+	"Geisha": "a geisha vampire, removing her {pink|blue|green|white|} kimono",
+	"Monkey King": "Monkey King Sun Wukong",
+	"Jellyfish": "a ghostly jellyfish, shiny aura",
+	"Manatee": "a fluffy manatee"
 }

@@ -8,9 +8,7 @@ from modules import util
 from modules import upscaler_esrgan, util, gfpgan_model
 
 def handler(task):
-    print(task)
-
-    input_image = task["image"]
+    input_image = task["image"][:,:,:3]
 
     # image = Image.fromarray(input_image)
     # w, h = image.size

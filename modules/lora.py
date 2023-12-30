@@ -90,3 +90,23 @@ def reduce(loras):
     loras = [(k, np.mean(v[0]), ",".join(v[1]).strip(",")) for k, v in lora_dict.items()]
 
     return loras
+
+def remove_prompt_lora(prompt, name):
+    lora_prompt = prompt
+    return_prompt = ""
+    while True:
+        lora = re.search(re_lora, lora_prompt)
+        if lora is not None:
+            lora_name, _, lora_weight = lora.groups()
+            start, end = lora.span()
+            if lora_name == name:
+                return_prompt = lora_prompt[:start]
+            else:
+                return_prompt = lora_prompt[:end]
+                
+            lora_prompt = lora_prompt[end:]
+        else:
+            return_prompt += lora_prompt
+            break
+    
+    return return_prompt

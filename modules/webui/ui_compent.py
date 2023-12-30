@@ -71,7 +71,7 @@ def MC(show_count):
         btn_refresh_mc = gr.Button("Refresh MC", size="sm", min_width=100, elem_classes="label-left", elem_id="btn_refresh_mc", scale=1)
     with gr.Row(visible=False) as panel_mc_other:
         ckb_mc_other = gr.CheckboxGroup(choices=["Other"], value=["Other"], label=opts.title['mc'], elem_classes="label-left", scale=10, min_width=250, elem_id="ckb_mc_other")
-        txt_mc_other = gr.Textbox(show_label=False, container=False, scale=20, elem_id="txt_mc_other")
+        txt_mc_other = gr.Textbox(show_label=False, container=False, scale=20, elem_id="txt_mc_other", elem_classes="prompt")
         gr.CheckboxGroup(scale=70, container=False)
 
     btn_refresh_mc.click(lambda x : gr.Radio(choices=get_mc(x)), [radio_mc], [radio_mc], queue=False)
@@ -229,22 +229,23 @@ def ReFaceUI(panel_action_btns, panel_action_interface, btn_reface_interface, op
 
     return btn_reface, img_face
 
-def ReSizeUI(panel_action_btns, panel_action_interface, btn_resize_interface, opt_dict):
-    with gr.Row(visible=False) as panel_resize:
-        opt_dict["resize_ratios"] = MakeOpts(["resize_ratios"], min_width=160)["resize_ratios"]
-        opt_resize = opt_dict["resize_ratios"]
-        btn_resize = gr.Button("ReSize", min_width=100, variant="primary", elem_id="btn_resize", elem_classes="btn_action")
-        btn_resize_cancel = gr.Button("Close", min_width=100, elem_id="btn_resize_cancel", elem_classes="btn_action")
+def ReFinerFaceUI(panel_action_btns, panel_action_interface, btn_refiner_face_interface, opt_dict):
+    with gr.Row(visible=False) as panel_refiner_face:
+        opt_dict["refiner_face_denoise"] = MakeSlider(["refiner_face_denoise"], min_width=160)["refiner_face_denoise"]
+        opt_dict["refiner_face_prompt"] = gr.Text(label="Prompt Content", elem_id="txt_refiner_face_prompt", elem_classes="prompt")
+        btn_refiner_face = gr.Button("Refiner Face", min_width=100, variant="primary", elem_id="btn_resize", elem_classes="btn_action")
+        btn_refiner_face_cancel = gr.Button("Close", min_width=100, elem_id="btn_resize_cancel", elem_classes="btn_action")
     
-    btn_resize_interface.click(lambda:(gr.Column(visible=False), gr.Column(visible=True), gr.Row(visible=True)), None, [panel_action_btns, panel_action_interface, panel_resize], queue=False)
-    btn_resize_cancel.click(lambda:(gr.Column(visible=True), gr.Column(visible=False), gr.Row(visible=False)), None, [panel_action_btns, panel_action_interface, panel_resize], queue=False)
+    btn_refiner_face_interface.click(lambda:(gr.Column(visible=False), gr.Column(visible=True), gr.Row(visible=True)), None, [panel_action_btns, panel_action_interface, panel_refiner_face], queue=False)
+    btn_refiner_face_cancel.click(lambda:(gr.Column(visible=True), gr.Column(visible=False), gr.Row(visible=False)), None, [panel_action_btns, panel_action_interface, panel_refiner_face], queue=False)
 
-    return btn_resize
+    return btn_refiner_face
 
 def VaryCustomUI(panel_action_btns, panel_action_interface, btn_vary_custom_interface, opt_dict, gl_sample_list, num_selected_sample, panel_sample_gallery, panel_editor, img_vary_editor):
     with gr.Row(visible=False) as panel_vary_custom:
         opt_dict["vary_custom_strength"] = MakeSlider(["vary_custom_strength"], min_width=160)["vary_custom_strength"]
         opt_dict["vary_custom_area"] = MakeOpts(["vary_custom_area"], opt_type="Radio", min_width=160)["vary_custom_area"]
+        opt_dict["vary_prompt"] = gr.Text(label="Prompt Content", elem_id="txt_vary_prompt", elem_classes="prompt")
         btn_vary_custom = gr.Button("Vary", min_width=100, variant="primary", elem_id="btn_vary_custom", elem_classes="btn_action")
         btn_vary_custom_cancel = gr.Button("Close", min_width=100, elem_id="btn_vary_custom_cancel", elem_classes="btn_action")
     
@@ -255,14 +256,20 @@ def VaryCustomUI(panel_action_btns, panel_action_interface, btn_vary_custom_inte
 
     return btn_vary_custom
 
-def ZoomCustomUI(panel_action_btns, panel_action_interface, btn_zoom_custom_interface, opt_dict):
+def ZoomCustomUI(panel_action_btns, panel_action_interface, btn_zoom_custom_interface, btn_resize_interface, opt_dict):
     with gr.Row(visible=False) as panel_zoom_custom:
-        opt_dict["zoom_custom"] = MakeSlider(["zoom_custom"], min_width=160)["zoom_custom"]
+        sl_zoom_custom = opt_dict["zoom_custom"] = MakeSlider(["zoom_custom"], min_width=160)["zoom_custom"]
+        opt_resize_ratios = opt_dict["resize_ratios"] = MakeOpts(["resize_ratios"], min_width=160, visible=False)["resize_ratios"]
+        opt_dict["zoom_denoise"] = MakeSlider(["zoom_denoise"], min_width=160, visible=False)["zoom_denoise"]
+        opt_dict["zoom_blur_alpha"] = MakeSlider(["zoom_blur_alpha"], min_width=160)["zoom_blur_alpha"]
+        opt_dict["zoom_prompt"] = gr.Text(label="Prompt Content", elem_id="txt_zoom_prompt", elem_classes="prompt")
         btn_zoom_custom = gr.Button("Zoom", min_width=100, variant="primary", elem_id="btn_zoom", elem_classes="btn_action")
+        btn_resize = gr.Button("ReSize", min_width=100, variant="primary", elem_id="btn_resize", elem_classes="btn_action")
         btn_zoom_cancel = gr.Button("Close", min_width=100, elem_id="btn_zoom_cancel", elem_classes="btn_action")
 
-    btn_zoom_custom_interface.click(lambda:(gr.Column(visible=False), gr.Column(visible=True), gr.Row(visible=True)), None, [panel_action_btns, panel_action_interface, panel_zoom_custom], queue=False)
+    btn_zoom_custom_interface.click(lambda:(gr.Column(visible=False), gr.Column(visible=True), gr.Row(visible=True), gr.Button(visible=True), gr.Button(visible=False), gr.Slider(visible=True), gr.Dropdown(visible=False)), None, [panel_action_btns, panel_action_interface, panel_zoom_custom, btn_zoom_custom, btn_resize, sl_zoom_custom, opt_resize_ratios], queue=False)
+    btn_resize_interface.click(lambda:(gr.Column(visible=False), gr.Column(visible=True), gr.Row(visible=True), gr.Button(visible=False), gr.Button(visible=True), gr.Slider(visible=False), gr.Dropdown(visible=True)), None, [panel_action_btns, panel_action_interface, panel_zoom_custom, btn_zoom_custom, btn_resize, sl_zoom_custom, opt_resize_ratios], queue=False)
     btn_zoom_cancel.click(lambda:(gr.Column(visible=True), gr.Column(visible=False), gr.Row(visible=False)), None, [panel_action_btns, panel_action_interface, panel_zoom_custom], queue=False)
 
-    return btn_zoom_custom
+    return btn_zoom_custom, btn_resize
 

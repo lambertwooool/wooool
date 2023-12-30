@@ -29,3 +29,26 @@ def load_sd_lora(model, lora_filename, strength_model=1.0, strength_clip=1.0):
     new_unet, new_clip = sd.load_lora_for_models(model.unet, model.clip, lora_model, strength_model, strength_clip)
 
     return StableDiffusionModel(unet=new_unet, clip=new_clip, vae=model.vae, clip_vision=model.clip_vision)
+
+def calculate_sigmas_all(sampler, model, scheduler, steps):
+    from modules.model.samplers import calculate_sigmas_scheduler
+
+    discard_penultimate_sigma = False
+    if sampler in ['dpm_2', 'dpm_2_ancestral']:
+        steps += 1
+        discard_penultimate_sigma = True
+
+    sigmas = calculate_sigmas_scheduler(model, scheduler, steps)
+
+    if discard_penultimate_sigma:
+        sigmas = torch.cat([sigmas[:-2], sigmas[-1:]])
+    return sigmas
+
+def calculate_sigmas(sampler, model, scheduler, steps, denoise):
+    if denoise is None or denoise > 0.9999:
+        sigmas = calculate_sigmas_all(sampler, model, scheduler, steps)
+    else:
+        new_steps = int(steps / denoise)
+        sigmas = calculate_sigmas_all(sampler, model, scheduler, new_steps)
+        sigmas = sigmas[-(steps + 1):]
+    return sigmas

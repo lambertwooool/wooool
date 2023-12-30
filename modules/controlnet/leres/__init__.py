@@ -28,16 +28,16 @@ class LeresDetector:
         offload_device = model_loader.offload_device("annotator")
         self.model = model_patcher.ModelPatcher(model, load_device, offload_device)
 
-        model_path_pix2pix = os.path.join(modules.paths.annotator_models_path, filename_pix2pix)
-        opt = TestOptions().parse()
-        if not torch.cuda.is_available():
-            opt.gpu_ids = []  # cpu mode
-        pix2pixmodel = Pix2Pix4DepthModel(opt)
-        pix2pixmodel.save_dir = os.path.dirname(model_path_pix2pix)
-        pix2pixmodel.load_networks('latest')
-        pix2pixmodel.eval()
+        # model_path_pix2pix = os.path.join(modules.paths.annotator_models_path, filename_pix2pix)
+        # opt = TestOptions().parse()
+        # if not torch.cuda.is_available():
+        #     opt.gpu_ids = []  # cpu mode
+        # pix2pixmodel = Pix2Pix4DepthModel(opt)
+        # pix2pixmodel.save_dir = os.path.dirname(model_path_pix2pix)
+        # pix2pixmodel.load_networks('latest')
+        # pix2pixmodel.eval()
 
-        self.pix2pixmodel = pix2pixmodel
+        # self.pix2pixmodel = pix2pixmodel
 
     @torch.no_grad()
     @torch.inference_mode()
@@ -47,10 +47,11 @@ class LeresDetector:
         model_loader.load_model_gpu(self.model)
 
         with torch.no_grad():
-            if boost:
-                depth = estimateboost(detected_map, self.model.model, 0, self.pix2pixmodel, max(detected_map.shape[1], detected_map.shape[0]))
-            else:
-                depth = estimateleres(detected_map, self.model.model, detected_map.shape[1], detected_map.shape[0])
+            # if boost:
+            #     depth = estimateboost(detected_map, self.model.model, 0, self.pix2pixmodel, max(detected_map.shape[1], detected_map.shape[0]))
+            # else:
+            #     depth = estimateleres(detected_map, self.model.model, detected_map.shape[1], detected_map.shape[0])
+            depth = estimateleres(detected_map, self.model.model, detected_map.shape[1], detected_map.shape[0])
 
             numbytes=2
             depth_min = depth.min()

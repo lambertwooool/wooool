@@ -14,7 +14,7 @@ from PIL import Image
 import modules.paths
 import modules.options as opts
 import modules.worker as worker
-from modules import civitai, devices, lora, shared, util
+from modules import civitai, devices, lora, shared, util, wd14tagger
 from modules.model import model_helper
 
 progress_html = "<progress value='{}' max='100'></progress><div class='progress_text'>{}</div>"
@@ -59,7 +59,7 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
         "cfg_scale_to": gen_opts.pop("cfg_scale_to"),
         "aspect_ratios": gen_opts.pop("ratios"),
         "batch": gen_opts.pop("pic_num"),
-        "style": style_item,
+        "style": style_item if not gen_opts.pop("disable_style", False) else None,
         "sampler": gen_opts.pop("sampler"),
         "scheduler": gen_opts.pop("scheduler"),
         "seed": seed,
@@ -85,7 +85,7 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
     if gen_opts.pop("custom_size", False):
         params["size"] = (int(gen_opts.pop("image_width")), int(gen_opts.pop("image_height")))
 
-    for x in ["mc", "style", "view", "emo", "location", "weather", "hue", "prompt_negative"]:
+    for x in ["mc", "style", "view", "emo", "location", "weather", "hue", "prompt_negative", "more_art"]:
         pm_weight = gen_opts.pop(f'{x}_weight', 1.0)
         if pm_weight != 1.0:
             if x == "mc":
@@ -93,9 +93,9 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
                 if isinstance(mc_prompt, dict):
                     params["main_character"][1]["weight"] = pm_weight
                 else:
-                    params["main_character"]["weight"] = pm_weight
-            elif x == "style":
-                params["style_weight"] = pm_weight
+                    params["main_character"] = (mc_name, { "prompt": mc_prompt, "weight": pm_weight})
+            elif x in ["style", "more_art"]:
+                params[f"{x}_weight"] = pm_weight
             elif x == "prompt_negative":
                 params["prompt_negative"] = f"({params['prompt_negative']}:{pm_weight})"
             elif x in params["options"]:
@@ -114,13 +114,14 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
             opt_type, image_refer, sl_rate, ckb_words, opt_model = ref_image_args[i * len_ref_ctrl : (i + 1) * len_ref_ctrl]
             ref_mode, _ = opts.options["ref_mode"][opt_type]
             if ref_mode == "base_image":
-                params["image"] = (image_refer, None)
-                skip_rate = sl_rate / 100.0
-                params["skip_step"] = skip_rate if skip_rate < 1 else 0.99
+                if image_refer is not None:
+                    params["image"] = (image_refer, None)
+                    skip_rate = sl_rate / 100.0
+                    params["skip_step"] = skip_rate if skip_rate < 1 else 0.99
             elif ref_mode == "content":
                 params["prompt_main"] += f",({','.join(ckb_words)}:{sl_rate / 100.0 / 0.8:.2f})"
             else:
-                if image_refer is not None:
+                if image_refer is not None or params.get("image"):
                     params["controlnet"].append([opt_type, ref_mode, image_refer, sl_rate / 100.0, opt_model])
 
         len_lora_ctrl = 3
@@ -210,9 +211,10 @@ def Process(process_handler):
         if file_path is not None:
             gen_opts, setting = GetGenOptions(txt_setting)
             params, pnginfo = ParseImageToTask(image, return_pnginfo=True)
-            ref_image = np.array(image)
+            ref_image = np.array(image)[:,:,:3]
 
             params["base_name"] = gen_opts.get("vary_model")
+            params["prompt_main"] = params.get("prompt_main", "") or ",".join(wd14tagger.tag(ref_image)[:12])
             params["refiner_name"] = gen_opts.get("refiner_model")
             params["batch"] = gen_opts.get("pic_num")
             params["quality"] = gen_opts.get("quality")
@@ -261,7 +263,7 @@ def GetModelInfo(opt_model):
     url = None
     if os.path.exists(model_file) or civitai.exists_info(model_file):
         info = civitai.get_model_versions(model_file)
-        url = info["model_homepage"]
+        url = info.get("model_homepage")
 
     if url:
         return gr.Button(link=url, interactive=True)
@@ -314,8 +316,9 @@ def RefreshModels():
     return gr.Dropdown(base_models), gr.Dropdown(GetRefinerModels("sdxl")), gr.Dropdown([opts.title["disable_refiner"]] + GetRefinerModels("sdxl"))
 
 def GetRefinerModels(base_model):
-    model_type = "(sd15)" if "sd15" in base_model else "sdxl"
-    renfiner_models = [x for x in list(model_helper.base_files) if model_type in x]
+    # model_type = "(sd15)" if "sd15" in base_model else "(sdxl)"
+    # renfiner_models = [x for x in list(model_helper.base_files) if model_type in x]
+    renfiner_models = [x for x in list(model_helper.base_files) if "(sd15)" not in x]
     return renfiner_models
 
 def GetSelectSamplePath(gl_sample_list, num_selected_sample):
@@ -365,6 +368,9 @@ def ParseGenerateData(txt_generate_data):
 
     if info.get("cfg_scale"):
         info["cfg_scale"] = round(float(info["cfg_scale"]) / 0.5) * 0.5
+    
+    if not info.get("cfg_scale_to"):
+        info["cfg_scale_to"] = info["cfg_scale"]
 
     if info.get("steps"):
         step_all = int(info.pop("steps", 0))
@@ -392,6 +398,9 @@ def ParseGenerateData(txt_generate_data):
 
     if info.get("clip_skip"):
         info["clip_skip"] = abs(int(info.get("clip_skip")))
+    
+    if not info.get("sdxl_style"):
+        info["disable_style"] = True
 
     # if info.get("main_character"):
     #     mc = re.search(r"\('(\w+)' .*", info.get("main_character"))
@@ -550,6 +559,7 @@ def ResetSetting():
         "fixed_seed": False,
         "custom_step": False,
         "custom_size": False,
+        "disable_style": False,
     }
     return InitSetting(json.dumps(data), reset=True)
 
@@ -613,6 +623,7 @@ def GetControlnets(ref_mode, model_type):
     re_sdxl = r"\b(xl|sdxl)\b"
     re_sd15 = r"\b(15|sd15)\b"
     re_ref_mode = opts.options["ref_mode"][ref_mode][1].get("keyword")
+    # re_ref_mode = re.sub(r"[\-_]", " ", re_ref_mode)
     default_model = opts.options["ref_mode"][ref_mode][1].get(model_type)
 
     def model_filter(filename, ref_mode, model_type):

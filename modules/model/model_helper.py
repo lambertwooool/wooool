@@ -64,14 +64,16 @@ def get_model_info(model_path, calc_hash=True):
     if data is None or not data or (calc_hash and not data.get("sha256", "")):
         if os.path.exists(f"{model_path}{civitai.suffix}"):
             civitai_info = civitai.get_model_versions(model_path)
-            model_types = {
-                "SD 1.5": "sd15",
-                "SDXL 1.0": "sdxl",
-            }
-            data = {
-                "sha256": civitai_info["files"][0]["hashes"]["SHA256"].lower(),
-                "base_model": model_types.get(civitai_info["baseModel"], ""),
-            }
+            if civitai_info is not None:
+                model_types = {
+                    "SD 1.5": "sd15",
+                    "SDXL 1.0": "sdxl",
+                }
+                baseMode = civitai_info["baseModel"]
+                data = {
+                    "sha256": civitai_info["files"][0]["hashes"]["SHA256"].lower(),
+                    "base_model": model_types.get(baseMode) or baseMode,
+                }
         else:
             data = {
                 "base_model": get_model_type_by_size(model_path),
@@ -79,18 +81,18 @@ def get_model_info(model_path, calc_hash=True):
             if calc_hash:
                 data["sha256"] = util.gen_file_sha256(model_path)
 
-        if data.get("sha256", ""):
+        if data and data.get("sha256", ""):
             with open(config_file, "w") as file:
                 file.write(json.dumps(data, indent=4))
     
-    return data
+    return data or {}
 
 def get_base_list():
     global base_files, default_base_name, default_refiner_name
 
     base_files = modules.paths.modelfile_path
     files = util.list_files(base_files, ["checkpoint", "safetensors"], search_subdir=True)
-    files = { re.sub(r"^(\w+)\\", r"[ \1 ] ", os.path.relpath(os.path.splitext(x)[0], base_files)) + f" ({get_model_info(x, calc_hash=False)['base_model']})" : x for x in files }
+    files = { re.sub(r"^(\w+)\\", r"[ \1 ] ", os.path.relpath(os.path.splitext(x)[0], base_files)) + f" ({get_model_info(x, calc_hash=False).get('base_model', '')})" : x for x in files }
     base_files = files
     refiner_files = files
     base_name = os.path.splitext(options.default_base_name)[0]
@@ -612,3 +614,33 @@ def throw_exception_if_processing_interrupted():
         if interrupt_processing:
             interrupt_processing = False
             raise InterruptProcessingException()
+        
+def get_tiled_scale_steps(width, height, tile_x, tile_y, overlap):
+    return math.ceil((height / (tile_y - overlap))) * math.ceil((width / (tile_x - overlap)))
+
+@torch.inference_mode()
+def tiled_scale(samples, function, tile_x=64, tile_y=64, overlap = 8, upscale_amount = 4, out_channels = 3, pbar = None):
+    output = torch.empty((samples.shape[0], out_channels, round(samples.shape[2] * upscale_amount), round(samples.shape[3] * upscale_amount)), device="cpu")
+    for b in range(samples.shape[0]):
+        s = samples[b:b+1]
+        out = torch.zeros((s.shape[0], out_channels, round(s.shape[2] * upscale_amount), round(s.shape[3] * upscale_amount)), device="cpu")
+        out_div = torch.zeros((s.shape[0], out_channels, round(s.shape[2] * upscale_amount), round(s.shape[3] * upscale_amount)), device="cpu")
+        for y in range(0, s.shape[2], tile_y - overlap):
+            for x in range(0, s.shape[3], tile_x - overlap):
+                s_in = s[:,:,y:y+tile_y,x:x+tile_x]
+
+                ps = function(s_in).cpu()
+                mask = torch.ones_like(ps)
+                feather = round(overlap * upscale_amount)
+                for t in range(feather):
+                        mask[:,:,t:1+t,:] *= ((1.0/feather) * (t + 1))
+                        mask[:,:,mask.shape[2] -1 -t: mask.shape[2]-t,:] *= ((1.0/feather) * (t + 1))
+                        mask[:,:,:,t:1+t] *= ((1.0/feather) * (t + 1))
+                        mask[:,:,:,mask.shape[3]- 1 - t: mask.shape[3]- t] *= ((1.0/feather) * (t + 1))
+                out[:,:,round(y*upscale_amount):round((y+tile_y)*upscale_amount),round(x*upscale_amount):round((x+tile_x)*upscale_amount)] += ps * mask
+                out_div[:,:,round(y*upscale_amount):round((y+tile_y)*upscale_amount),round(x*upscale_amount):round((x+tile_x)*upscale_amount)] += mask
+                if pbar is not None:
+                    pbar.update(1)
+
+        output[b:b+1] = out/out_div
+    return output
