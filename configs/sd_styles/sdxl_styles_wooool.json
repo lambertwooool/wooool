@@ -38,5 +38,17 @@
         "name": "wl-vincent-van-gogh",
         "prompt": "A painting of {prompt}, style of Vincent van Gogh the starry night, Vincent van Gogh's painting style, pointillism style, magnificent landscapes, illustrations, negative space, art, minimalism",
         "negative_prompt": "(low quality, worst quality), lowres, jpeg artifacts,watermark, signature"
+    },
+    {
+        "name": "wl-blood-forest",
+        "prompt": "creature in the red forest made from fractal vines, blood forest, {prompt}, blood sky, Fractal Vines, ral mythcr, soft lighting, dark red background, detailed background, real life",
+        "negative_prompt": "(low quality, worst quality), lowres, jpeg artifacts,watermark, signature, green"
     }
+    ,
+    {
+        "name": "wl-crystal-glass",
+        "prompt": "figurine made of clear glass, FrostedStyle, {prompt}, glowing inside,studded with rubies,holding a delicate blue ruby jewelry,graceful figure, with gold patterned edging,clear glass",
+        "negative_prompt": "(low quality, worst quality), lowres, jpeg artifacts,watermark, signature"
+    }
+    
 ]

@@ -220,14 +220,20 @@ def get_faces(input_image):
     detector = dlib.get_frontal_face_detector()
     gray = cv2.cvtColor(input_image, cv2.COLOR_BGR2GRAY)
     faces = detector(gray)
+    max_face = ([0, 0, 0, 0], None)
     for i, face in enumerate(faces):
         # Calculate the central coordinates of the face
         x, y, w, h = face.left(), face.top(), face.width(), face.height()
+        _, _, mw, mh = max_face[0]
+
+        if w * h < mw * mh:
+            continue
+
         center_x = x + w // 2
         center_y = y + h // 2
 
         # Calculates the top-left and bottom-right coordinates of the crop box
-        crop_size = 1024
+        crop_size = int(max(w, h) * 2) // 8 * 8
         x1 = max(0, center_x - crop_size // 2)
         y1 = max(0, center_y - crop_size // 2)
         x2 = min(input_image.shape[1], x1 + crop_size)
@@ -235,13 +241,13 @@ def get_faces(input_image):
 
         # Crop face
         cropped_face = input_image[y1:y2, x1:x2]
-        cropped_face = input_image[max(0, y):min(input_image.shape[0], y+h), max(0, x):min(input_image.shape[1], x+w)]
+        # cropped_face = input_image[max(0, y):min(input_image.shape[0], y+h), max(0, x):min(input_image.shape[1], x+w)]
 
         save_temp_image(cropped_face, f"face_{i}.png")
 
-        return [x, y, w, h], cropped_face
+        max_face = ([x, y, w, h], cropped_face)
 
-    return None, None
+    return max_face
 
 def resample_image(im, width, height):
     im = Image.fromarray(im)

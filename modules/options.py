@@ -98,13 +98,38 @@ default["detail"] = 30
 
 # Ref Mode
 options["ref_mode"] = {
-	"Ref All": ("ip_adapter",  { "sdxl": "ip-adapter-plus_sdxl_vit-h.bin", "sd15": "ip-adapter_sd15_plus.pth", "keyword": r"ip adapter plus (?!face)" }),
+	"Ref All": (	"ip_adapter",
+			 		{	"sdxl": "ip-adapter-plus_sdxl_vit-h.bin", "sd15": "ip-adapter_sd15_plus.pth",
+	   					"keyword": [r"ip adapter.*plus(?! face)", "tile"],
+						"annotator": ["ip_adapter", "tile"]
+					}),
 	"Ref Content": ("content", { "sdxl": None, "sd15": None, "keyword": None }),
-	"Ref Stuct": ("canny", { "sdxl": "sai_xl_canny_128lora.safetensors", "sd15": "control_v11p_sd15_canny.pth", "keyword": r"canny" }),
-    "Ref Depth": ("depth_leres", { "sdxl": "sai_xl_depth_128lora.safetensors", "sd15": "control_v11f1p_sd15_depth.pth", "keyword": r"depth" }),
-    "Ref Face": ("ip_adapter_face", { "sdxl": "ip-adapter-plus-face_sdxl_vit-h.bin", "sd15": "ip-adapter-plus-face_sd15.bin", "keyword": r"ip adapter plus face" }),
-	"Ref Pose": ("dwpose", { "sdxl": "thibaud_xl_openpose_256lora.safetensors", "sd15": "control_v11p_sd15_openpose.pth", "keyword": r"openpose" }), # thibaud_xl_openpose_256lora.safetensors
+	"Ref Stuct": (	"canny",
+			   		{	"sdxl": "sai_xl_canny_128lora.safetensors", "sd15": "control_v11p_sd15_canny.pth",
+						"keyword": [r"canny", r"^(?!.*t2i)(?=.*lineart).*$", r".*t2i.*lineart", r"sketch", r"mlsd", r"scribble", r"softedge"],
+						"annotator": ["canny", ["lineart_coarse", "lineart_realistic", "lineart_anime", "lineart_anime_denoise"], ["lineart_coarse_invert", "lineart_realistic_invert", "lineart_anime_invert", "lineart_anime_denoise_invert"], ["scribble_hed", "softedge_hed"], ["mlsd", "canny"], "scribble_hed", "softedge_hed" ]
+					}),
+    "Ref Depth": (	"depth_leres",
+				  	{ 	"sdxl": "sai_xl_depth_128lora.safetensors", "sd15": "control_v11f1p_sd15_depth.pth",
+						"keyword": [r"^(?!.*t2i)(?=.*depth).*$", r"depth midas", r"depth zoe"],
+						"annotator": [["depth_leres", "depth_midas", "depth_zoe"], "depth_midas", "depth_zoe"]
+					}),
+    "Ref Face": (	"ip_adapter_face",
+				 	{	"sdxl": "ip-adapter-plus-face_sdxl_vit-h.bin", "sd15": "ip-adapter-plus-face_sd15.bin",
+	   					"keyword": [r"(ip adapter plus.*face|ip adapter face.*plus)", r"^(?!.*xl)(?!.*animal)(?=.*openpose)(?!.*xl).*$"],
+						"annotator": ["ip_adapter_face", "dwpose_face"]
+					}),
+	"Ref Pose": (	"dwpose",
+			  		{ 	"sdxl": "thibaud_xl_openpose_256lora.safetensors", "sd15": "control_v11p_sd15_openpose.pth",
+						"keyword": [r"^(?!.*animal)(?=.*openpose).*$", r".*animal.*openpose"],
+						"annotator": ["dwpose", "animal_pose"]
+					}),
 	"Base Image": ("base_image", { "sdxl": None, "sd15": None, "keyword": None }),
+	"Others": (		"default",
+					{	"sdxl": None, "sd15": None,
+	  					"keyword": [r"normalbae", r"shuffle", r"(brightness|qrcode)", r"\bseg\b", r"\bcolor\b", r"^(?!.*(ip adapter|tile|canny|lineart|mlsd|scribble|softedge|sketch|depth|openpose|normalbae|shuffle|brightness|\bseg\b|\bcolor\b)).*$"],
+						"annotator": ["normal_bae", "shuffle", ["binary", "binary_invert"], ["oneformer", "segment_anything"], "color", "default"]
+					 }),
 }
 default["ref_mode"] = "Ref All"
 
@@ -128,7 +153,7 @@ default["cfg_scale"] = 7
 options["cfg_scale_to"] = (0.5, 20, 0.5)
 mul["cfg_scale_to"] = 1
 title["cfg_scale_to"] = "CFG Work-up to"
-default["cfg_scale_to"] = 9
+default["cfg_scale_to"] = 5
 
 # File Format
 options["file_format"] = {
@@ -251,8 +276,14 @@ mul["zoom_blur_alpha"] = 0.01
 title["zoom_blur_alpha"] = "Blur alpha %"
 default["zoom_blur_alpha"] = 50
 
-# Refiner Face Denoise
-options["refiner_face_denoise"] = (0, 100, 5)
-mul["refiner_face_denoise"] = 0.01
-title["refiner_face_denoise"] = "Refiner Weight %"
-default["refiner_face_denoise"] = 30
+# Refiner Denoise
+options["refiner_denoise"] = (0, 100, 5)
+mul["refiner_denoise"] = 0.01
+title["refiner_denoise"] = "Vary Strength %"
+default["refiner_denoise"] = 30
+
+# Refiner Detail
+options["refiner_detail"] = (0, 100, 5)
+mul["refiner_detail"] = 0.01
+title["refiner_detail"] = "Refiner Detail %"
+default["refiner_detail"] = 30

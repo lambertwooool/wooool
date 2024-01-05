@@ -46,7 +46,8 @@ def parse_block(prompt):
             start, end = lora.span()
             lora_prompt = lora_prompt[:start] + lora_prompt[end:]
             lora_name, _, lora_weight = lora.groups()
-            lora_weight = float(lora_weight)
+            lora_weight = float(lora_weight) if lora_weight else 1.0
+            lora_name = lora_name + ".safetensors" if os.path.splitext(lora_name)[1] == "" else lora_name
             
             loras.append((lora_name, lora_weight, ""))
         else:
@@ -100,9 +101,9 @@ def remove_prompt_lora(prompt, name):
             lora_name, _, lora_weight = lora.groups()
             start, end = lora.span()
             if lora_name == name:
-                return_prompt = lora_prompt[:start]
+                return_prompt += lora_prompt[:start]
             else:
-                return_prompt = lora_prompt[:end]
+                return_prompt += lora_prompt[:end]
                 
             lora_prompt = lora_prompt[end:]
         else:

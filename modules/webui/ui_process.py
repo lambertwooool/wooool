@@ -14,7 +14,7 @@ from PIL import Image
 import modules.paths
 import modules.options as opts
 import modules.worker as worker
-from modules import civitai, devices, lora, shared, util, wd14tagger
+from modules import civitai, controlnet_helper, devices, lora, shared, util, wd14tagger
 from modules.model import model_helper
 
 progress_html = "<progress value='{}' max='100'></progress><div class='progress_text'>{}</div>"
@@ -107,22 +107,25 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
             ref_mode, _ = opts.options["ref_mode"]["Ref All"]
             params["controlnet"].append(["Ref All", ref_mode, img_refer, 0.5])
     else:
-        len_ref_ctrl = 5
+        len_ref_ctrl = 8
         ref_image_args = args[: ref_image_count[0] * len_ref_ctrl]
         args = args[ref_image_count[0] * len_ref_ctrl :]
         for i in range(ref_image_count[0]):
-            opt_type, image_refer, sl_rate, ckb_words, opt_model = ref_image_args[i * len_ref_ctrl : (i + 1) * len_ref_ctrl]
+            opt_type, image_refer, sl_rate, ckb_words, opt_model, opt_annotator, sl_start_percent, sl_end_percent = ref_image_args[i * len_ref_ctrl : (i + 1) * len_ref_ctrl]
             ref_mode, _ = opts.options["ref_mode"][opt_type]
             if ref_mode == "base_image":
                 if image_refer is not None:
-                    params["image"] = (image_refer, None)
+                    params["base_image"] = (image_refer, None)
                     skip_rate = sl_rate / 100.0
                     params["skip_step"] = skip_rate if skip_rate < 1 else 0.99
             elif ref_mode == "content":
                 params["prompt_main"] += f",({','.join(ckb_words)}:{sl_rate / 100.0 / 0.8:.2f})"
             else:
                 if image_refer is not None or params.get("image"):
-                    params["controlnet"].append([opt_type, ref_mode, image_refer, sl_rate / 100.0, opt_model])
+                    params["controlnet"].append([opt_type, opt_annotator or ref_mode, image_refer, sl_rate / 100.0, opt_model, sl_start_percent / 100.0, sl_end_percent / 100.0])
+        
+        if params.get("base_image"):
+            params["image"] = params.pop("base_image")
 
         len_lora_ctrl = 3
         lora_args = args[: lora_count[0] * len_lora_ctrl]
@@ -263,7 +266,7 @@ def GetModelInfo(opt_model):
     url = None
     if os.path.exists(model_file) or civitai.exists_info(model_file):
         info = civitai.get_model_versions(model_file)
-        url = info.get("model_homepage")
+        url = info.get("model_homepage") if info else None
 
     if url:
         return gr.Button(link=url, interactive=True)
@@ -341,12 +344,12 @@ def GetImageGenerateData(img_generate_data):
     else:
         return gr.Textbox()
 
-def ParseGenerateData(txt_generate_data):
+def GetGenerateData(generate_data):
     alias = {
         "prompt": "prompt_main",
-        # "negative": "prompt_negative",
+        "negative": "prompt_negative",
     }
-    info = util.parse_generation_parameters(txt_generate_data)
+    info = util.parse_generation_parameters(generate_data)
     info = { alias.get(k, k.replace(" ", "_")) : v for k, v in info.items() }
 
     if info.get("size"):
@@ -355,52 +358,76 @@ def ParseGenerateData(txt_generate_data):
         size = [int(info.get("width")), int(info.get("height"))]
     else:
         size = None
-
+    
     if size:
-        # ratios = util.size2ratio(size[0], size[1])
         width, height = [int(x / 8) * 8 for x in size]
         src_ratio = width / height
         ratios = sorted([(k, v) for k, v in opts.options["ratios"].items()], key=lambda x: abs((x[1][0] / x[1][1]) - src_ratio))[0][1]
-        info["ratios"] = f"{ratios[0]}:{ratios[1]}"
-        info["image_width"] = width
-        info["image_height"] = height
-        info["custom_size"] = True
-
+        info["aspect_ratios"] = ratios
+        info["size"] = (width, height)
+    
     if info.get("cfg_scale"):
         info["cfg_scale"] = round(float(info["cfg_scale"]) / 0.5) * 0.5
     
-    if not info.get("cfg_scale_to"):
-        info["cfg_scale_to"] = info["cfg_scale"]
-
+    if not info.get("cfg_scale_to") and info.get("cfg_scale"):
+        info["cfg_scale_to"] = float(info.get("cfg_scale"))
+    
     if info.get("steps"):
         step_all = int(info.pop("steps", 0))
         step_refiner = int(info.pop("refiner_steps", 0))
-        info["step_base"] = max(0, step_all - step_refiner)
-        info["step_refiner"] = max(0, step_refiner)
-        info["custom_step"] = True
-
+        info["steps"] = (max(0, step_all - step_refiner), max(0, step_refiner))
+    
     if info.get("seed"):
-        info["fixed_seed"] = True
-
+        info["seed"] = int(info.get("seed"))
+    
     sampler = info.get("sampler", "").lower()
     scheduler = info.get("scheduler", "").lower()
     if scheduler:
         scheduler = ([k for k, v in opts.options["scheduler"].items() if k.lower() == scheduler or v.lower() == scheduler] + [None])[0]
     elif sampler:
         scheduler = ([k for k, v in opts.options["scheduler"].items() if sampler.endswith(f" {k.lower()}") or sampler.endswith(f" {v.lower()}")] + [None])[0]
-    info["scheduler"] = scheduler
+    if scheduler:
+        info["scheduler"] = scheduler
     sampler = sampler[:-(len(scheduler) + 1)] if scheduler else sampler
 
     if sampler:
         sampler = ([k for k, v in opts.options["sampler"].items() if f"{k.lower()}".startswith(sampler) or f"{v.lower()}".startswith(sampler)] + [None])[0]
     info["sampler"] = sampler
+
+    if info.get("clip_skip"):
+        info["clip_skip"] = -1 * abs(int(info.get("clip_skip")))
+
+    return info
+
+def ParseGenerateData(txt_generate_data):
+    info = GetGenerateData(txt_generate_data)
+    info["custom_size"] = True
+    info["custom_step"] = True
+
+    ratios = info.get("aspect_ratios")
+    if ratios:
+        info["ratios"] = f"{ratios[0]}:{ratios[1]}"
+
+    if info.get("seed"):
+        info["fixed_seed"] = True
+
+    info["negative"] = info.pop("prompt_negative") if info.get("prompt_negative") else None
     info["recommend_negative"] = []
 
     if info.get("clip_skip"):
-        info["clip_skip"] = abs(int(info.get("clip_skip")))
+        info["clip_skip"] = abs(info.get("clip_skip"))
     
     if not info.get("sdxl_style"):
         info["disable_style"] = True
+    
+    if info.get("steps"):
+        steps = info.get("steps")
+        info["step_base"] = steps[0]
+        info["step_refiner"] = steps[1]
+    
+    width, height = info.get("size")
+    info["image_width"] = width
+    info["image_height"] = height
 
     # if info.get("main_character"):
     #     mc = re.search(r"\('(\w+)' .*", info.get("main_character"))
@@ -413,6 +440,35 @@ def ParseGenerateData(txt_generate_data):
     info["mc_other"] = ""
 
     return gr.Textbox(json.dumps(info))
+
+def GenerateByData(txt_generate_data, txt_setting):
+    params = GetGenerateData(txt_generate_data)
+    gen_opts, setting = GetGenOptions(txt_setting)
+    
+    if params.get("sampler"):
+        params["sampler"] = opts.options["sampler"][params.get("sampler")]
+    
+    if params.get("scheduler"):
+        params["scheduler"] = opts.options["scheduler"][params.get("scheduler")]
+    
+    if not params.get("cfg_scale"):
+        params["cfg_scale"] = gen_opts.pop("cfg_scale")
+        params["cfg_scale_to"] = gen_opts.pop("cfg_scale_to")
+    
+    params["aspect_ratios"] = gen_opts.pop("ratios")
+    params["batch"] = gen_opts.pop("pic_num")
+    gen_opts["steps"] = (gen_opts.pop("step_base"), gen_opts.pop("step_refiner")) if gen_opts.pop("custom_step") else (None, None)
+    
+    for k, v in gen_opts.items():
+        if k in ["quality", "size", "steps", "seed", "sampler", "clip_skip", "scheduler"] and not params.get(k):
+            params[k] = v
+
+    proc_output = ProcessTask(params)
+    while True:
+        try:
+            yield next(proc_output)
+        except StopIteration:
+            break
 
 def ParseImageToTask(image, return_pnginfo=False):
     params = {}
@@ -609,6 +665,13 @@ def InitSetting(txt_setting, reset=False):
             
     return objs
 
+def ChangeQuality(opt_quality):
+    quality = opts.options["quality"][opt_quality]
+    quality_file = opts.options["quality_setting"][str(quality)]["setting"]
+    data = json.dumps(util.load_json(os.path.join("./configs/settings", quality_file)))
+
+    return gr.Text(value=data)
+
 def LoadSetting(btn_load_setting):
     data = json.dumps(util.load_json(btn_load_setting.name))
     return gr.Text(value=data)
@@ -620,11 +683,14 @@ def ChangeRefBlockNum(sl_refNum):
     return [gr.Column(visible=True)] * sl_refNum + [gr.Column(visible=False)] * (5 - sl_refNum)
 
 def GetControlnets(ref_mode, model_type):
-    re_sdxl = r"\b(xl|sdxl)\b"
-    re_sd15 = r"\b(15|sd15)\b"
+    re_sdxl = r"\b(xl|sdxl|control\s*lora)\b"
+    re_sd15 = r"\b(14|15|sd14|sd15)(v\d+)?\b"
     re_ref_mode = opts.options["ref_mode"][ref_mode][1].get("keyword")
     # re_ref_mode = re.sub(r"[\-_]", " ", re_ref_mode)
     default_model = opts.options["ref_mode"][ref_mode][1].get(model_type)
+
+    if not isinstance(re_ref_mode, list):
+        re_ref_mode = [re_ref_mode]
 
     def model_filter(filename, ref_mode, model_type):
         if filename == default_model:
@@ -640,15 +706,17 @@ def GetControlnets(ref_mode, model_type):
         else:
             return False
         
-        if re_ref_mode is not None and re.search(re_ref_mode, filename) is None:
+        if re_ref_mode is not None and all([re.search(x, filename) is None for x in re_ref_mode]):
             return False
 
         return True
             
-    files = util.list_files(modules.paths.controlnet_models_path)
+    # files = util.list_files(modules.paths.controlnet_models_path, ["pth", "safetensors"])
     # files = [os.path.split(os.path.splitext(x)[0])[-1] for x in files if model_filter(x, ref_mode, model_type)]
     # files = [os.path.split(os.path.splitext(default_model)[0])[-1]] + files
-    files = [os.path.split(x)[-1] for x in files if model_filter(x, ref_mode, model_type)]
+    files = controlnet_helper.get_controlnets()
+    files = [k for k, v in files.items() if model_filter(v.lower(), ref_mode, model_type)]
+    default_model = os.path.splitext(default_model)[0] if default_model else None
     files = [default_model] + files if default_model not in files else files
     
     return files, default_model

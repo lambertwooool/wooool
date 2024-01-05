@@ -63,7 +63,7 @@ div:has(#radio_mc, #ckb_mc_other), #radio_mc, #ckb_mc_other { background-color: 
 
 #radio_mc, #ckb_mc_other { padding: 0px; }
 #radio_mc input[type=radio] { display: none; }
-#radio_mc label { padding: 2px; }
+#radio_mc label { padding: 2px; min-width: 80px; text-align: center; display: inline-grid; }
 .label-left span { float:left; margin-right: 8px; }
 #txt_mc_other { margin-bottom: -5px; }
 #btn_refresh_mc { padding: 0; font-size: 14px; }
@@ -88,4 +88,7 @@ div:has(#radio_mc, #ckb_mc_other), #radio_mc, #ckb_mc_other { background-color: 
 #panel_action div:has(>button) { gap: 5px; }
 #ckb_seed { padding-top: 55px }
 
-.gr_slider > div:has(input[disabled]), #txt_seed > label:has(input[disabled]) { opacity: 0.3 }
+.refer_start_at, .refer_end_at { white-space: nowrap; }
+.refer_start_at input[type=number], .refer_end_at input[type=number] { width: 50px; padding: 0; }
+
+.gr_slider > div:has(input[disabled]), #txt_seed > label:has(input[disabled]), .gr_dropdown > label:has(input[disabled]) { opacity: 0.3 }

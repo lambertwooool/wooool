@@ -39,6 +39,7 @@
     "Zoom": "Zoom",
     "Blur Alpha %": "Continuity %",
     "Prompt Content": "Prompt Content",
+    "Refiner Detail %": "Refiner Detail %",
     "Initializing": "Initializing",
     "Waiting": "Waiting",
     "Generating": "Generating",
@@ -92,7 +93,9 @@
     "Monkey King": "Monkey King",
     "Jellyfish": "Jellyfish",
     "Manatee": "Manatee",
+    "Buddha": "Buddha",
     "Other": "Other",
+    "Others": "Others",
 
     "Ref Image": "Reference image",
     "Skip": "Skip",
@@ -184,6 +187,8 @@
     "Base Image": "Base Image",
     "Ref Template": "LoRA Template",
     "Trained Words": "Trained Words",
+    "Start At %": "Start At %",
+    "End At %": "End At %",
     "None": "None",
     "1 Sample": "1 sample",
     "2 Samples": "2 samples",
@@ -266,6 +271,8 @@
     "Download Setting": "Download Setting",
     "Load Setting": "Load Setting",
     "Reset Setting": "Reset Setting",
+    "Generate Data": "Generate Data",
+    "Parse Data": "Parse Data",
     
     "waiting ...": "Adding to processing queue...",
     "processing ...": "Preprocessing...",
@@ -494,5 +501,6 @@
     "wl-gold-casting": "Gold Casting",
     "wl-undersea": "Undersea",
     "wl-christmas": "Christmas",
-    "wl-vincent-van-gogh": "Vincent Van Gogh"
+    "wl-vincent-van-gogh": "Vincent Van Gogh",
+    "wl-blood-forest": "Blood Forest"
 }

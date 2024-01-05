@@ -65,15 +65,17 @@ def get_url(url):
 
 def exists_info(model_path):
     config_file = f"{model_path}{suffix}"
-    return os.path.exists(config_file)
+    return os.path.exists(config_file) and util.load_json(config_file)
 
 def get_model_versions(
         model_path: str
 ) -> dict:
     config_file = f"{model_path}{suffix}"
+    data = None
     if os.path.exists(config_file):
         data = util.load_json(config_file)
-    else:
+    
+    if data is None:
         if base_url is not None:
             hash_value = util.gen_file_sha256(model_path)[:10]
             url = f"{base_url}{api['model-versions-hash']}{hash_value}"

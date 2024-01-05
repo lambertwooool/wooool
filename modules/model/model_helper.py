@@ -25,8 +25,11 @@ def load_torch_file(ckpt, safe_load=False, device=None):
     start_time = time.perf_counter()
     if device is None:
         device = torch.device("cpu")
-    if ckpt.lower().endswith(".safetensors"):
+    ext = os.path.splitext(ckpt)[1]
+    if ext == ".safetensors":
         sd = safetensors.torch.load_file(ckpt, device=device.type)
+    elif ".torchscript" in ckpt:
+        sd = torch.jit.load(ckpt, map_location=device)
     else:
         if safe_load:
             if not 'weights_only' in torch.load.__code__.co_varnames:
@@ -74,7 +77,8 @@ def get_model_info(model_path, calc_hash=True):
                     "sha256": civitai_info["files"][0]["hashes"]["SHA256"].lower(),
                     "base_model": model_types.get(baseMode) or baseMode,
                 }
-        else:
+        
+        if data is None:
             data = {
                 "base_model": get_model_type_by_size(model_path),
             }
@@ -108,6 +112,13 @@ def get_base_list():
         default_base_name: os.path.join(modules.paths.modelfile_path, options.default_base_name),
         default_refiner_name: os.path.join(modules.paths.modelfile_path, options.default_refiner_name),
     } | files
+
+def get_model_filename(model_name):
+    filename = base_files.get(model_name, "")
+    filename = os.path.split(filename)[1]
+    filename = os.path.splitext(filename)[0]
+
+    return filename    
 
 base_files = get_base_list()
 

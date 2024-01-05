@@ -1,18 +1,8 @@
 {
-    "sampler": {
-        "DPM++ SDE GPU": "dpmpp_sde_gpu"
-    },
-    "scheduler": {
-        "Karras": "Normal"
-    },
-    "cfg_scale": {
-        "9": 9
-    },
-    "cfg_scale_to": {
-        "1": 1
-    },
-    "step_base": {
-        "6": 6
-    },
+    "sampler": "DPM++ SDE GPU",
+    "scheduler": "Karras",
+    "cfg_scale": 9,
+    "cfg_scale_to": 1,
+    "step_base": 6,
     "custom_step": true
 }

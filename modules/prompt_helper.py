@@ -29,23 +29,37 @@ def generate(main_character_prompt, prompt_main, prompt_negative, batch_size, st
                     v = f"({v}:{pm_weight})"
             options[k] = v.replace("{lang}", f"{lang_desc}")
 
-        positive = {
-            "main_character": options.pop("main_character"),
-            "prompt_main": prompt_main,
-            **options,
+        prompt_main = ("{__mc__}," + prompt_main) if "{__mc__}" not in prompt_main else prompt_main
+        prompt_main = (prompt_main + ",{__options__}") if "{__options__}" not in prompt_main else prompt_main
+        prompt_main = (prompt_main + ",{__prompt_lora__}") if "{__prompt_lora__}" not in prompt_main else prompt_main
+        
+        positive_items = {
+            "mc": options.pop("main_character"),
+            "options": dictJoin(options),
             "prompt_lora": listJoin([x[2] for x in loras])
         }
-        positive = dictJoin(positive)
+        for k, v in positive_items.items():
+            prompt_main = prompt_main.replace(f"{{__{k}__}}", v)
+        positive = prompt_main.strip(",")
+        
+        # positive = {
+        #     "main_character": options.pop("main_character"),
+        #     "prompt_main": prompt_main,
+        #     **options,
+        #     : listJoin([x[2] for x in loras])
+        # }
+        # positive = dictJoin(positive)
 
         batch_size = min(8, batch_size)
+
+        positive, lora_blocks = lora.parse_block(positive)
+        kw_loras = lora.keyword_loras(positive)
+        loras = lora.reduce(loras + lora_blocks + kw_loras)
+
         positive, negative, style, style_loras = apply_style(style, style_weight, positive, prompt_negative, sd_type=sd_type, seeds=seeds)
         loras += style_loras
     else:
         positive, negative = prompt_main, prompt_negative
-    
-    positive, lora_blocks = lora.parse_block(positive)
-    kw_loras = lora.keyword_loras(positive)
-    loras = lora.reduce(loras + lora_blocks + kw_loras)
 
     positive = [normalize(positive)] + dynamic_prompt(positive, num_images=batch_size, seeds=seeds)
     negative = [normalize(negative)] + dynamic_prompt(negative, num_images=batch_size, seeds=seeds)

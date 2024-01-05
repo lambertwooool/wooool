@@ -178,42 +178,77 @@ def RefBlock(opt_base_model, opt_dict, refCount=5, showCount=3):
         if img_refer is not None and opt_type == "Ref Content":
             words = wd14tagger.tag(img_refer)[:12]
             
-        return gr.CheckboxGroup(choices=words, value=words, visible=len(words) > 0)
+        return gr.CheckboxGroup(choices=words, value=words)
 
-    def get_models(opt_type, opt_base_model):
+    def get_models(opt_type, opt_base_model, opt_ctrl_model):
         if opt_type in ["Ref Content", "Base Image"]:
             return gr.Dropdown(visible=False)
         else:
             model_type = "sd15" if opt_base_model and "(sd15)" in opt_base_model else "sdxl"
             ctrl_models, default_model = ui_process.GetControlnets(opt_type, model_type)
-            return gr.Dropdown(choices=ctrl_models, value=default_model, visible=len(ctrl_models) > 1)
+            if opt_ctrl_model in ctrl_models:
+                return gr.Dropdown(choices=ctrl_models, visible=len(ctrl_models) > 1)
+            else:
+                return gr.Dropdown(choices=ctrl_models, value=default_model, visible=len(ctrl_models) > 1)
+    
+    def get_annotators_inner(opt_type, opt_ctrl_model):
+        opt_config = opts.options["ref_mode"][opt_type][1]
+        keyword = opt_config.get("keyword", [None])
+        keyword = keyword if isinstance(keyword, list) else [keyword]
+        opt_ctrl_model = re.sub(r"[\-_]", " ", opt_ctrl_model or "").lower()
+        model_annotators = opt_config.get("annotator")
+        model_annotators = model_annotators if isinstance(model_annotators, list) else [model_annotators]
+        model_annotators = [a if isinstance(a, list) else [a] for k, a in zip(keyword, model_annotators) if re.search(k, opt_ctrl_model)]
 
-    ctrl_models, default_model = ui_process.GetControlnets(opts.default["ref_mode"], "sdxl")
+        model_annotators = model_annotators[0] if model_annotators else []
+        default_annotator = model_annotators[0] if model_annotators else None
+
+        return model_annotators, default_annotator
+    
+    def get_annotators(opt_type, opt_model, opt_annotator):
+        if opt_type in ["Ref Content", "Base Image"]:
+            return gr.Dropdown(visible=False)
+        else:
+            ctrl_annotators, default_annotator = get_annotators_inner(opt_type, opt_model)
+            if opt_annotator in ctrl_annotators:
+                return gr.Dropdown(choices=ctrl_annotators, visible=len(ctrl_annotators) > 1)
+            else:
+                return gr.Dropdown(choices=ctrl_annotators, value=default_annotator, visible=len(ctrl_annotators) > 1)
+
+    default_ref_mode = opts.default["ref_mode"]
+    ctrl_models, default_model = ui_process.GetControlnets(default_ref_mode, "sdxl")
+    ctrl_annotators, default_annotator = get_annotators_inner(default_ref_mode, default_model)
 
     for i in range(refCount):
         with gr.Column(min_width=100, visible=i < showCount) as block:
             image_refer = gr.Image(label=opts.title['ref_image'], height=200, elem_id=f"refer_img_{i}")
             sl_rate = gr.Slider(minimum=5, maximum=100, value=60, step=5, label="Ref Rate", visible=False, elem_id=f"refer_rate_{i}")
+            with gr.Row():
+                sl_start_percent = gr.Slider(minimum=0, maximum=100, value=0, step=5, min_width=120, label="Start At %", visible=False, elem_id=f"refer_start_{i}", elem_classes="refer_start_at")
+                sl_end_percent = gr.Slider(minimum=0, maximum=100, value=50, step=5, min_width=120, label="End At %", visible=False, elem_id=f"refer_end_{i}", elem_classes="refer_end_at")
             ckb_words = gr.CheckboxGroup(show_label=False, visible=False, elem_id=f"refer_wd14_{i}", elem_classes="refer_words")
             
             opt_type_list = list(opts.options['ref_mode'].keys())
             opt_type_list = [x for x in opt_type_list if i == 0 or x != "Base Image"]
             opt_type = gr.Dropdown(choices=opt_type_list, value=opts.default["ref_mode"], container=False, filterable=False, min_width=80, elem_id=f"refer_type_{i}", elem_classes="gr_dropdown")
-
-            opt_model = gr.Dropdown(choices=ctrl_models, value=default_model, visible=(len(ctrl_models) > 1),  container=False, filterable=False, min_width=80, elem_id=f"ref_model_{i}", elem_classes="gr_dropdown")
+            opt_ctrl_model = gr.Dropdown(choices=ctrl_models, value=default_model, visible=(len(ctrl_models) > 1),  container=False, filterable=False, min_width=80, elem_id=f"ref_ctrl_model_{i}", elem_classes="gr_dropdown")
+            opt_annotator = gr.Dropdown(choices=ctrl_annotators, value=default_annotator, visible=(len(ctrl_annotators) > 1),  container=False, filterable=False, min_width=80, elem_id=f"ref_annotator_{i}", elem_classes="gr_dropdown")
 
         opt_dict[f"refer_type_{i}"] = opt_type
 
         opt_type.change(get_tags, [opt_type, image_refer], [ckb_words], queue=False) \
-            .then(get_models, [opt_type, opt_base_model], opt_model, queue=False)
+            .then(lambda x, y: gr.CheckboxGroup(visible=x == "Ref Content" and y is not None), [opt_type, image_refer], ckb_words, queue=False) \
+            .then(get_models, [opt_type, opt_base_model, opt_ctrl_model], [opt_ctrl_model], queue=False) \
+            .then(get_annotators, [opt_type, opt_ctrl_model, opt_annotator], opt_annotator, queue=False)
 
-        opt_base_model.change(get_models, [opt_type, opt_base_model], opt_model, queue=False)
+        opt_base_model.change(get_models, [opt_type, opt_base_model, opt_ctrl_model], opt_ctrl_model, queue=False)
+        opt_ctrl_model.change(get_annotators, [opt_type, opt_ctrl_model, opt_annotator], opt_annotator, queue=False)
 
-        image_refer.change(lambda x: gr.Slider(visible=x is not None), image_refer, [sl_rate], queue=False) \
+        image_refer.change(lambda x: (gr.Slider(visible=x is not None), gr.Slider(visible=x is not None), gr.Slider(visible=x is not None)), image_refer, [sl_rate, sl_start_percent, sl_end_percent], queue=False) \
             .then(get_tags, [opt_type, image_refer], [ckb_words], queue=False)
 
         blocks.append(block)
-        ctrls += [opt_type, image_refer, sl_rate, ckb_words, opt_model]
+        ctrls += [opt_type, image_refer, sl_rate, ckb_words, opt_ctrl_model, opt_annotator, sl_start_percent, sl_end_percent]
     
     return blocks, ctrls
 
@@ -229,17 +264,20 @@ def ReFaceUI(panel_action_btns, panel_action_interface, btn_reface_interface, op
 
     return btn_reface, img_face
 
-def ReFinerFaceUI(panel_action_btns, panel_action_interface, btn_refiner_face_interface, opt_dict):
-    with gr.Row(visible=False) as panel_refiner_face:
-        opt_dict["refiner_face_denoise"] = MakeSlider(["refiner_face_denoise"], min_width=160)["refiner_face_denoise"]
-        opt_dict["refiner_face_prompt"] = gr.Text(label="Prompt Content", elem_id="txt_refiner_face_prompt", elem_classes="prompt")
-        btn_refiner_face = gr.Button("Refiner Face", min_width=100, variant="primary", elem_id="btn_resize", elem_classes="btn_action")
-        btn_refiner_face_cancel = gr.Button("Close", min_width=100, elem_id="btn_resize_cancel", elem_classes="btn_action")
+def ReFinerUI(panel_action_btns, panel_action_interface, btn_refiner_interface, btn_refiner_face_interface, opt_dict):
+    with gr.Row(visible=False) as panel_refiner:
+        opt_dict["refiner_denoise"] = MakeSlider(["refiner_denoise"], min_width=160)["refiner_denoise"]
+        opt_dict["refiner_detail"] = MakeSlider(["refiner_detail"], min_width=160)["refiner_detail"]
+        opt_dict["refiner_prompt"] = gr.Text(label="Prompt Content", elem_id="txt_refiner_prompt", elem_classes="prompt")
+        btn_refiner = gr.Button("Refiner Image", min_width=100, variant="primary", elem_id="btn_refiner", elem_classes="btn_action")
+        btn_refiner_face = gr.Button("Refiner Face", min_width=100, variant="primary", elem_id="btn_refiner", elem_classes="btn_action", visible=False)
+        btn_refiner_cancel = gr.Button("Close", min_width=100, elem_id="btn_refiner_cancel", elem_classes="btn_action")
     
-    btn_refiner_face_interface.click(lambda:(gr.Column(visible=False), gr.Column(visible=True), gr.Row(visible=True)), None, [panel_action_btns, panel_action_interface, panel_refiner_face], queue=False)
-    btn_refiner_face_cancel.click(lambda:(gr.Column(visible=True), gr.Column(visible=False), gr.Row(visible=False)), None, [panel_action_btns, panel_action_interface, panel_refiner_face], queue=False)
+    btn_refiner_interface.click(lambda:(gr.Column(visible=False), gr.Column(visible=True), gr.Row(visible=True), gr.Button(visible=True), gr.Button(visible=False)), None, [panel_action_btns, panel_action_interface, panel_refiner, btn_refiner, btn_refiner_face], queue=False)
+    btn_refiner_face_interface.click(lambda:(gr.Column(visible=False), gr.Column(visible=True), gr.Row(visible=True), gr.Button(visible=False), gr.Button(visible=True)), None, [panel_action_btns, panel_action_interface, panel_refiner, btn_refiner, btn_refiner_face], queue=False)
+    btn_refiner_cancel.click(lambda:(gr.Column(visible=True), gr.Column(visible=False), gr.Row(visible=False)), None, [panel_action_btns, panel_action_interface, panel_refiner], queue=False)
 
-    return btn_refiner_face
+    return btn_refiner, btn_refiner_face
 
 def VaryCustomUI(panel_action_btns, panel_action_interface, btn_vary_custom_interface, opt_dict, gl_sample_list, num_selected_sample, panel_sample_gallery, panel_editor, img_vary_editor):
     with gr.Row(visible=False) as panel_vary_custom:

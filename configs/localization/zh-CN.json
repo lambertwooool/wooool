@@ -39,6 +39,7 @@
     "Zoom": "扩展",
     "Blur Alpha %": "延续性 %",
     "Prompt Content": "提示内容",
+    "Refiner Detail %": "精修细节 %",
     "Initializing": "初始化",
     "Waiting": "等待中",
     "Generating": "生成中",
@@ -92,7 +93,9 @@
     "Monkey King": "美猴王",
     "Jellyfish": "水母",
     "Manatee": "海牛",
+    "Buddha": "佛陀",
     "Other": "其他",
+    "Others": "其他",
 
     "Ref Image": "参考图",
     "Skip": "跳过这张",
@@ -183,6 +186,8 @@
     "Base Image": "作为底图",
     "Ref Template": "LoRA模板",
     "Trained Words": "触发词",
+    "Start At %": "起始步数 %",
+    "End At %": "停止步数 %",
     "None": "无",
     "1 Sample": "1张样图",
     "2 Samples": "2张样图",
@@ -264,6 +269,8 @@
     "Download Setting": "下载配置",
     "Load Setting": "加载配置",
     "Reset Setting": "重置配置",
+    "Generate Data": "生成数据",
+    "Parse Data": "解析数据",
 
     "Weight Reset": "重置权重",
     "waiting ...": "加入处理队列 ...",
@@ -493,5 +500,6 @@
     "wl-gold-casting": "铸金徽章",
     "wl-undersea": "海底世界",
     "wl-christmas": "圣诞节",
-    "wl-vincent-van-gogh": "梵高"
+    "wl-vincent-van-gogh": "梵高",
+    "wl-blood-forest": "血色森林"
 }

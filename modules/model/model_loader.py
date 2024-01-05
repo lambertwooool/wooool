@@ -8,7 +8,7 @@ current_loaded_models = []
 device_config = {
     "clip": (False, False),
     "clip_vision": (True, False),
-    "annotator": (False, False),
+    "annotator": (True, False),
     "unet": (True, False),
     "upscaler": (True, False),
     "controlnet": (True, False),

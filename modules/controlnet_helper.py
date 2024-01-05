@@ -7,8 +7,15 @@ from modules.model import controlnet, clip_vision, model_loader
 from modules import devices, util
 from modules.controlnet.processor import Processor as controlnet_processor
 
-@torch.no_grad()
-@torch.inference_mode()
+controlnet_files = {}
+
+def get_controlnets():
+    global controlnet_files
+    files = util.list_files(modules.paths.controlnet_models_path, ["bin", "pth", "safetensors"])
+    controlnet_files = { os.path.splitext(os.path.split(x)[-1])[0]: os.path.split(x)[-1] for x in files }
+
+    return controlnet_files
+
 def processor(controlnets, unet_model, width, height):
     ctrl_procs = load_controlnets_by_task(controlnets)
     ctrls = []
@@ -18,7 +25,7 @@ def processor(controlnets, unet_model, width, height):
     ip_proc = None
 
     for cn in controlnets:
-        cn_type, cn_img, cn_weight, cn_model_name = cn
+        cn_type, cn_img, cn_weight, cn_model_name, start_percent, end_percent = cn
         if cn_type in ctrl_procs.keys():
             if cn_type in ["ip_adapter", "ip_adapter_face"]:
                 if cn_type == "ip_adapter_face":
@@ -36,8 +43,12 @@ def processor(controlnets, unet_model, width, height):
                 cn_img = util.resize_image(cn_img, width=width, height=height)
                 cn_img = util.HWC3(ctrl_procs[cn_type](cn_img))
                 cn_model = ctrl_procs[cn_type].load_controlnet(cn_model_name)
+                # start_percent = 0
+                # end_percent = 0.5
+                if "recolor" in cn_model_name:
+                    end_percent = 1.0
                 # ctrls.append((cn_type, cn_img, cn_weight, cn_model, ctrl_procs[cn_type]))
-                ctrls.append((cn_type, cn_img, cn_weight, cn_model))
+                ctrls.append((cn_type, cn_img, cn_weight, cn_model, start_percent, end_percent))
 
             util.save_temp_image(cn_img, f"{cn_type}.png")
         else:
@@ -45,14 +56,12 @@ def processor(controlnets, unet_model, width, height):
     
     return ctrls, unet_model
 
-@torch.no_grad()
-@torch.inference_mode()
 def load_controlnets_by_task(cn_types):
     ctrls = {}
 
-    for cn_type, cn_image, cn_weight, cn_model_name in cn_types:
+    for cn_type, cn_image, cn_weight, cn_model_name, start_percent, end_percent in cn_types:
         if cn_type not in ctrls:
-            if cn_type in controlnet_processor.model_keys():
+            if cn_type in controlnet_processor.model_keys() and cn_model_name is not None and end_percent > start_percent:
                 proc = controlnet_processor(cn_type)
                 if cn_type in ["ip_adapter", "ip_adapter_face"]:
                     proc.processor.load(cn_type, cn_model_name)
@@ -64,12 +73,12 @@ def load_controlnets_by_task(cn_types):
 @torch.inference_mode()
 def apply_controlnets(positive_cond, negative_cond, ctrls):
     for cn in ctrls:
-        cn_type, cn_img, cn_weight, cn_model = cn
+        cn_type, cn_img, cn_weight, cn_model, start_percent, end_percent = cn
 
         if cn_model is not None :
             positive_cond, negative_cond = apply_controlnet(
                 positive_cond, negative_cond,
-                cn_model, util.numpy_to_pytorch(cn_img), cn_weight, 0, 0.5)
+                cn_model, util.numpy_to_pytorch(cn_img), cn_weight, start_percent, end_percent)
     
     return positive_cond, negative_cond
 

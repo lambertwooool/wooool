@@ -83,19 +83,21 @@ def handler(task):
     if more_art != 0:
         more_art_lora = { "sd15": "", "sdxl": "xl_more_art-full_v1.safetensors" }[sd_type]
         loras.append((more_art_lora, more_art, ""))
-    denoise = task.get("denoise", 1.0)
+    denoise = round(task.get("denoise", 1.0), 2)
     sampler = task.get("sampler", "") or default_sampler
     scheduler = task.get("scheduler", "") or default_scheduler
-    file_format = task.get("file_format", "jpeg").lower()
+    file_format = task.get("file_format", "jpeg").lower()   
     image, mask = task.get("image", (None, None))
     if size is None:
         size = util.ratios2size(util.size2ratio(image.shape[1], image.shape[0]) if image is not None else (1, 1), pixels ** 2)
     width, height = size
     size = (width // 8 * 8, height // 8 * 8)
     single_vae = task.get("single_vae", True)
-    controlnets = [[ref_mode, image_refer, sl_rate, (args[0] if len(args) >0 else None) or opts.options["ref_mode"][opt_type][1][sd_type]] \
-                    for opt_type, ref_mode, image_refer, sl_rate, *args in task.get("controlnet", []) \
-                        if opts.options["ref_mode"][opt_type][1][sd_type] is not None]
+    controlnets = [[    ref_mode, image_refer, sl_rate,
+                        controlnet_helper.controlnet_files.get(opt_model) or opts.options["ref_mode"][opt_type][1][sd_type],
+                        start_percent, end_percent ]
+                    for opt_type, ref_mode, image_refer, sl_rate, opt_model, start_percent, end_percent in task.get("controlnet", []) \
+                        if opt_model or opts.options["ref_mode"][opt_type][1][sd_type] is not None]
 
     tiled = False
     initial_latent = None
@@ -103,10 +105,11 @@ def handler(task):
     task["prompt"] = positive
     task["negative"] = negative
     task["style"] = style
+    task["batch"] = batch_size
     task["base_model"] = base_name
     task["base_hash"] = base_hash
     task["refiner_model"] = refiner_name
-    task["base_hash"] = refiner_hash
+    task["refiner_hash"] = refiner_hash
     task["cfg_scale"] = cfg_scale
     task["cfg_scale_to"] = cfg_scale_to
     task["noise_scale"] = noise_scale
@@ -143,7 +146,7 @@ def handler(task):
             '\n[subseed strength]:', subseed_strength, \
             '\n[file_format]:', file_format, \
             '\n[loras]:', loras, \
-            '\n[controlnets]:', [(x[0], x[2], x[3]) for x in controlnets], \
+            '\n[controlnets]:', [(x[0], x[2], x[3], x[4], x[5]) for x in controlnets], \
             '\n-------------------------------'
         )
 
@@ -376,8 +379,9 @@ def create_infotext(task, prompt, negative_prompt, seed, subseed, batch_index=0)
     re_s = r"[\s,]"
     loras = task.get("lora", [])
     prompt = ",".join(prompt)
-    prompt += " " + ", ".join([f"<lora:{lo_name}:{lo_weight}>" for lo_name, lo_weight, lo_trained_words in loras if lo_name])
-    
+    prompt += " " + ", ".join([f"<lora:{os.path.splitext(lo_name)[0]}:{lo_weight}>" for lo_name, lo_weight, lo_trained_words in loras if lo_name])
+    main_character = task.get("main_character")
+
     generation_params = {
         "Prompt": prompt,
         "Negative prompt": negative_prompt,
@@ -390,24 +394,29 @@ def create_infotext(task, prompt, negative_prompt, seed, subseed, batch_index=0)
         "Seed": seed,
         "Sub seed": subseed,
         "Size": f'{width}x{height}',
-        "Model": (task.get("base_model", None) and os.path.split(task["base_model"])[1]) or "",
+        "Model": task.get("base_model", "") and model_helper.get_model_filename(task["base_model"]),
         "Model hash": task.get("base_hash", None) or "",
-        "Refiner model": (task.get("refiner_model", None) and os.path.split(task["refiner_model"])[1]) or "",
+        "Refiner model": task.get("refiner_model", "") and model_helper.get_model_filename(task["refiner_model"]),
         "Refiner model hash": task.get("refiner_hash", None) or "",
-        "Denoising strength": task.get("denoise", 1.0),
+        "Denoising strength": round(task.get("denoise"), 2) if task.get("denoise") else None,
         # "Loras": task.get("lora", []),
         "Controlnets": [[x[0], x[2]] for x in task.get("controlnet", [])],
-        "Main character": task.get("main_character", None),
         "SDXL style": task.get("style", None),
-        "Options": task.get("options", {}),
+        "Main character": main_character[1] if isinstance(main_character, dict) else "",
         "Version": "Wooool",
     }
 
     generation_params = { k: v for k, v in generation_params.items() if v }
 
+    if generation_params.get("Denoising strength") == 1.0:
+        generation_params.pop("Denoising strength")
+    if seed == subseed:
+        generation_params.pop("Sub seed")
+
     prompt_text = generation_params.pop("Prompt")
     negative_prompt_text = re.sub(re_line, " ", f'Negative prompt: {util.listJoin(generation_params.pop("Negative prompt"))}')
-    generation_params_text = ", \n".join([f'{k}: {re.sub(re_s, " ", str(v))}' for k, v in generation_params.items() if v is not None])
+    generation_params_text = ", ".join([f'{k}: {re.sub(re_s, " ", str(v))}' for k, v in generation_params.items() if v is not None])
+    # generation_params_text += ", \n" + ", \n".join([f'{k}: {re.sub(re_s, " ", str(v))}' for k, v in extra_params.items() if v is not None])
     
     return f"{prompt_text}\n{negative_prompt_text}\n{generation_params_text}".strip()
 

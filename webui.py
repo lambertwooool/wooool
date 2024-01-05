@@ -46,7 +46,7 @@ with gr.Blocks(theme=my_theme, title=app_name).queue() as wooool:
                                     btn_resize_interface = gr.Button("ReSize", min_width=100, elem_id="btn_resize_interface", variant="primary", elem_classes="btn_action")
 
                                     btn_change_style = gr.Button("Change Style", min_width=100, elem_id="btn_change_style", variant="primary", elem_classes="btn_action")
-                                    btn_refiner = gr.Button("Refiner Image", min_width=100, elem_id="btn_refiner", variant="primary", elem_classes="btn_action")
+                                    btn_refiner_interface = gr.Button("Refiner Image", min_width=100, elem_id="btn_refiner", variant="primary", elem_classes="btn_action")
                                     btn_refiner_face_interface = gr.Button("Refiner Face", min_width=100, elem_id="btn_refiner_face", variant="primary", elem_classes="btn_action")
                                     btn_reface_interface = gr.Button("ReFace", min_width=100, elem_id="btn_reface_interface", variant="primary", elem_classes="btn_action")
 
@@ -72,7 +72,7 @@ with gr.Blocks(theme=my_theme, title=app_name).queue() as wooool:
                         btn_reface, img_face = ui_compent.ReFaceUI(panel_action, panel_action_interface, btn_reface_interface, opt_dict)
                         btn_vary_custom = ui_compent.VaryCustomUI(panel_action, panel_action_interface, btn_vary_custom_interface, opt_dict, gl_sample_list, num_selected_sample, panel_sample_gallery, panel_editor, img_vary_editor)
                         btn_zoom_custom, btn_resize = ui_compent.ZoomCustomUI(panel_action, panel_action_interface, btn_zoom_custom_interface, btn_resize_interface, opt_dict)
-                        btn_refiner_face = ui_compent.ReFinerFaceUI(panel_action, panel_action_interface, btn_refiner_face_interface, opt_dict)
+                        btn_refiner, btn_refiner_face = ui_compent.ReFinerUI(panel_action, panel_action_interface, btn_refiner_interface, btn_refiner_face_interface, opt_dict)
         
         with gr.Column(elem_id="panel_main") as panel_main:
             with gr.Row(elem_id="panel_prompt") as panel_prompt:
@@ -100,8 +100,10 @@ with gr.Blocks(theme=my_theme, title=app_name).queue() as wooool:
 
             with gr.Column():
                 with gr.Row():
-                    opt_dict = opt_dict | ui_compent.MakeOpts(['style', 'ratios', 'view', 'emo', 'location', 'weather', 'hue'])
+                    opt_dict = opt_dict | ui_compent.MakeOpts(["style", "ratios", "view", "emo", "location", "weather", "hue"])
                 
+                opt_style = opt_dict["style"]
+                opt_ratios = opt_dict["ratios"]
                 gl_style_list, num_selected_style = ui_compent.StyleGallery()
                 opt_dict = opt_dict | {
                     "style_index": num_selected_style
@@ -119,7 +121,7 @@ with gr.Blocks(theme=my_theme, title=app_name).queue() as wooool:
                                 "base_model": opt_base_model,
                             }   | ui_compent.MakeSlider(["ref_num"]) \
                                 | ui_compent.MakeOpts(["quality"])
-                            sl_refNum = opt_dict['ref_num']
+                            sl_refNum = opt_dict["ref_num"]
 
                         with gr.Column(scale=80):
                             with gr.Row():
@@ -183,18 +185,23 @@ with gr.Blocks(theme=my_theme, title=app_name).queue() as wooool:
                     }
                 # with gr.Column(visible=False):
                 with gr.Tab("Setting File"):
-                    txt_setting = gr.Textbox(show_label=False, lines=7, elem_id="txt_setting", visible=False)
+                    with gr.Row():
+                        # with gr.Column(scale=20, min_width=200):
+                        txt_setting = gr.Textbox(show_label=False, lines=7, elem_id="txt_setting", visible=False)
 
-                    with gr.Row(elem_id="panel_setting_btns") as panel_setting_btns:
-                        btn_download_setting = gr.Button("Download Setting", elem_id="btn_download_setting")
-                        btn_load_setting = gr.UploadButton("Load Setting", file_types=[".json"])
-                        btn_reset_setting = gr.Button("Reset Setting", elem_id="btn_reset_setting")
+                        with gr.Column(scale=20, min_width=200) as panel_setting_btns:
+                            btn_download_setting = gr.Button("Download Setting", elem_id="btn_download_setting")
+                            btn_load_setting = gr.UploadButton("Load Setting", file_types=[".json"])
+                            btn_reset_setting = gr.Button("Reset Setting", elem_id="btn_reset_setting")
 
-                    with gr.Column(visible=False):
-                        with gr.Row():
+                        with gr.Column(scale=20, min_width=200):
                             img_generate_data = gr.Image(source="upload", interactive=True, type="pil", elem_id="img_generate_data")
+                        
+                        with gr.Column(scale=20, min_width=200):
                             txt_generate_data = gr.Textbox(label="Generate Data", lines=7, elem_id="txt_generate_data")
-                        btn_parse_generate_data = gr.Button("Parse")
+                            with gr.Row():
+                                btn_parse_generate_data = gr.Button("Parse Data")
+                                btn_generate_by_data = gr.Button("Generate")
 
                         img_generate_data.change(ui_process.GetImageGenerateData, img_generate_data, txt_generate_data)
 
@@ -233,9 +240,10 @@ with gr.Blocks(theme=my_theme, title=app_name).queue() as wooool:
     opt_base_model.change(ui_process.GetModelInfo, [opt_base_model], [btn_base_model_info], _js="x => model_link(x)", queue=False)
     ckb_seed.change(lambda x: (gr.Textbox(interactive=x), gr.Slider(visible=x)), ckb_seed, [txt_seed, sl_subseed_strength], queue=False)
     ckb_step.change(lambda x: (gr.Slider(interactive=x), gr.Slider(interactive=x)), ckb_step, [sl_step_base, sl_step_refiner], queue=False)
-    ckb_size.change(lambda x: (gr.Slider(interactive=x), gr.Slider(interactive=x)), ckb_size, [sl_image_width, sl_image_height], queue=False)
+    ckb_size.change(lambda x: (gr.Slider(interactive=x), gr.Slider(interactive=x), gr.Dropdown(interactive=not x)), ckb_size, [sl_image_width, sl_image_height, opt_ratios], queue=False)
     ckb_grp_negative.change(ui_process.GetNegativeText, ckb_grp_negative, txt_sel_negative, queue=False)
     sl_sample_pagesize.release(ui_process.ChangePageSize, sl_sample_pagesize, [gl_sample_list, num_page_sample], queue=False)
+    ckb_disable_style.change(lambda x: (gr.Dropdown(interactive=not x), gr.Gallery(visible=not x)), ckb_disable_style, [opt_style, gl_style_list], queue=False)
 
     for x in opt_list:
         opt_type = str(x)
@@ -251,7 +259,7 @@ with gr.Blocks(theme=my_theme, title=app_name).queue() as wooool:
 
     generate_inputs = [img_refer, ckb_pro, txt_setting] + ref_list + lora_list
     action_inputs = [gl_sample_list, num_selected_sample, txt_setting]
-    action_btns = [btn_vary_subtle, btn_vary_strong, btn_vary_custom, btn_vary_custom_interface, btn_zoom_out15, btn_zoom_out20, btn_zoom_custom_interface, btn_change_style, btn_resize_interface, btn_resize, btn_reface_interface, btn_refiner, btn_refiner_face, btn_refiner_face_interface, btn_upscale]
+    action_btns = [btn_vary_subtle, btn_vary_strong, btn_vary_custom, btn_vary_custom_interface, btn_zoom_out15, btn_zoom_out20, btn_zoom_custom_interface, btn_change_style, btn_resize_interface, btn_resize, btn_reface_interface, btn_refiner, btn_refiner_interface, btn_refiner_face, btn_refiner_face_interface, btn_upscale]
     generate_outpus = [title, html_proccbar, gl_sample_list, panel_gallery, panel_generate, panel_process, btn_skip, btn_stop, btn_delete] + action_btns
     ui_process.action_btns = action_btns
 
@@ -289,6 +297,7 @@ with gr.Blocks(theme=my_theme, title=app_name).queue() as wooool:
 
     btn_parse_generate_data.click(ui_process.ParseGenerateData, txt_generate_data, txt_setting, queue=False) \
         .then(ui_process.InitSetting, txt_setting, opt_list, queue=False)
+    btn_generate_by_data.click(ui_process.GenerateByData, [txt_generate_data, txt_setting], generate_outpus)
 
 wooool.launch(
     server_name=shared.args.listen,

@@ -10,9 +10,9 @@ import modules.paths
 import modules.options as opts
 from modules import lora, prompt_helper, util, wd14tagger
 
-def UseControlnet(ref_type, ref_image, weight):
+def UseControlnet(ref_type, ref_image, weight, start_percent=0, end_percent=0.5):
     ref_mode, _ = opts.options["ref_mode"][ref_type]
-    return [ref_type, ref_mode, ref_image, weight, None]
+    return [ref_type, ref_mode, ref_image, weight, None, start_percent, end_percent]
 
 def VarySubtle(ref_image, params, pnginfo, gen_opts, weight=0.5, skip_step=0.2):
     # subseed_strength = 0.05
@@ -301,18 +301,22 @@ def Refiner(ref_image, params, pnginfo, gen_opts, mask=None):
 
     params["action"] = "generate"
     # params["batch"] = gen_opts.pop("pic_num")
-    params["prompt_main"] = lora.remove_prompt_lora(params["prompt_main"], "add-detail-xl.safetensors")
-    params["prompt_main"] = lora.remove_prompt_lora(params["prompt_main"], "add_detail.safetensors")
+    params["prompt_main"] = lora.remove_prompt_lora(params["prompt_main"], "add-detail-xl")
+    params["prompt_main"] = lora.remove_prompt_lora(params["prompt_main"], "add_detail")
     
-    params["steps"] = (step_base, 5)
+    denoise = gen_opts.get("refiner_denoise", 0.4) * 0.8
+    params["steps"] = (step_base, max(0, int(denoise * 10)))
+    params["denoise"] = denoise
     params["skip_step"] = int(step_base * 0.1)
-    params["denoise"] = 0.3
-    # params["seed"] = pnginfo.get("seed", 0)
+    
     params["seed"] = 0
     params["sample"] = "dpmpp_3m_sde_gpu"
     params["clip_skip"] = 1
     params["refiner_name"] = gen_opts.get("refiner_model", params.get("refiner_name", ""))
-    params["lora"] = [("add-detail-xl.safetensors", 0.3, "")]
+    
+    detail = gen_opts.get("refiner_detail", 0.3)
+    if detail != 0:
+        params["lora"] = [("add-detail-xl.safetensors", detail, "")]
 
     prompt_main = (params.get("prompt_main", "") or "(UHD,8K,ultra detailed) " + ",".join(wd14tagger.tag(ref_image)[:12]))
     params["prompt_main"] = prompt_main
@@ -325,7 +329,7 @@ def Refiner(ref_image, params, pnginfo, gen_opts, mask=None):
         mask = None
 
         if faces:
-            min_face_area = 448 ** 2
+            min_face_area = 768 ** 2
             landmarks = [face.landmark_2d_106 for face in faces if (face.bbox[2] - face.bbox[0]) * (face.bbox[3] - face.bbox[1]) < min_face_area]
             if landmarks:
                 mask = util.face_mask(ref_image, landmarks)
@@ -361,11 +365,7 @@ def RefinerFace(ref_image, params, pnginfo, gen_opts):
         prompt_main = ("(detail face:1.2)" + prompt_main) if "detail face" not in prompt_main else prompt_main
         params["prompt_main"] = prompt_main
 
-        denoise = gen_opts.get("refiner_face_denoise", 0.4) * 0.8
-        params["steps"] = (params["steps"][0], max(0, int(denoise * 10)))
-        params["denoise"] = denoise
-        # params["skip_step"] = 2
-        if denoise > 0.5:
+        if params["denoise"] > 0.5:
             params["controlnet"] = [UseControlnet("Ref Depth", None, 0.6)]
         
         return params

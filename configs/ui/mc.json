@@ -9,9 +9,11 @@
 	},
 	"Cat": "a {white|black|orange|} __cat_breed__ cat",
 	"Dog": "a {__dog_breed__|}, dog",
-	"Dragon": "a {lang} dragon",
+	"Dragon": {
+		"prompt": "a {white|black|gold|red|} god dragon, fly in sky, Eagle claw, {white|black|gold|red|} snake body, dragon horns, gleaming squama dragon with golden accents, amidst brilliance, symetrical hyperdetailed texture, pearl filigree",
+		"negative_prompt": "wings, eagle"
+	},
 	"Monster": "devious monster, intricate gills around its body, armor with engraved as intricate details",
-	"Cyborg": "a cyborg",
     "Robot": "a transformer",
     "Wonder Woman": "Wonder Woman",
 	"Thanos": "Thanos",
@@ -20,7 +22,7 @@
 	"Marilyn Dream": "Marilyn Dream",
     "Catwoman": "Catwoman",
     "Cat girl": "Cat girl",
-	"Skeleton": "Skeleton",
+	"Skeleton": "Skeleton {girl|woman|man|}",
 	"Zombie": "Zombie",
 	"Elf": "Elf",
 	"Unicorn": "Unicorn",
@@ -51,5 +53,6 @@
 	"Geisha": "a geisha vampire, removing her {pink|blue|green|white|} kimono",
 	"Monkey King": "Monkey King Sun Wukong",
 	"Jellyfish": "a ghostly jellyfish, shiny aura",
-	"Manatee": "a fluffy manatee"
+	"Manatee": "a fluffy manatee",
+	"Buddha": "a chinese {Buddha|Guanyin}"
 }
