@@ -5,64 +5,117 @@ import io
 import logging
 import os
 import torch
-from typing import Dict, Optional, Union
+from typing import Any, Dict, Optional, Union
+
+import sys
+
+sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), "custom_repo"))
 
 from PIL import Image
 
+from .binary import BinaryDetector
+from .color import ColorDetector
 from .canny import CannyDetector
 from .hed import HEDdetector
 from .midas import MidasDetector
 from .leres import LeresDetector
-from .dwpose import DwposeDetector
+from .zoe import ZoeDetector
+from .mlsd import MLSDdetector
+from .lineart import LineartDetector
+from .lineart_anime import LineartAnimeDetector
+from .manga_line import LineartMangaDetector
+from .dwpose import DwposeDetector, AnimalposeDetector
+from .densepose import DenseposeDetector
 from .shuffle import ContentShuffleDetector
 from .ipadapter import IPAdapterDetector
+from .tile import TileDetector
+from .normalbae import NormalBaeDetector
+from .oneformer import OneformerSegmentor
+from .sam import SamDetector
 
 import modules.paths
 from modules.model import controlnet, model_loader, model_patcher
 
 LOGGER = logging.getLogger(__name__)
 
+class DefaultDetector:
+    def __init__(self):
+        pass
+
+    def __call__(self, input_image):
+        return input_image
+
 MODELS = {
     # checkpoint models
+    'default': { 'class': DefaultDetector },
+    'binary': { 'class': BinaryDetector },
+    'binary_invert': { 'class': BinaryDetector },
+    'color': { 'class': ColorDetector },
     'canny': { 'class': CannyDetector },
-
     'scribble_hed': { 'class': HEDdetector },
     'softedge_hed': { 'class': HEDdetector },
     'scribble_hedsafe': { 'class': HEDdetector },
     'softedge_hedsafe': { 'class': HEDdetector },
-
+    'normal_bae': { 'class': NormalBaeDetector },
+    'lineart_coarse': { 'class': LineartDetector },
+    'lineart_realistic': { 'class': LineartDetector },
+    'lineart_anime': { 'class': LineartAnimeDetector },
+    'lineart_anime_denoise': { 'class': LineartMangaDetector },
+    'lineart_realistic_invert': { 'class': LineartDetector },
+    'lineart_coarse_invert': { 'class': LineartDetector },
+    'lineart_anime_invert': { 'class': LineartAnimeDetector },
+    'lineart_anime_denoise_invert': { 'class': LineartMangaDetector },
     'depth_midas': { 'class': MidasDetector },
-    # 'depth_zoe': { 'class': ZoeDetector }, 
+    'depth_zoe': { 'class': ZoeDetector }, 
     'depth_leres': { 'class': LeresDetector }, 
     'depth_leres++': { 'class': LeresDetector },
-
+    'mlsd': {'class': MLSDdetector },
     'dwpose': { 'class': DwposeDetector },
-
+    'dwpose_face': { 'class': DwposeDetector },
+    'densepose': { 'class': DenseposeDetector },
+    'animal_pose': { 'class': AnimalposeDetector },
     'shuffle': { 'class': ContentShuffleDetector },
-
     'ip_adapter': { 'class': IPAdapterDetector },
     'ip_adapter_face': { 'class': IPAdapterDetector },
+    'tile': { 'class': TileDetector },
+    'oneformer': { 'class': OneformerSegmentor },
+    'segment_anything': { 'class': SamDetector },
 }
 
 MODEL_PARAMS = {
+    'default': {},
+    'binary': { 'invert': False },
+    'binary_invert': { 'invert': True },
+    'color': {},
     'canny': { 'low_threshold': 64, 'high_threshold': 128 },
-
     'scribble_hed': { 'scribble': True, 'safe': False },
     'softedge_hed': { 'scribble': False, 'safe': False },
     'scribble_hedsafe': { 'scribble': True, 'safe': True },
     'softedge_hedsafe': { 'scribble': False, 'safe': True },
-
+    'normal_bae': {},
+    'lineart_realistic': { 'coarse': False },
+    'lineart_coarse': { 'coarse': True },
+    'lineart_anime': {},
+    'lineart_anime_denoise': { 'invert': False },
+    'lineart_realistic_invert': { 'coarse': False, 'invert': True },
+    'lineart_coarse_invert': { 'coarse': True, 'invert': True },
+    'lineart_anime_invert': { 'invert': True },
+    'lineart_anime_denoise_invert': { 'invert': True },
     'depth_midas': {},
     'depth_zoe': {},
     'depth_leres': { 'boost': False },
     'depth_leres++': { 'boost': True },
-
-    'dwpose': { 'include_hand': True, 'include_face': True },
-
+    'mlsd': {},
+    'dwpose': { 'include_body': True, 'include_hand': True, 'include_face': True },
+    'dwpose_face': { 'include_body': False, 'include_hand': False, 'include_face': True },
+    'densepose': {},
+    'animal_pose': {},
     'shuffle': { 'f': 512 },
-
-    'ip_adapter': { },
-    'ip_adapter_face': { },
+    'ip_adapter': {},
+    'ip_adapter_face': {},
+    'tile': {},
+    'oneformer': {},
+    'segment_anything': {}
 }
 
 class Processor:
@@ -85,7 +138,7 @@ class Processor:
         self.controlnet = None
 
         # load default params
-        self.params = MODEL_PARAMS[self.processor_id]
+        self.params = MODEL_PARAMS.get(self.processor_id) or {}
         # update with user params
         if params:
             self.params.update(params)

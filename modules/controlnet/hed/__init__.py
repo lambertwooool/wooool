@@ -90,11 +90,11 @@ class HEDdetector:
         assert input_image.ndim == 3
         H, W, C = input_image.shape
 
-        model_loader.load_model_gpu(self.model)
+        model_loader.load_model_gpu(self.netNetwork)
 
         with torch.no_grad():
             # device = next(iter(self.netNetwork.parameters())).device
-            device = self.netNetwork.current_device
+            device = self.netNetwork.load_device
             image_hed = torch.from_numpy(input_image).float().to(device)
             image_hed = rearrange(image_hed, 'h w c -> 1 c h w')
             # edges = self.netNetwork(image_hed)

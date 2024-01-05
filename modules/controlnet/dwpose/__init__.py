@@ -5,6 +5,8 @@
 # 4th Edited by ControlNet (added face and correct hands)
 # 5th Edited by ControlNet (Improved JSON serialization/deserialization, and lots of bug fixs)
 # This preprocessor is licensed by CMU for non-commercial use only.
+import torch.utils.benchmark as benchmark
+benchmark.timer()
 
 import os
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
@@ -18,6 +20,7 @@ from .hand import Hand
 from .face import Face
 from .types import PoseResult, HandResult, FaceResult
 from .wholebody import Wholebody # DW Pose
+from .animalpose import AnimalPoseImage
 import warnings
 
 import modules.paths
@@ -114,8 +117,8 @@ def decode_json_as_poses(json_string: str, normalize_coords: bool = False) -> Tu
     )
 
 
-def encode_poses_as_json(poses: List[PoseResult], canvas_height: int, canvas_width: int) -> str:
-    """ Encode the pose as a JSON string following openpose JSON output format:
+def encode_poses_as_dict(poses: List[PoseResult], canvas_height: int, canvas_width: int) -> str:
+    """ Encode the pose as a dict following openpose JSON output format:
     https://github.com/CMU-Perceptual-Computing-Lab/openpose/blob/master/doc/02_output.md
     """
     def compress_keypoints(keypoints: Union[List[Keypoint], None]) -> Union[List[float], None]:
@@ -132,7 +135,7 @@ def encode_poses_as_json(poses: List[PoseResult], canvas_height: int, canvas_wid
             )
         ]
 
-    return json.dumps({
+    return {
         'people': [
             {
                 'pose_keypoints_2d': compress_keypoints(pose.body.keypoints),
@@ -144,7 +147,7 @@ def encode_poses_as_json(poses: List[PoseResult], canvas_height: int, canvas_wid
         ],
         'canvas_height': canvas_height,
         'canvas_width': canvas_width,
-    }, indent=4)
+    }
 
 class DwposeDetector:
     """
@@ -154,50 +157,79 @@ class DwposeDetector:
         model_dir (str): Path to the directory where the pose models are stored.
     """
     def __init__(self):
-        det_filename = "yolox_l.onnx"
-        pose_filename = "dw-ll_ucoco_384.onnx"
+        det_filename = "yolox_l.torchscript.pt" # "yolox_l.onnx"
+        pose_filename = "dw-ll_ucoco_384_bs5.torchscript.pt" # "dw-ll_ucoco_384.onnx"
 
         det_model_path = os.path.join(modules.paths.annotator_models_path, det_filename)
         pose_model_path = os.path.join(modules.paths.annotator_models_path, pose_filename)
 
-        self.dw_pose_estimation = Wholebody(det_model_path, pose_model_path)
-    
-    # @classmethod
-    # def from_pretrained(cls, pretrained_model_or_path, det_filename=None, pose_filename=None, cache_dir=None):
-    #     det_filename = det_filename or "yolox_l.onnx"
-    #     pose_filename = pose_filename or "dw-ll_ucoco_384.onnx"
+        dw_pose_estimation = Wholebody(det_model_path, pose_model_path)
 
-    #     if os.path.isdir(pretrained_model_or_path):
-    #         det_model_path = os.path.join(pretrained_model_or_path, det_filename)
-    #         pose_model_path = os.path.join(pretrained_model_or_path, pose_filename)
-    #     else:
-    #         det_model_path = hf_hub_download(pretrained_model_or_path, det_filename, cache_dir=cache_dir)
-    #         pose_model_path = hf_hub_download(pretrained_model_or_path, pose_filename, cache_dir=cache_dir)
+        self.dw_pose_estimation = dw_pose_estimation
 
-    #     return cls(Wholebody(det_model_path, pose_model_path))
+        load_device = model_loader.run_device("annotator")
+        offload_device = model_loader.offload_device("annotator")
+
+        self.det_model_wrap = model_patcher.ModelPatcher(dw_pose_estimation.det, load_device, offload_device) if util.is_model_torchscript(dw_pose_estimation.det) else None
+        self.pose_model_wrap = model_patcher.ModelPatcher(dw_pose_estimation.pose, load_device, offload_device) if util.is_model_torchscript(dw_pose_estimation.pose) else None
 
     def detect_poses(self, oriImg) -> List[PoseResult]:
         with torch.no_grad():
             keypoints_info = self.dw_pose_estimation(oriImg.copy())
             return Wholebody.format_result(keypoints_info)
     
-    @torch.no_grad()
-    @torch.inference_mode()
-    def __call__(self, input_image, include_body=True, include_hand=False, include_face=False, hand_and_face=None, image_and_json=False):
+    def __call__(self, input_image, include_body=True, include_hand=False, include_face=False, hand_and_face=None):
         if hand_and_face is not None:
             warnings.warn("hand_and_face is deprecated. Use include_hand and include_face instead.", DeprecationWarning)
             include_hand = hand_and_face
             include_face = hand_and_face
 
-        detected_map, remove_pad = image_pad(input_image)
+        input_image, remove_pad = image_pad(input_image)
 
-        poses = self.detect_poses(detected_map)
+        models = [x for x in [self.det_model_wrap, self.pose_model_wrap] if x is not None]
+        if models:
+            model_loader.load_models_gpu(models)
+        
+        poses = self.detect_poses(input_image)
+        canvas = draw_poses(poses, input_image.shape[0], input_image.shape[1], draw_body=include_body, draw_hand=include_hand, draw_face=include_face) 
+        detected_map = HWC3(remove_pad(canvas))
+        
+        return detected_map
+
+
+class AnimalposeDetector:
+    """
+    A class for detecting animal poses in images using the RTMPose AP10k model.
+
+    Attributes:
+        model_dir (str): Path to the directory where the pose models are stored.
+    """
+    def __init__(self):
+        det_filename = "yolox_l.torchscript.pt" # "yolox_l.onnx"
+        pose_filename = "rtmpose-m_ap10k_256_bs5.torchscript.pt" # "rtmpose-m_ap10k_256.onnx"
+
+        det_model_path = os.path.join(modules.paths.annotator_models_path, det_filename)
+        pose_model_path = os.path.join(modules.paths.annotator_models_path, pose_filename)
+
+        animal_pose_estimation = AnimalPoseImage(det_model_path, pose_model_path)
+
+        self.animal_pose_estimation = animal_pose_estimation
+
+        load_device = model_loader.run_device("annotator")
+        offload_device = model_loader.offload_device("annotator")
+
+        self.det_model_wrap = model_patcher.ModelPatcher(animal_pose_estimation.det, load_device, offload_device) if util.is_model_torchscript(animal_pose_estimation.det) else None
+        self.pose_model_wrap = model_patcher.ModelPatcher(animal_pose_estimation.pose, load_device, offload_device) if util.is_model_torchscript(animal_pose_estimation.pose) else None
+    
+    
+    def __call__(self, input_image):
+        input_image, remove_pad = image_pad(input_image)
+
+        models = [x for x in [self.det_model_wrap, self.pose_model_wrap] if x is not None]
+        if models:
+            model_loader.load_models_gpu(models)
+
+        detected_map, openpose_dict = self.animal_pose_estimation(input_image)
         detected_map = remove_pad(detected_map)
-        canvas = draw_poses(poses, detected_map.shape[0], detected_map.shape[1], draw_body=include_body, draw_hand=include_hand, draw_face=include_face) 
 
-        detected_map = HWC3(canvas)
-        
-        if image_and_json:
-            return (detected_map, encode_poses_as_json(poses, detected_map.shape[0], detected_map.shape[1]))
-        
         return detected_map

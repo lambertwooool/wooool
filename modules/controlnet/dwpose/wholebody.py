@@ -2,58 +2,107 @@
 import cv2
 import numpy as np
 
-from .cv_ox_det import inference_detector
-from .cv_ox_pose import inference_pose
+from .dw_onnx.cv_ox_det import inference_detector as inference_onnx_yolox
+from .dw_onnx.cv_ox_yolo_nas import inference_detector as inference_onnx_yolo_nas
+from .dw_onnx.cv_ox_pose import inference_pose as inference_onnx_pose
+
+from .dw_torchscript.jit_det import inference_detector as inference_jit_yolox
+from .dw_torchscript.jit_pose import inference_pose as inference_jit_pose
 
 from typing import List, Optional
 from .types import PoseResult, BodyResult, Keypoint
+from timeit import default_timer
+import os
+from .util import guess_onnx_input_shape_dtype, get_model_type, get_ort_providers, is_model_torchscript
+import torch
+import torch.utils.benchmark.utils.timer as torch_timer
 
-ONNX_PROVIDERS = ["CUDAExecutionProvider", "DirectMLExecutionProvider", "OpenVINOExecutionProvider", "ROCMExecutionProvider"]
-def check_ort_gpu():
-    try:
-        import onnxruntime as ort
-        for provider in ONNX_PROVIDERS:
-            if provider in ort.get_available_providers():
-                return True
-        return False
-    except:
-        return False
-
-#Global caching as the startup of onnxruntime is a bit slow
-ort_session_det, ort_session_pose = None, None
+from modules.model import model_helper
 
 class Wholebody:
-    def __init__(self, onnx_det: str, onnx_pose: str):
-        global ort_session_det, ort_session_pose
-        if check_ort_gpu():
-            import onnxruntime as ort
-            if ort_session_det is None:
-                ort_session_det = ort.InferenceSession(onnx_det, providers=ort.get_available_providers())
-                ort_session_pose = ort.InferenceSession(onnx_pose, providers=ort.get_available_providers())
-            self.session_det = ort_session_det
-            self.session_pose = ort_session_pose
-            return
-            
+    def __init__(self, det_model_path: Optional[str] = None, pose_model_path: Optional[str] = None):
+        self.det_filename = det_model_path and os.path.basename(det_model_path)
+        self.pose_filename = pose_model_path and os.path.basename(pose_model_path)
+        self.det, self.pose = None, None
+        # return type: None ort cv2 torchscript
+        self.det_model_type = get_model_type("DWPose",self.det_filename)
+        self.pose_model_type = get_model_type("DWPose",self.pose_filename)
         # Always loads to CPU to avoid building OpenCV.
-        device = 'cpu'
-        backend = cv2.dnn.DNN_BACKEND_OPENCV if device == 'cpu' else cv2.dnn.DNN_BACKEND_CUDA
+        cv2_device = 'cpu'
+        cv2_backend = cv2.dnn.DNN_BACKEND_OPENCV if cv2_device == 'cpu' else cv2.dnn.DNN_BACKEND_CUDA
         # You need to manually build OpenCV through cmake to work with your GPU.
-        providers = cv2.dnn.DNN_TARGET_CPU if device == 'cpu' else cv2.dnn.DNN_TARGET_CUDA
+        cv2_providers = cv2.dnn.DNN_TARGET_CPU if cv2_device == 'cpu' else cv2.dnn.DNN_TARGET_CUDA
+        ort_providers = get_ort_providers()
 
-        self.session_det = cv2.dnn.readNetFromONNX(onnx_det)
-        self.session_det.setPreferableBackend(backend)
-        self.session_det.setPreferableTarget(providers)
+        if self.det_model_type is None:
+            pass
+        elif self.det_model_type == "ort":
+            try:
+                import onnxruntime as ort
+                self.det = ort.InferenceSession(det_model_path, providers=ort_providers)
+            except:
+                print(f"Failed to load onnxruntime with {self.det.get_providers()}.\nPlease change EP_list in the config.yaml and restart ComfyUI")
+                self.det = ort.InferenceSession(det_model_path, providers=["CPUExecutionProvider"])
+        elif self.det_model_type == "cv2":
+            try:
+                self.det = cv2.dnn.readNetFromONNX(det_model_path)
+                self.det.setPreferableBackend(cv2_backend)
+                self.det.setPreferableTarget(cv2_providers)
+            except:
+                print("TopK operators may not work on your OpenCV, try use onnxruntime with CPUExecutionProvider")
+                try:
+                    import onnxruntime as ort
+                    self.det = ort.InferenceSession(det_model_path, providers=["CPUExecutionProvider"])
+                except:
+                    print(f"Failed to load {det_model_path}, you can use other models instead")
+        else:
+            self.det = model_helper.load_torch_file(det_model_path)
 
-        self.session_pose = cv2.dnn.readNetFromONNX(onnx_pose)
-        self.session_pose.setPreferableBackend(backend)
-        self.session_pose.setPreferableTarget(providers)
-    
+        if self.pose_model_type is None:
+            pass
+        elif self.pose_model_type == "ort":
+            try:
+                import onnxruntime as ort
+                self.pose = ort.InferenceSession(pose_model_path, providers=ort_providers)
+            except:
+                print(f"Failed to load onnxruntime with {self.pose.get_providers()}.\nPlease change EP_list in the config.yaml and restart ComfyUI")
+                self.pose = ort.InferenceSession(pose_model_path, providers=["CPUExecutionProvider"])
+        elif self.pose_model_type == "cv2":
+            self.pose = cv2.dnn.readNetFromONNX(pose_model_path)
+            self.pose.setPreferableBackend(cv2_backend)
+            self.pose.setPreferableTarget(cv2_providers)
+        else:
+            self.pose = model_helper.load_torch_file(pose_model_path)
+        
+        if self.pose_filename is not None:
+            self.pose_input_size, _ = guess_onnx_input_shape_dtype(self.pose_filename)
+
     def __call__(self, oriImg) -> Optional[np.ndarray]:
-        det_result = inference_detector(self.session_det, oriImg)
-        if det_result is None:
+        
+        if is_model_torchscript(self.det):
+            det_start = torch_timer.timer()
+            det_result = inference_jit_yolox(self.det, oriImg, detect_classes=[0])
+            print(f"DWPose: Bbox {((torch_timer.timer() - det_start) * 1000):.2f}ms")
+        else:
+            det_start = default_timer()
+            if "yolox" in self.det_filename:
+                det_result = inference_onnx_yolox(self.det, oriImg, detect_classes=[0], dtype=np.float32)
+            else:
+                #FP16 and INT8 YOLO NAS accept uint8 input
+                det_result = inference_onnx_yolo_nas(self.det, oriImg, detect_classes=[0], dtype=np.uint8)
+            print(f"DWPose: Bbox {((default_timer() - det_start) * 1000):.2f}ms")
+        if (det_result is None) or (det_result.shape[0] == 0):
             return None
 
-        keypoints, scores = inference_pose(self.session_pose, det_result, oriImg)
+        if is_model_torchscript(self.pose):
+            pose_start = torch_timer.timer()
+            keypoints, scores = inference_jit_pose(self.pose, det_result, oriImg, self.pose_input_size)
+            print(f"DWPose: Pose {((torch_timer.timer() - pose_start) * 1000):.2f}ms on {det_result.shape[0]} people\n")
+        else:
+            pose_start = default_timer()
+            _, pose_onnx_dtype = guess_onnx_input_shape_dtype(self.pose_filename)
+            keypoints, scores = inference_onnx_pose(self.pose, det_result, oriImg, self.pose_input_size, dtype=pose_onnx_dtype)
+            print(f"DWPose: Pose {((default_timer() - pose_start) * 1000):.2f}ms on {det_result.shape[0]} people\n")
 
         keypoints_info = np.concatenate(
             (keypoints, scores[..., None]), axis=-1)
