@@ -23,7 +23,7 @@ shaping the whole view gradually by description with photographic words.
 
 Anything is a reference image
 - IPAdapter，Reference All(IPAdapter) and Face only(IPAdapter Face)
-- Controlnet，Layout only(Canny)、Depth only(Depth)、Pose only(DWPose)
+- Controlnet，Layout only(Canny, Lineart, MLSD, Scribble, Softedge)、Depth only(Depth)、Pose only(DWPose, DWPoseFace, AnimalPose), Others(Tile, Seg, Recolor), etc.
 - Wd14Tagger, Content only
 - Base Image, Img2img
 
@@ -70,12 +70,10 @@ Integrating image browser with generating preview galleries for easier managemen
 
 ```json
 {
-    ...
     "prompt": "",
     "negative_prompt": "",
     "loras_sd15": { "lora_name_1": 0.7 },
     "loras_sdxl": { "lora_name_2": 0.8 },
-    ...
 }
 ```
 
