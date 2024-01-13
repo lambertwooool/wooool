@@ -1,6 +1,7 @@
 import os
 import re
 import random
+import numpy as np
 from dynamicprompts.generators import RandomPromptGenerator
 from dynamicprompts.wildcards.wildcard_manager import WildcardManager
 
@@ -14,10 +15,10 @@ re_attention = re.compile(r"[\(\)\[\]]|:\s*([+-]?[.\d]+)\s*[\)\]]|[^\(\)\[\]:]+"
 re_normalize = [re.compile(x, re.X) for x in [r"([ ])\s+", r"\s*([,\.])\s*", r"([,\.])[,\.]+"]]
 re_random_style = re.compile(r"^__style_(\w+)__$")
 
-def generate(main_character_prompt, prompt_main, prompt_negative, batch_size, style, style_weight, options, loras, lang, seeds, sd_type="sdxl", skip_prompt=False):
+def generate(main_character_prompt, prompt_main, prompt_temp, prompt_negative, batch_size, style, style_weight, options, loras, lang, seeds, sd_type="sdxl", skip_prompt=False):
+    lang_desc = localization.localization_json(lang).get("@lang-desc", "") if lang else ""
     if not skip_prompt:
         mc_name, mc_prompt = main_character_prompt
-        lang_desc = localization.localization_json(lang).get("@lang-desc", "") if lang else ""
         options = { "main_character": mc_prompt, **options }
         for k, v in options.items():
             if isinstance(v, dict):
@@ -59,10 +60,10 @@ def generate(main_character_prompt, prompt_main, prompt_negative, batch_size, st
         positive, negative, style, style_loras = apply_style(style, style_weight, positive, prompt_negative, sd_type=sd_type, seeds=seeds)
         loras += style_loras
     else:
-        positive, negative = prompt_main, prompt_negative
+        prompt_temp, positive, negative = [x.replace("{lang}", f"{lang_desc}") for x in [prompt_temp, prompt_main, prompt_negative]]
 
-    positive = [normalize(positive)] + dynamic_prompt(positive, num_images=batch_size, seeds=seeds)
-    negative = [normalize(negative)] + dynamic_prompt(negative, num_images=batch_size, seeds=seeds)
+    positive = [[normalize(prompt_temp), normalize(positive)]] + dynamic_prompt([prompt_temp, positive], style=[style, style_weight], num_images=batch_size, seeds=seeds)
+    negative = [[normalize(negative)]] + dynamic_prompt([negative], num_images=batch_size, seeds=seeds)
     
     return positive, negative, style, loras
 
@@ -85,15 +86,23 @@ def get_config_loras(config, sd_type, weight=1.0):
         loras.append((lk, round(lv * weight, 2), kw))
     return loras
 
-def dynamic_prompt(positive, num_images=1, seeds=None, lang=None):
+def dynamic_prompt(positive, num_images=1, style=None, seeds=None, lang=None):
+    positive = positive if isinstance(positive, list) else [positive]
     if lang is not None:
         lang_desc = localization.localization_json(lang).get("@lang-desc", "") if lang else ""
-        positive = positive.replace("{lang}", f"{lang_desc}")
+        positive = [x.replace("{lang}", f"{lang_desc}") for x in positive]
 
-    if positive != "":
-        return [[normalize(x)] for x in dynamic_generator.generate(positive, num_images=num_images, seeds=seeds)]
-    else:
-        return [[""] for _ in range(num_images)]
+    generate_positive = []
+    for positive_item in positive:
+        if positive_item != "":
+            generate_positive.append([normalize(x) for x in dynamic_generator.generate(positive_item, num_images=num_images, seeds=seeds)])
+    
+    if not generate_positive:
+        generate_positive.append(["" for _ in range(num_images)])
+    
+    generate_positive = np.array(generate_positive).transpose().tolist()
+
+    return generate_positive
 
 def apply_style(style, style_weight, positive, negative, sd_type="sdxl", seeds=None):
     style_name = None
@@ -182,4 +191,4 @@ def normalize(prompt):
     for re_n in re_normalize:
         prompt = re.sub(re_n, "\\1", prompt)
 
-    return prompt
+    return prompt.strip().strip(",")

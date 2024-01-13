@@ -22,11 +22,19 @@ def get_list():
 
 lora_files = get_list()
 
+def exists(lora_name):
+    return get_lora_path(lora_name) is not None
+
 def get_lora_path(lora_name):
-    return ([file for file in lora_files.values() if os.path.split(file)[1] == lora_name] + [None])[0]
+    return ([file for name, file in lora_files.items() if name == lora_name or os.path.splitext(os.path.split(file)[1])[0] == lora_name] + [None])[0]
+
+def get_name_by_path(lora_path):
+    lora_name = ([k for k, v in lora_files.items() if v == lora_path] + [None])[0]
+    return lora_name
 
 def get_info(lora_name):
-    lora_file = os.path.join(modules.paths.lorafile_path, lora_files[lora_name])
+    # lora_file = os.path.join(modules.paths.lorafile_path, lora_files[lora_name])
+    lora_file = get_lora_path(lora_name)
     info = civitai.get_model_versions(lora_file)
     if info is not None:
         preview_url = info["images"][0]["url"]
@@ -92,15 +100,17 @@ def reduce(loras):
 
     return loras
 
-def remove_prompt_lora(prompt, name):
+def remove_prompt_lora(prompt, name=None):
     lora_prompt = prompt
+    remove_lora = []
     return_prompt = ""
     while True:
         lora = re.search(re_lora, lora_prompt)
         if lora is not None:
             lora_name, _, lora_weight = lora.groups()
             start, end = lora.span()
-            if lora_name == name:
+            if name is None or lora_name in name:
+                remove_lora.append((lora_name, float(lora_weight or 1.0)))
                 return_prompt += lora_prompt[:start]
             else:
                 return_prompt += lora_prompt[:end]
@@ -110,4 +120,4 @@ def remove_prompt_lora(prompt, name):
             return_prompt += lora_prompt
             break
     
-    return return_prompt
+    return return_prompt, remove_lora

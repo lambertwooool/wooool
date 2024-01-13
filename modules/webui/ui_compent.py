@@ -94,7 +94,7 @@ def SetMCShowCount(opt_lang, radio_mc):
 def SampleGallery():
     # img_preview = gr.Image(label='Preview', show_label=True, visible=False, elem_id="img_preview", scale=20)
     # with gr.Column(scale=85):
-    gl_sample_list = gr.Gallery(label="Generated images", show_label=False, columns=[8], rows=[1], object_fit="contain", elem_id="gl_sample_list")
+    gl_sample_list = gr.Gallery(label="Generated images", show_label=False, columns=[8], rows=[1], object_fit="contain", allow_preview=False, elem_id="gl_sample_list", elem_classes="image_gallery")
     num_selected_sample = gr.Number(gl_sample_list.selected_index or -1, visible=False, elem_id="num_selected_sample")
     txt_sample_info = gr.Text(visible=False, show_label=False, container=False, lines=5, elem_id="txt_sample_info")
     
@@ -111,15 +111,12 @@ def StyleGallery():
 
     return gl_style_list, num_selected_style
 
-def LoraBlock(opt_dict, loraCount=5, showCount=3):
+def LoraBlock(opt_dict, loraCount=6, showCount=3):
     blocks = []
     ctrls = []
     lora_label = list(opts.options['ref_mode'].keys())[-1]
     btn_loras = []
     opt_loras = []
-
-    def refresh_lora():
-        return [ gr.Dropdown(choices=["None"] + list(lora.get_list().keys())) ] * loraCount
 
     def select_lora(opt_lora):
         trained_words = []
@@ -143,11 +140,11 @@ def LoraBlock(opt_dict, loraCount=5, showCount=3):
                 gr.HTML(html)
 
     for i in range(loraCount):
-        with gr.Column(min_width=100, visible=i < showCount) as block:
+        with gr.Column(min_width=260, visible=i < showCount, elem_classes="panel_lora_block") as block:
             image_lora = gr.Image(show_label=False, height=200, show_download_button=False, type="filepath", interactive=False, elem_id=f"refer_lora_img_{i}", elem_classes="lora_preview")
             with gr.Row():
-                opt_lora = gr.Dropdown(choices=["None"] + list(lora.lora_files.keys()), value="None", container=False, filterable=False, elem_id=f"refer_lora_{i}", elem_classes="gr_dropdown", scale=95)
-                btn_refresh_lora = gr.Button("\U0001f504", min_width=20, scale=5, elem_id=f"refer_lora_refresh_{i}")
+                ckb_enable = gr.Checkbox(label="", value=True, min_width=40, elem_id=f"refer_lora_enable_{i}", scale=1)
+                opt_lora = gr.Dropdown(choices=["None"] + list(lora.lora_files.keys()), value="None", container=False, filterable=True, elem_id=f"refer_lora_{i}", elem_classes="gr_dropdown", scale=95)
             html_link = gr.HTML()
             opt_trained_words = gr.Dropdown(label="Trained Words", visible=False, filterable=False, elem_id=f"refer_trained_words_{i}", elem_classes="gr_dropdown")
             sl_weight = gr.Slider(minimum=0, maximum=200, value=80, step=5, label="Weight", visible=False, elem_id=f"refer_weight_{i}")
@@ -156,16 +153,13 @@ def LoraBlock(opt_dict, loraCount=5, showCount=3):
             opt_dict[f"refer_lora_trained_words_{i}"] = opt_trained_words
             opt_dict[f"refer_lora_weight_{i}"] = sl_weight
             
-        btn_loras.append(btn_refresh_lora)
         opt_loras.append(opt_lora)
 
         opt_lora.change(select_lora, opt_lora, [image_lora, opt_trained_words, sl_weight, html_link], queue=False)
+        ckb_enable.change(lambda x: gr.Dropdown(interactive=x), ckb_enable, opt_lora, queue=False)
 
         blocks.append(block)
-        ctrls += [opt_lora, sl_weight, opt_trained_words]
-
-    for btn_lora in btn_loras:
-        btn_lora.click(refresh_lora, None, opt_loras, queue=False)
+        ctrls += [opt_lora, ckb_enable, sl_weight, opt_trained_words]
 
     return blocks, ctrls
 
@@ -220,17 +214,21 @@ def RefBlock(opt_base_model, opt_dict, refCount=5, showCount=3):
     ctrl_annotators, default_annotator = get_annotators_inner(default_ref_mode, default_model)
 
     for i in range(refCount):
-        with gr.Column(min_width=100, visible=i < showCount) as block:
+        with gr.Column(min_width=100, visible=i < showCount, elem_classes="panel_ref_block") as block:
             image_refer = gr.Image(label=opts.title['ref_image'], height=200, elem_id=f"refer_img_{i}")
+            
+            opt_type_list = list(opts.options['ref_mode'].keys())
+            opt_type_list = [x for x in opt_type_list if i == 0 or x != "Base Image"]
+            with gr.Row():
+                ckb_enable = gr.Checkbox(label="", value=True, min_width=40, elem_id=f"refer_enable_{i}", scale=1)
+                opt_type = gr.Dropdown(choices=opt_type_list, value=opts.default["ref_mode"], container=False, filterable=False, min_width=80, elem_id=f"refer_type_{i}", elem_classes="gr_dropdown refer_type", scale=9)
+
             sl_rate = gr.Slider(minimum=5, maximum=100, value=60, step=5, label="Ref Rate", visible=False, elem_id=f"refer_rate_{i}")
             with gr.Row():
                 sl_start_percent = gr.Slider(minimum=0, maximum=100, value=0, step=5, min_width=120, label="Start At %", visible=False, elem_id=f"refer_start_{i}", elem_classes="refer_start_at")
                 sl_end_percent = gr.Slider(minimum=0, maximum=100, value=50, step=5, min_width=120, label="End At %", visible=False, elem_id=f"refer_end_{i}", elem_classes="refer_end_at")
             ckb_words = gr.CheckboxGroup(show_label=False, visible=False, elem_id=f"refer_wd14_{i}", elem_classes="refer_words")
             
-            opt_type_list = list(opts.options['ref_mode'].keys())
-            opt_type_list = [x for x in opt_type_list if i == 0 or x != "Base Image"]
-            opt_type = gr.Dropdown(choices=opt_type_list, value=opts.default["ref_mode"], container=False, filterable=False, min_width=80, elem_id=f"refer_type_{i}", elem_classes="gr_dropdown")
             opt_ctrl_model = gr.Dropdown(choices=ctrl_models, value=default_model, visible=(len(ctrl_models) > 1),  container=False, filterable=False, min_width=80, elem_id=f"ref_ctrl_model_{i}", elem_classes="gr_dropdown")
             opt_annotator = gr.Dropdown(choices=ctrl_annotators, value=default_annotator, visible=(len(ctrl_annotators) > 1),  container=False, filterable=False, min_width=80, elem_id=f"ref_annotator_{i}", elem_classes="gr_dropdown")
 
@@ -247,8 +245,10 @@ def RefBlock(opt_base_model, opt_dict, refCount=5, showCount=3):
         image_refer.change(lambda x: (gr.Slider(visible=x is not None), gr.Slider(visible=x is not None), gr.Slider(visible=x is not None)), image_refer, [sl_rate, sl_start_percent, sl_end_percent], queue=False) \
             .then(get_tags, [opt_type, image_refer], [ckb_words], queue=False)
 
+        ckb_enable.change(lambda x: gr.Dropdown(interactive=x), ckb_enable, opt_type, queue=False)
+
         blocks.append(block)
-        ctrls += [opt_type, image_refer, sl_rate, ckb_words, opt_ctrl_model, opt_annotator, sl_start_percent, sl_end_percent]
+        ctrls += [opt_type, ckb_enable, image_refer, sl_rate, ckb_words, opt_ctrl_model, opt_annotator, sl_start_percent, sl_end_percent]
     
     return blocks, ctrls
 
@@ -264,20 +264,21 @@ def ReFaceUI(panel_action_btns, panel_action_interface, btn_reface_interface, op
 
     return btn_reface, img_face
 
-def ReFinerUI(panel_action_btns, panel_action_interface, btn_refiner_interface, btn_refiner_face_interface, opt_dict):
+def ReFinerUI(panel_action_btns, panel_action_interface, btn_refiner_interface, opt_dict, type="image"):
+    action_name = "Refiner Image" if type == "image" else "Refiner Face"
     with gr.Row(visible=False) as panel_refiner:
-        opt_dict["refiner_denoise"] = MakeSlider(["refiner_denoise"], min_width=160)["refiner_denoise"]
-        opt_dict["refiner_detail"] = MakeSlider(["refiner_detail"], min_width=160)["refiner_detail"]
-        opt_dict["refiner_prompt"] = gr.Text(label="Prompt Content", elem_id="txt_refiner_prompt", elem_classes="prompt")
-        btn_refiner = gr.Button("Refiner Image", min_width=100, variant="primary", elem_id="btn_refiner", elem_classes="btn_action")
-        btn_refiner_face = gr.Button("Refiner Face", min_width=100, variant="primary", elem_id="btn_refiner", elem_classes="btn_action", visible=False)
+        opt_dict[f"refiner_{type}_denoise"] = MakeSlider(["refiner_denoise"], min_width=160)["refiner_denoise"]
+        opt_dict[f"refiner_{type}_detail"] = MakeSlider(["refiner_detail"], min_width=160)["refiner_detail"]
+        if type == "face":
+            opt_dict["refiner_face_index"] = MakeOpts(["refiner_face_index"], opt_type="Radio", min_width=160)["refiner_face_index"]
+        opt_dict[f"refiner_{type}_prompt"] = gr.Text(label="Prompt Content", elem_id="txt_refiner_prompt", elem_classes="prompt")
+        btn_refiner = gr.Button(action_name, min_width=100, variant="primary", elem_id="btn_refiner", elem_classes="btn_action")
         btn_refiner_cancel = gr.Button("Close", min_width=100, elem_id="btn_refiner_cancel", elem_classes="btn_action")
     
-    btn_refiner_interface.click(lambda:(gr.Column(visible=False), gr.Column(visible=True), gr.Row(visible=True), gr.Button(visible=True), gr.Button(visible=False)), None, [panel_action_btns, panel_action_interface, panel_refiner, btn_refiner, btn_refiner_face], queue=False)
-    btn_refiner_face_interface.click(lambda:(gr.Column(visible=False), gr.Column(visible=True), gr.Row(visible=True), gr.Button(visible=False), gr.Button(visible=True)), None, [panel_action_btns, panel_action_interface, panel_refiner, btn_refiner, btn_refiner_face], queue=False)
+    btn_refiner_interface.click(lambda:(gr.Column(visible=False), gr.Column(visible=True), gr.Row(visible=True)), None, [panel_action_btns, panel_action_interface, panel_refiner], queue=False)
     btn_refiner_cancel.click(lambda:(gr.Column(visible=True), gr.Column(visible=False), gr.Row(visible=False)), None, [panel_action_btns, panel_action_interface, panel_refiner], queue=False)
 
-    return btn_refiner, btn_refiner_face
+    return btn_refiner
 
 def VaryCustomUI(panel_action_btns, panel_action_interface, btn_vary_custom_interface, opt_dict, gl_sample_list, num_selected_sample, panel_sample_gallery, panel_editor, img_vary_editor):
     with gr.Row(visible=False) as panel_vary_custom:
@@ -310,4 +311,20 @@ def ZoomCustomUI(panel_action_btns, panel_action_interface, btn_zoom_custom_inte
     btn_zoom_cancel.click(lambda:(gr.Column(visible=True), gr.Column(visible=False), gr.Row(visible=False)), None, [panel_action_btns, panel_action_interface, panel_zoom_custom], queue=False)
 
     return btn_zoom_custom, btn_resize
+
+def UpscaleUI(panel_action_btns, panel_action_interface, btn_interface, opt_dict):
+    with gr.Row(visible=False) as panel_ui:
+        opt_dict["upscale_factor"] = MakeSlider(["upscale_factor"], min_width=160)["upscale_factor"]
+        opt_dict["upscale_model"] = MakeOpts(["upscale_model"], min_width=160)["upscale_model"]
+        opt_dict["upscale_origin"] = MakeSlider(["upscale_origin"], min_width=160)["upscale_origin"]
+        ckb_upscale_repair_face = gr.Checkbox(label="Repair Face", elem_id="ckb_upscale_repair_face", value=True)
+        opt_dict["upscale_repair_face"] = ckb_upscale_repair_face
+
+        btn_upscale = gr.Button("Upscale", min_width=100, elem_id="btn_upscale", variant="primary", elem_classes="btn_action")
+        btn_cancel = gr.Button("Close", min_width=100, elem_id="btn_upscale_cancel", elem_classes="btn_action")
+
+    btn_interface.click(lambda:(gr.Column(visible=False), gr.Column(visible=True), gr.Row(visible=True)), None, [panel_action_btns, panel_action_interface, panel_ui], queue=False)
+    btn_cancel.click(lambda:(gr.Column(visible=True), gr.Column(visible=False), gr.Row(visible=False)), None, [panel_action_btns, panel_action_interface, panel_ui], queue=False)
+
+    return btn_upscale
 

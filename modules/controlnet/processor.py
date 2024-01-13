@@ -32,6 +32,8 @@ from .tile import TileDetector
 from .normalbae import NormalBaeDetector
 from .oneformer import OneformerSegmentor
 from .sam import SamDetector
+from .lama_inpaint import LamaInpaintdetector
+from .anime_face_segment import AnimeFaceSegmentor
 
 import modules.paths
 from modules.model import controlnet, model_loader, model_patcher
@@ -80,6 +82,8 @@ MODELS = {
     'tile': { 'class': TileDetector },
     'oneformer': { 'class': OneformerSegmentor },
     'segment_anything': { 'class': SamDetector },
+    'lama_inpaint': { 'class': LamaInpaintdetector },
+    'anime_segmentation': { 'class': AnimeFaceSegmentor },
 }
 
 MODEL_PARAMS = {
@@ -115,7 +119,9 @@ MODEL_PARAMS = {
     'ip_adapter_face': {},
     'tile': {},
     'oneformer': {},
-    'segment_anything': {}
+    'segment_anything': {},
+    'lama_inpaint': {},
+    'anime_segmentation': { 'remove_background': True },
 }
 
 class Processor:

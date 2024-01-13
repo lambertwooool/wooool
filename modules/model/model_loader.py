@@ -12,7 +12,7 @@ device_config = {
     "unet": (True, False),
     "upscaler": (True, False),
     "controlnet": (True, False),
-    "vae": (False, False),
+    "vae": (True, False),
     "face": (True, False),
 }
 

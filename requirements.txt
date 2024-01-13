@@ -17,3 +17,8 @@ onnxruntime
 accelerate==0.22.0
 insightface==0.7.3
 facexlib==0.3.0
+ftfy
+fvcore
+omegaconf
+pytorch_lightning
+kornia==0.7.1

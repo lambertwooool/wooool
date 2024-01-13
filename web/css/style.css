@@ -37,11 +37,10 @@ gradio-app {
 #panel_header { height: var(--header-height); }
 #title { font-size:168px; margin:0; font-family:'Arial Rounded MT Bold'; height: var(--header-height); align-items: center; align-content: center; justify-content:center; }
 #title { background: url(/file=web/css/logo-t.png) center no-repeat; background-size: contain; text-indent: -9999px; }
-#img_preview { text-align: center; }
-#img_preview img { height: var(--header-height); }
-#panel_gallery { height: var(--header-height); }
+/*#panel_gallery { height: var(--header-height); }*/
 #gl_sample_list { height: var(--header-height); }
-#gl_sample_list .fixed-height { max-height: var(--header-height); }
+/*#gl_sample_list { resize: vertical; }*/
+/*#gl_sample_list .fixed-height { max-height: var(--header-height); }*/
 #gl_sample_list .grid-wrap .grid-container .caption-label { font-size: 12px;}
 #gl_sample_list img[alt="Waiting"] { animation: blink 3s infinite; }
 #gl_sample_list .grid-wrap .grid-container button:has(img[alt="Initializing"], img[alt="Waiting"], img[alt="Generating"], img[alt="Encoding"]) .caption-label { animation: blink 3s infinite; background-color: var(--block-title-background-fill); font-weight: bold; }
@@ -67,6 +66,7 @@ div:has(#radio_mc, #ckb_mc_other), #radio_mc, #ckb_mc_other { background-color: 
 .label-left span { float:left; margin-right: 8px; }
 #txt_mc_other { margin-bottom: -5px; }
 #btn_refresh_mc { padding: 0; font-size: 14px; }
+#txt_prompt_main textarea { overflow-y: auto !important; resize:vertical; }
 #img_refer button div.wrap { line-height: 1000%; }
 #img_refer button div.wrap .or { display: none; }
 #img_refer button[aria-label="Edit"] { display: none; }
@@ -91,4 +91,17 @@ div:has(#radio_mc, #ckb_mc_other), #radio_mc, #ckb_mc_other { background-color: 
 .refer_start_at, .refer_end_at { white-space: nowrap; }
 .refer_start_at input[type=number], .refer_end_at input[type=number] { width: 50px; padding: 0; }
 
-.gr_slider > div:has(input[disabled]), #txt_seed > label:has(input[disabled]), .gr_dropdown > label:has(input[disabled]) { opacity: 0.3 }
+.gr_slider > div:has(input[disabled]),
+#txt_seed > label:has(input[disabled]),
+.gr_dropdown > label:has(input[disabled]) {
+    opacity: 0.3
+}
+
+.panel_ref_block:has(input[disabled]), .panel_lora_block:has(input[disabled]) {
+    div[id^="refer_img_"], div[id^="refer_lora_img_"] {
+        opacity: 0.3
+    }
+    button[aria-label] {
+        display: none;
+    }
+}

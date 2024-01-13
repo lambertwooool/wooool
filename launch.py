@@ -6,8 +6,9 @@ import os
 import re
 import subprocess
 import sys
-
 import version
+import warnings
+
 from modules import shared
 
 print(f"[Launch] {str(sys.argv)}")
@@ -20,6 +21,7 @@ REINSTALL_ALL = False
 
 logging.getLogger("torch.distributed.nn").setLevel(logging.ERROR)  # sshh...
 logging.getLogger("xformers").addFilter(lambda record: 'A matching Triton is not available' not in record.getMessage())
+warnings.filterwarnings(action="ignore", category=UserWarning, module="torchvision.transforms.functional_tensor")
 
 re_requirement = re.compile(r"\s*([-_a-zA-Z0-9]+)\s*(?:==\s*([-+_.a-zA-Z0-9]+))?\s*")
 

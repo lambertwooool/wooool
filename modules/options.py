@@ -1,5 +1,5 @@
 import os
-from modules import util
+from modules import util, paths
 
 def load_ui_config(name):
 	return util.load_json(os.path.join("./configs/ui", f"{name}.json"))
@@ -69,7 +69,15 @@ default["pic_num"] = "2 Samples"
 # Ref Num
 options["ref_num"] = (1, 5, 1)
 title["ref_num"] = "Ref Count"
-default["ref_num"] = 3
+default["ref_num"] = 4
+
+# Lora Num
+options["lora_num"] = {
+	"3 LoRA": 3,
+	"6 LoRA": 6,
+}
+title["lora_num"] = "Lora Count"
+default["lora_num"] = "3 LoRA"
 
 # Quality
 options["quality"] = {
@@ -84,17 +92,11 @@ default["quality"] = "Fast Generate"
 
 options["quality_setting"] = {
     # "5": { "sdxl": (1024, 5, 0, "lcm", "lcm"), "sd15": (768, 5, 0, "lcm", "lcm") },
-	"1": { "sdxl": (1152, 18, 0, "ddim", "karras"), "sd15": (808, 18, 0, "ddim", "karras") },
-	"2": { "sdxl": (1152, 25, 0, "dpmpp_3m_sde_gpu", "karras"), "sd15": (808, 25, 0, "dpmpp_3m_sde_gpu", "karras") },
-	"3": { "sdxl": (1152, 25, int(25 / 2.5), "dpmpp_3m_sde_gpu", "karras"), "sd15": (808, 35, 0, "dpmpp_3m_sde_gpu", "karras") },
-	"4": { "sdxl": (1152, 35, int(35 / 2.5), "dpmpp_3m_sde_gpu", "karras"), "sd15": (808, 50, 0, "dpmpp_3m_sde_gpu", "karras") },
+	"1": { "sdxl": (1024, 16, 0, "dpmpp_2m", "karras"), "sd15": (768, 16, 0, "dpmpp_2m", "karras") },
+	"2": { "sdxl": (1024, 25, 0, "dpmpp_3m_sde_gpu", "karras"), "sd15": (768, 25, 0, "dpmpp_3m_sde_gpu", "karras") },
+	"3": { "sdxl": (1024, 25, int(25 / 2.5), "dpmpp_3m_sde_gpu", "karras"), "sd15": (768, 35, 0, "dpmpp_3m_sde_gpu", "karras") },
+	"4": { "sdxl": (1024, 35, int(35 / 2.5), "dpmpp_3m_sde_gpu", "karras"), "sd15": (768, 50, 0, "dpmpp_3m_sde_gpu", "karras") },
 }
-
-# Detail
-options["detail"] = (0, 120, 5)
-mul["detail"] = 0.01
-title["detail"] = "Detail Enhance %"
-default["detail"] = 30
 
 # Ref Mode
 options["ref_mode"] = {
@@ -153,7 +155,7 @@ default["cfg_scale"] = 7
 options["cfg_scale_to"] = (0.5, 20, 0.5)
 mul["cfg_scale_to"] = 1
 title["cfg_scale_to"] = "CFG Work-up to"
-default["cfg_scale_to"] = 5
+default["cfg_scale_to"] = 9
 
 # File Format
 options["file_format"] = {
@@ -238,11 +240,17 @@ for x in ["mc", "style", "view", "emo", "location", "weather", "hue"]:
 	default[k] = 100
 default["style_weight"] = 110
 
+# Detail
+options["detail"] = (0, 120, 5)
+mul["detail"] = 0.01
+title["detail"] = "Detail Enhance %"
+default["detail"] = 0
+
 # More Art Weight
 options["more_art_weight"] = (0, 100, 5)
 mul["more_art_weight"] = 0.01
 title["more_art_weight"] = "More Art Weight %"
-default["more_art_weight"] = 10
+default["more_art_weight"] = 0
 
 # Vary Custom Area
 options["vary_custom_area"] = {
@@ -278,12 +286,41 @@ default["zoom_blur_alpha"] = 50
 
 # Refiner Denoise
 options["refiner_denoise"] = (0, 100, 5)
-mul["refiner_denoise"] = 0.01
+mul["refiner_image_denoise"] = mul["refiner_face_denoise"] = 0.01
 title["refiner_denoise"] = "Vary Strength %"
 default["refiner_denoise"] = 30
 
 # Refiner Detail
-options["refiner_detail"] = (0, 100, 5)
-mul["refiner_detail"] = 0.01
+options["refiner_detail"] = (-300, 300, 5)
+mul["refiner_image_detail"] = mul["refiner_face_detail"] = 0.01
 title["refiner_detail"] = "Refiner Detail %"
 default["refiner_detail"] = 30
+
+# Refiner Face index
+options["refiner_face_index"] = {
+	"Max": 0,
+	"2nd": 1,
+	"3rd": 2,
+}
+title["refiner_face_index"] = "Specify Face"
+default["refiner_face_index"] = "Max"
+
+# Upscale Model
+options["upscale_model"] = {
+	"Non-use model": "",
+} | { os.path.split(x)[1]: os.path.split(x)[1] for x in util.list_files(paths.upscale_models_path, ext=["pt", "pth", "bin"]) }
+title["upscale_model"] = "Upscale Model"
+default["upscale_model"] = "4x-UltraSharp.pth"
+
+# Upscale Factor
+options["upscale_factor"] = (100, 400, 50)
+mul["upscale_factor"] = 0.01
+title["upscale_factor"] = "Upscale Factor %"
+default["upscale_factor"] = 200
+
+# Upscale Origin Visibility
+options["upscale_origin"] = (0, 100, 0)
+mul["upscale_origin"] = 0.01
+title["upscale_origin"] = "Origin Visibility %"
+default["upscale_origin"] = 0
+

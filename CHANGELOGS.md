@@ -1,5 +1,14 @@
 # Change Logs
 
+## 0.8.4
+- Support MeshGraphormer Hand Refiner
+- New finetune interface, supports extracting Lora from prompt words into finetune list, as well as selecting number of Lora models
+- Enable or disable individual ref image or Lora model
+- Upscale UI, including upscale factor, model selection, face restoration etc. options
+- Image zoom interface after double click
+- Vary(Custom) Inpaint UI
+- New endless mode, can adjust parameters in real time during generation
+
 ## 0.8.3
 - Support more controlnet, densepose, animal_pose, lineart, lineart_anime, manga_line, mlsd, normalbae, oneformer, sam, tile, depth_zoe, qrcode, brightness, recolor, color, style.
 - Controlnet can adjust the starting and ending percent, as well as preprocessor selection.

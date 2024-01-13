@@ -20,10 +20,21 @@ from modules.model import model_helper
 progress_html = "<progress value='{}' max='100'></progress><div class='progress_text'>{}</div>"
 opt_dict = []
 ref_image_count = [5, 3]
-lora_count = [3, 3]
+lora_count = [6, 3]
 cur_taskid = None
 action_btns = []
 page_size = 128
+endless_mode = False
+
+def GenerateOne(img_refer, ckb_pro, txt_setting, *args):
+    setting = json.loads(txt_setting)
+    setting["pic_num"] = 1
+    proc_output = Generate(img_refer, ckb_pro, json.dumps(setting), *args)
+    while True:
+        try:
+            yield next(proc_output)
+        except StopIteration:
+            break
 
 def Generate(img_refer, ckb_pro, txt_setting, *args):
     args = list(args)
@@ -31,13 +42,12 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
 
     radio_mc = list(setting["mc"])[0]
 
-    ref_num = gen_opts.pop('ref_num', 0)
     refiner_model = gen_opts.pop("refiner_model")
     if refiner_model == opts.title["disable_refiner"]:
         refiner_model = ""
 
-    seed = gen_opts.pop("seed")
     fixed_seed = gen_opts.pop("fixed_seed", False)
+    seed = gen_opts.pop("seed") if fixed_seed else 0
 
     prompt_negative = gen_opts.pop("prompt_negative")
     style_item = gen_opts.pop("style_item")
@@ -73,7 +83,7 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
         "detail": gen_opts.pop("detail"),
         "denoise": gen_opts.pop("denoise"),
         "file_format": gen_opts.pop("file_format"),
-        "single_vae": gen_opts.pop("single_vae"),
+        "single_vae": gen_opts.pop("single_vae", False),
         "options": {
             k: v if isinstance(v, dict) else { "prompt": v } \
                 for k, v in gen_opts.items() if k in ["view", "emo", "location", "weather", "hue"]
@@ -107,11 +117,15 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
             ref_mode, _ = opts.options["ref_mode"]["Ref All"]
             params["controlnet"].append(["Ref All", ref_mode, img_refer, 0.5])
     else:
-        len_ref_ctrl = 8
+        len_ref_ctrl = 9
         ref_image_args = args[: ref_image_count[0] * len_ref_ctrl]
+        ref_num = int(gen_opts.get("ref_num", ref_image_count[1]))
         args = args[ref_image_count[0] * len_ref_ctrl :]
         for i in range(ref_image_count[0]):
-            opt_type, image_refer, sl_rate, ckb_words, opt_model, opt_annotator, sl_start_percent, sl_end_percent = ref_image_args[i * len_ref_ctrl : (i + 1) * len_ref_ctrl]
+            opt_type, ckb_enable, image_refer, sl_rate, ckb_words, opt_model, opt_annotator, sl_start_percent, sl_end_percent = ref_image_args[i * len_ref_ctrl : (i + 1) * len_ref_ctrl]
+            if not ckb_enable or i >= ref_num:
+                continue
+
             ref_mode, _ = opts.options["ref_mode"][opt_type]
             if ref_mode == "base_image":
                 if image_refer is not None:
@@ -127,85 +141,109 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
         if params.get("base_image"):
             params["image"] = params.pop("base_image")
 
-        len_lora_ctrl = 3
+        len_lora_ctrl = 4
         lora_args = args[: lora_count[0] * len_lora_ctrl]
+        lora_num = int(gen_opts.get("lora_num", lora_count[1]))
         args = args[lora_count[0] * len_lora_ctrl :]
         for i in range(lora_count[0]):
-            opt_lora, sl_weight, opt_trained_words = lora_args[i * len_lora_ctrl : (i + 1) * len_lora_ctrl]
+            opt_lora, ckb_enable, sl_weight, opt_trained_words = lora_args[i * len_lora_ctrl : (i + 1) * len_lora_ctrl]
+            if not ckb_enable or i >= lora_num:
+                continue
             if lora.lora_files.get(opt_lora, "") != "":
                 lora_filename = os.path.split(lora.lora_files.get(opt_lora))[1]
                 params["lora"].append((lora_filename, sl_weight / 100.0, opt_trained_words))
 
-    proc_output = ProcessTask(params)
+    proc_output = ProcessTask(params, hide_history=gen_opts.get("hide_history", False), show_endless=True)
     while True:
         try:
             yield next(proc_output)
         except StopIteration:
             break
 
-def ProcessTask(params, default_image=None):
+def ProcessTask(params, default_image=None, hide_history=False, show_endless=False):
     global cur_taskid
 
-    cur_taskid = worker.append(params)
-    finished = False
-    batch_start_time = params["create_time"]
-    cur_batch = -1
-    default_pic_preview = default_image or os.path.join(modules.paths.css_path, "logo-t-s.png")
     disable_actions = tuple([gr.Button(interactive=False) for _ in range(len(action_btns) + 1)]) # 2=btn_delete, btn_top
     enable_actions = tuple([gr.Button(interactive=True) for _ in range(len(action_btns) + 1)]) # 2=btn_delete, btn_top
 
-    yield   gr.HTML(visible=False), \
-            gr.HTML(value=progress_html.format(0, "Initializing")), \
-            gr.Gallery(value=[(default_pic_preview, "Initializing")] + GetSampleList(), allow_preview=False), \
-            gr.Row(visible=True), \
-            gr.Row(visible=False), \
-            gr.Column(visible=True), \
-            gr.Button(interactive=True), \
-            gr.Button(interactive=True), \
-            *disable_actions
+    if params is not None:
+        cur_taskid = worker.append(params)
+        finished = False
+        batch_start_time = params["create_time"]
+        cur_batch = -1
+        default_pic_preview = default_image or os.path.join(modules.paths.css_path, "logo-t-s.png")
+        simple_list = GetSampleList() if not hide_history else []
+        sample_start_time = os.path.getmtime(simple_list[-1][0]) if not hide_history else batch_start_time
+        pic_preview = [(default_pic_preview, "Initializing")]
 
-    while not finished:
-        if len(shared.outputs):
-            task, percent, finished, message, picture = shared.outputs.pop()
-            # print(time.time(), percent, finished, len(shared.outputs), message)
-            shared.outputs.clear()
+        yield   gr.HTML(visible=False), \
+                gr.HTML(value=progress_html.format(0, "Initializing")), \
+                gr.Row(visible=True), \
+                gr.Row(visible=False), \
+                gr.Column(visible=True), \
+                gr.Button(interactive=True), \
+                gr.Button(interactive=True), \
+                gr.Gallery(value=pic_preview + simple_list), \
+                *disable_actions
 
-            task_cur_batch = task.get("cur_batch", 0)
-            refresh_skip = False
-            if cur_batch < task_cur_batch:
-                batch_start_time = time.time()
-                cur_batch = task_cur_batch
-                pic_preview = [(default_pic_preview, "Waiting")]
-                refresh_skip = True
+        while not finished:
+            if len(shared.outputs):
+                task, percent, finished, message, picture = shared.outputs.pop()
+                # print(time.time(), percent, finished, len(shared.outputs), message)
+                shared.outputs.clear()
 
-            if picture is not None:
-                pic_preview = [(picture, "Generating")]
+                task_cur_batch = task.get("cur_batch", 0)
+                refresh_skip = False
+                if cur_batch < task_cur_batch:
+                    batch_start_time = time.time()
+                    cur_batch = task_cur_batch
+                    pic_preview = [(default_pic_preview, "Waiting")]
+                    refresh_skip = True
+                    simple_list = GetSampleList(start_time=sample_start_time, end_time=batch_start_time)
 
-            yield   gr.HTML(visible=False), \
-                    gr.HTML(value=progress_html.format(percent, message)), \
-                    gr.Gallery(value=pic_preview + GetSampleList(end_time=batch_start_time)), \
-                    gr.Row(visible=True), \
-                    gr.Row(visible=False), \
-                    gr.Column(visible=True), \
-                    gr.Button(interactive=True) if refresh_skip else gr.Button(), \
-                    gr.Button(), \
-                    *disable_actions
-        time.sleep(0.05)
+                if picture is not None:
+                    pic_preview = [(picture, "Generating")]
 
-    yield   gr.HTML(visible=False), \
-            gr.HTML(value=progress_html.format(0, 'finished')), \
-            gr.Gallery(value=GetSampleList()), \
-            gr.Row(visible=True), \
-            gr.Row(visible=True), \
-            gr.Column(visible=False), \
-            gr.Button(interactive=True), \
-            gr.Button(interactive=True), \
-            *enable_actions
+                yield   gr.HTML(visible=False), \
+                        gr.HTML(value=progress_html.format(percent, message)), \
+                        gr.Row(visible=True), \
+                        gr.Row(visible=False), \
+                        gr.Column(visible=True), \
+                        gr.Button(interactive=True) if refresh_skip else gr.Button(), \
+                        gr.Button(), \
+                        gr.Gallery(value=pic_preview + simple_list), \
+                        *disable_actions
+                        
+            time.sleep(0.01)
+
+    yield *ProcessFinish(show_endless), *enable_actions
     
     cur_taskid = None
     
-    execution_time = time.time() - params["create_time"]
+    execution_time = (time.time() - params.get("create_time", time.time())) if params else 0
     print(f'Total time: {execution_time:.2f} seconds')
+
+def ProcessFinishNoRefresh(endless_mode):
+    if endless_mode:
+        return  gr.HTML(), \
+                gr.HTML(value=progress_html.format(0, 'finished')), \
+                gr.Row(), \
+                gr.Row(), \
+                gr.Column(), \
+                gr.Button(), \
+                gr.Button()
+                
+    else:
+        return  gr.HTML(visible=False), \
+                gr.HTML(value=progress_html.format(0, 'finished')), \
+                gr.Row(visible=True), \
+                gr.Row(visible=True), \
+                gr.Column(visible=False), \
+                gr.Button(interactive=True), \
+                gr.Button(interactive=True)
+
+def ProcessFinish(endless_mode):
+    return *ProcessFinishNoRefresh(endless_mode), gr.Gallery(value=GetSampleList())
 
 def Process(process_handler):
     def func(gl_sample_list, num_selected_sample, txt_setting, *args):
@@ -223,6 +261,7 @@ def Process(process_handler):
             params["quality"] = gen_opts.get("quality")
             params["file_format"] = gen_opts.get("file_format")
             params["single_vae"] = gen_opts.get("single_vae")
+            params["lang"] = gen_opts.get("lang")
 
             min_pixel = opts.options["quality_setting"][str(params["quality"])]["sdxl"][0] ** 2
             h, w = ref_image.shape[:2]
@@ -234,7 +273,7 @@ def Process(process_handler):
 
             params = process_handler(ref_image, params, pnginfo, gen_opts, *args)
 
-            proc_output = ProcessTask(params)
+            proc_output = ProcessTask(params, hide_history=gen_opts.get("hide_history", False))
             while True:
                 try:
                     yield next(proc_output)
@@ -247,7 +286,8 @@ def StopProcess():
     worker.stop(cur_taskid)
 
     return  gr.Button(interactive=False), \
-            gr.Button(interactive=False)
+            gr.Button(interactive=False), \
+            gr.Checkbox(value=False)
 
 def SkipBatch():
     worker.skip(cur_taskid)
@@ -273,13 +313,16 @@ def GetModelInfo(opt_model):
     else:
         return gr.Button(interactive=False)
 
-def GetSampleList(show_count=0, page=0, end_time=None, return_page_count=False):
+def GetSampleList(show_count=0, page=0, start_time=None, end_time=None, return_page_count=False):
     page = int(page)
     show_count = show_count if show_count > 0 else page_size
-    excludes = ["temp.png"]
-    files = util.list_files(modules.paths.temp_outputs_path, ["jpg", "jpeg", "png"], excludes=excludes)
+    files = util.list_files(modules.paths.temp_outputs_path, ["jpg", "jpeg", "png"], excludes_dir=["recycled", "temp"], search_subdir=True)
     files = sorted(files, key=lambda x: os.path.getmtime(x), reverse=True)
-    if end_time is not None:
+    if start_time is not None and end_time is not None:
+        files = filter(lambda x: os.path.getmtime(x) > start_time and os.path.getmtime(x) < end_time, files)
+    elif start_time is not None:
+        files = filter(lambda x: os.path.getmtime(x) > start_time, files)
+    elif end_time is not None:
         files = filter(lambda x: os.path.getmtime(x) < end_time, files)
     files = [(x, os.path.splitext(os.path.split(x)[-1])[0] if os.path.getsize(x) > 50 * 1024 else "Encoding") for x in files]
         
@@ -318,10 +361,15 @@ def RefreshModels():
 
     return gr.Dropdown(base_models), gr.Dropdown(GetRefinerModels("sdxl")), gr.Dropdown([opts.title["disable_refiner"]] + GetRefinerModels("sdxl"))
 
+def RefreshLoras():
+    return [ gr.Dropdown(choices=["None"] + list(lora.get_list().keys())) ] * lora_count[0]
+
 def GetRefinerModels(base_model):
     # model_type = "(sd15)" if "sd15" in base_model else "(sdxl)"
     # renfiner_models = [x for x in list(model_helper.base_files) if model_type in x]
-    renfiner_models = [x for x in list(model_helper.base_files) if "(sd15)" not in x]
+    # renfiner_models = [x for x in list(model_helper.base_files) if "(sd15)" not in x]
+    renfiner_models = [x for x in list(model_helper.base_files)]
+    
     return renfiner_models
 
 def GetSelectSamplePath(gl_sample_list, num_selected_sample):
@@ -332,6 +380,8 @@ def GetSelectSamplePath(gl_sample_list, num_selected_sample):
         selected_image = gl_sample_list[selected_index]
         filename = os.path.split(selected_image[0]["name"])[1]
         file_path = os.path.join(modules.paths.temp_outputs_path, filename)
+        if not os.path.exists(file_path):
+            file_path = os.path.join(modules.paths.temp_outputs_path, f"{filename[:6]}/{filename}")
     
     return file_path
 
@@ -504,6 +554,11 @@ def ParseImageToTask(image, return_pnginfo=False):
     else:
         return params
 
+def ChangeEndless(ckb_endless_mode):
+    global endless_mode
+
+    endless_mode = ckb_endless_mode
+
 def GetSampleImage(gl_sample_list, num_selected_sample):
     file_path = GetSelectSamplePath(gl_sample_list, num_selected_sample)
     image = None
@@ -513,6 +568,9 @@ def GetSampleImage(gl_sample_list, num_selected_sample):
     return file_path, image
 
 def DeleteSample(gl_sample_list, num_selected_sample, num_page_sample):
+    if gl_sample_list is None:
+        return gr.Gallery()
+
     file_path = GetSelectSamplePath(gl_sample_list, num_selected_sample)
     if file_path is not None:
         recycled_path = os.path.join(modules.paths.temp_outputs_path, "recycled")
@@ -527,7 +585,7 @@ def ChangePageSize(sl_sample_pagesize):
     global page_size
     page_size = int(sl_sample_pagesize)
 
-    return gr.Gallery(value=GetSampleList(), allow_preview=False), gr.Number(0)
+    return gr.Gallery(value=GetSampleList()), gr.Number(0)
 
 def SetPageSize(sl_sample_pagesize):
     global page_size
@@ -548,32 +606,67 @@ def TopSample(gl_sample_list, num_selected_sample, num_page_sample):
     if file_path is not None:
         os.utime(file_path, (time.time(), time.time()))
 
-    return gr.Gallery(value=GetSampleList(page=num_page_sample), allow_preview=False)
+    return gr.Gallery(value=GetSampleList(page=num_page_sample))
 
 def FirstPageSample(num_page_sample):
     page = 0
-    return gr.Gallery(value=GetSampleList(page=page), allow_preview=False), gr.Number(page)
+    return gr.Gallery(value=GetSampleList(page=page)), gr.Number(page)
 
 def PrevPageSample(num_page_sample):
     page = max(0, num_page_sample - 1)
-    return gr.Gallery(value=GetSampleList(page=page), allow_preview=False), gr.Number(page)
+    return gr.Gallery(value=GetSampleList(page=page)), gr.Number(page)
 
 def NextPageSample(num_page_sample):
     page = num_page_sample + 1
     list, page_count = GetSampleList(page=page, return_page_count=True)
     page = min(page_count, page)
-    return gr.Gallery(value=list, allow_preview=False), gr.Number(page)
+    return gr.Gallery(value=list), gr.Number(page)
 
-def SelectSample(evt: gr.SelectData, gl_sample_list, ckb_fullscreen):  # SelectData is a subclass of EventData
+def SelectSample(evt: gr.SelectData, gl_sample_list):  # SelectData is a subclass of EventData
     file_path, image = GetSampleImage(gl_sample_list, evt.index)
     if image is not None:
         geninfo, items = util.read_info_from_image(image)
         w, h, s, f = image.width, image.height, os.path.getsize(file_path), image.format
         wr, hr = util.size2ratio(w, h, 10)
-        return gr.Gallery(allow_preview=True), evt.index, gr.Text(f"{geninfo}\n\n{file_path}\n{w}x{h}({wr}:{hr}) {util.size_str(s)} {f}".strip(), visible=ckb_fullscreen)
+        return evt.index, gr.Text(f"{geninfo}\n\n{file_path}\n{w}x{h}({wr}:{hr}) {util.size_str(s)} {f}".strip())
     else:
-        print(evt.index)
-        return gr.Gallery(allow_preview=True) ,evt.index, ""
+        return evt.index, ""
+
+def GetLoraFromPrompt(txt_prompt_main, opt_lora_num, *args):
+    _, loras = lora.remove_prompt_lora(txt_prompt_main)
+    items = []
+    found_loras = []
+    args = list(args)
+    ctrl_count = 4
+    count = 0
+    cur_loras = [x for x in args[::ctrl_count] if x != "None"]
+    lora_num = int(opts.options["lora_num"].get(opt_lora_num, 3))
+
+    while args:
+        opt_lora, ckb_enable, sl_weight, opt_trained_words = [args.pop(0) for _ in range(ctrl_count)]
+        is_found = False
+
+        if (not opt_lora or opt_lora == "None") and count < lora_num:
+            while loras:
+                lora_name, lora_weight = loras.pop()
+                lora_path = lora.get_lora_path(lora_name)
+                if lora_path is not None:
+                    found_loras.append(lora_name)
+                    show_name = lora.get_name_by_path(lora_path)
+                    if show_name not in cur_loras:
+                        items += [gr.Dropdown(value=show_name), gr.Checkbox(value=True), gr.Slider(value=lora_weight * 100), gr.Dropdown()]
+                        is_found = True
+                        break
+        
+        if not is_found:
+            items += [gr.Dropdown(), gr.Checkbox(), gr.Slider(), gr.Dropdown()]
+
+        count += 1
+
+    prompt_main, _ = lora.remove_prompt_lora(txt_prompt_main, found_loras)
+    items = [gr.Textbox(value=prompt_main)] + items
+
+    return items
 
 def GetSettingJson(gl_style_list, *args):
     opt_name_list = list(opt_dict)
@@ -681,6 +774,10 @@ def GetNegativeText(ckb_grp_negative):
 
 def ChangeRefBlockNum(sl_refNum):
     return [gr.Column(visible=True)] * sl_refNum + [gr.Column(visible=False)] * (5 - sl_refNum)
+
+def ChangeLoraBlockNum(opt_loraNum):
+    loraNum = int(opts.options["lora_num"].get(opt_loraNum, 3))
+    return [gr.Column(visible=True)] * loraNum + [gr.Column(visible=False)] * (6 - loraNum)
 
 def GetControlnets(ref_mode, model_type):
     re_sdxl = r"\b(xl|sdxl|control\s*lora)\b"

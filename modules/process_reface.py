@@ -89,7 +89,7 @@ def create_infotext(generation_params):
 
     prompt_text = generation_params.pop("prompt", "")
     negative_prompt_text = re.sub(re_line, " ", f'Negative prompt: {generation_params.pop("negative", "")}')
-    generation_params_text = ", \n".join([f'{k}: {re.sub(re_s, " ", str(v))}' for k, v in generation_params.items() if v is not None])
+    generation_params_text = ", ".join([f'{k}: {re.sub(re_s, " ", str(v))}' for k, v in generation_params.items() if v is not None])
     
     return f"{prompt_text}\n{negative_prompt_text}\n{generation_params_text}".strip()
 

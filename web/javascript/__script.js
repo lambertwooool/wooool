@@ -105,18 +105,18 @@ var executedOnLoaded = false;
 
 document.addEventListener("DOMContentLoaded", function() {
     var mutationObserver = new MutationObserver(function(m) {
-        if (!executedOnLoaded && gradioApp().querySelector('#generate_button')) {
+        if (!executedOnLoaded && gradioApp().querySelector('#btn_generate')) {
             executedOnLoaded = true;
             executeCallbacks(uiLoadedCallbacks);
         }
 
         executeCallbacks(uiUpdateCallbacks, m);
         scheduleAfterUiUpdateCallbacks();
-        const newTab = get_uiCurrentTab();
-        if (newTab && (newTab !== uiCurrentTab)) {
-            uiCurrentTab = newTab;
-            executeCallbacks(uiTabChangeCallbacks);
-        }
+        // const newTab = get_uiCurrentTab();
+        // if (newTab && (newTab !== uiCurrentTab)) {
+        //     uiCurrentTab = newTab;
+        //     executeCallbacks(uiTabChangeCallbacks);
+        // }
     });
     mutationObserver.observe(gradioApp(), {childList: true, subtree: true});
 });
@@ -132,7 +132,7 @@ document.addEventListener('keydown', function(e) {
         if ((e.keyCode == 13 && (e.metaKey || e.ctrlKey || e.altKey))) handled = true;
     }
     if (handled) {
-        var button = gradioApp().querySelector('button[id=generate_button]');
+        var button = gradioApp().querySelector('button[id=btn_generate]');
         if (button) {
             button.click();
         }

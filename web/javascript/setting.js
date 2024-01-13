@@ -19,6 +19,13 @@ function model_link(model) {
 	return model;
 }
 
+function endless(is_endless) {
+	if (is_endless) {
+		document.getElementById("btn_generate").click();
+	}
+	return is_endless;
+}
+
 function download_ui_settings(data) {
 	data = JSON.parse(data);
 	["mc", "mc_other", "prompt_main", "ckb_pro"].forEach(x => delete data[x])
@@ -35,4 +42,13 @@ function download_ui_settings(data) {
 
 function reset_ui_settings(data) {
 	delete localStorage["setting"];
+}
+
+function deleteSample(gl_sample_list, num_selected_sample, num_page_sample) {
+	pic_item = gl_sample_list[num_selected_sample]
+	if (pic_item && (event.shiftKey || window.confirm("Do you want to delete picture?\n" + pic_item[1] + "\n\n(Shift + Delete skip confirm)"))) {
+		return [gl_sample_list, num_selected_sample, num_page_sample];
+	} else {
+		return [null, -1, 0];
+	}
 }

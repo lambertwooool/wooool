@@ -8,12 +8,12 @@ from modules.util import list_files, webpath
 GradioTemplateResponseOriginal = gr.routes.templates.TemplateResponse
 
 def javascript_html():
-    head = ""
+    head = f'<script type="text/javascript" src="{webpath(os.path.join(modules.paths.scripts_path, "__script.js"))}"></script>\n'
 
     # localization_path = f"{modules.paths.localization_path}/{shared.localization}.json";
     head += f'<script type="text/javascript">window.localization_url = {json.dumps(localization.urls())}</script>'
 
-    for script in list_files(modules.paths.scripts_path, "js"):
+    for script in list_files(modules.paths.scripts_path, "js", excludes=["__script.js"], search_subdir=True):
         head += f'<script type="text/javascript" src="{webpath(script)}"></script>\n'
 
     return head
@@ -21,7 +21,7 @@ def javascript_html():
 def css_html():
     head = ""
 
-    for css in list_files(modules.paths.css_path):
+    for css in list_files(modules.paths.css_path, search_subdir=True):
         head += f'<link rel="stylesheet" property="stylesheet" href="{webpath(css)}" />\n'
 
     return head

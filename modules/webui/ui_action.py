@@ -10,9 +10,9 @@ import modules.paths
 import modules.options as opts
 from modules import lora, prompt_helper, util, wd14tagger
 
-def UseControlnet(ref_type, ref_image, weight, start_percent=0, end_percent=0.5):
-    ref_mode, _ = opts.options["ref_mode"][ref_type]
-    return [ref_type, ref_mode, ref_image, weight, None, start_percent, end_percent]
+def UseControlnet(ref_type, ref_image, weight, ref_mode=None, model=None, start_percent=0, end_percent=0.5):
+    ref_mode = ref_mode or opts.options["ref_mode"][ref_type][0]
+    return [ref_type, ref_mode, ref_image, weight, model, start_percent, end_percent]
 
 def VarySubtle(ref_image, params, pnginfo, gen_opts, weight=0.5, skip_step=0.2):
     # subseed_strength = 0.05
@@ -171,7 +171,7 @@ def ZoomOut(ref_image, params, pnginfo, gen_opts, zoom = 1.5):
 
     prompt = gen_opts.get("zoom_prompt", "")
     if prompt:
-        params["prompt_main"] = prompt +","+ params["prompt_main"]
+        params["prompt_temp"] = prompt + ",".join(wd14tagger.tag(ref_image)[:12])
 
     if style != "":
         params["sample"] = "dpmpp_3m_sde_gpu"
@@ -285,7 +285,7 @@ def Resize(ref_image, params, pnginfo, gen_opts):
     return params
 
 
-def Refiner(ref_image, params, pnginfo, gen_opts, mask=None):
+def Refiner(ref_image, params, pnginfo, gen_opts, mask=None, type="image"):
     # blurred = cv2.GaussianBlur(ref_image, (5, 5), 2)
     # ref_image = cv2.addWeighted(ref_image, 1.5, blurred, -0.5, 0)
     height, width = ref_image.shape[:2]
@@ -294,35 +294,35 @@ def Refiner(ref_image, params, pnginfo, gen_opts, mask=None):
     if re_zoom < 1:
         width, height = round(width / re_zoom / 8) * 8, round(height / re_zoom / 8) * 8
         ref_image = util.resize_image(ref_image, width, height)
-    util.save_temp_image(ref_image, "refiner.png")
+    util.save_temp_image(ref_image, f"refiner_{type}.png")
 
     # step_base = max(20, pnginfo.get("all_steps", (20, 0))[0])
     step_base = 25
 
     params["action"] = "generate"
     # params["batch"] = gen_opts.pop("pic_num")
-    params["prompt_main"] = lora.remove_prompt_lora(params["prompt_main"], "add-detail-xl")
-    params["prompt_main"] = lora.remove_prompt_lora(params["prompt_main"], "add_detail")
+    params["prompt_main"] = lora.remove_prompt_lora(params["prompt_main"], ["add-detail-xl", "add_detail"])[0]
     
-    denoise = gen_opts.get("refiner_denoise", 0.4) * 0.8
+    denoise = gen_opts.get(f"refiner_{type}_denoise", 0.4) * 0.8
     params["steps"] = (step_base, max(0, int(denoise * 10)))
     params["denoise"] = denoise
     params["skip_step"] = int(step_base * 0.1)
     
     params["seed"] = 0
-    params["sample"] = "dpmpp_3m_sde_gpu"
+    params["sample"] = "dpmpp_2m"
     params["clip_skip"] = 1
     params["refiner_name"] = gen_opts.get("refiner_model", params.get("refiner_name", ""))
     
-    detail = gen_opts.get("refiner_detail", 0.3)
+    detail = gen_opts.get(f"refiner_{type}_detail", 0.3)
     if detail != 0:
         params["lora"] = [("add-detail-xl.safetensors", detail, "")]
 
-    prompt_main = (params.get("prompt_main", "") or "(UHD,8K,ultra detailed) " + ",".join(wd14tagger.tag(ref_image)[:12]))
-    params["prompt_main"] = prompt_main
+    params["prompt_temp"] = gen_opts.get("refiner_prompt", "") + "(UHD,8K,ultra detailed)"
     params["prompt_negative"] = params.get("prompt_negative", "") or "ugly,deformed,noisy,blurry,NSFW"
 
     if mask is None:
+        params["prompt_temp"] += "," + ",".join(wd14tagger.tag(ref_image)[:12])
+
         app = FaceAnalysis(root=modules.paths.face_models_path)
         app.prepare(ctx_id=0, det_size=(640, 640))
         faces = app.get(ref_image)
@@ -351,8 +351,16 @@ def RefinerFace(ref_image, params, pnginfo, gen_opts):
     faces = sorted(faces, key = lambda x : ((x.bbox[2]-x.bbox[0]) * (x.bbox[3]-x.bbox[1])), reverse=True)
 
     if faces:
-        landmarks = [face.landmark_2d_106 for face in faces]
+        face_index = gen_opts.get(f"refiner_face_index", 0)
+        if face_index >= len(faces):
+            return None
+        face = faces[face_index]
+        landmarks = [face.landmark_2d_106]
         ref_mask = util.face_mask(ref_image, landmarks)
+        face_box = [int(x) for x in face.bbox]
+        face_image = ref_image[face_box[1]:face_box[3], face_box[0]:face_box[2]]
+        age = face.age
+        sex = face.sex # M, F
         # face_mask = ref_mask[:,:,0].astype(np.float32) / 255
         # face_mask = face_mask.reshape(ref_image.shape[0], ref_image.shape[1], 1)
         # ref_image = ref_image * (1 - face_mask) + util.blur(ref_image, 20) * face_mask
@@ -360,13 +368,13 @@ def RefinerFace(ref_image, params, pnginfo, gen_opts):
         # ref_image = util.blur(ref_image, 2)
         # gen_opts["detail"] = 0.95
 
-        params = Refiner(ref_image, params, pnginfo, gen_opts, mask=ref_mask)
-        prompt_main = params["prompt_main"]
-        prompt_main = ("(detail face:1.2)" + prompt_main) if "detail face" not in prompt_main else prompt_main
-        params["prompt_main"] = prompt_main
+        params = Refiner(ref_image, params, pnginfo, gen_opts, mask=ref_mask, type="face")
+        params["prompt_temp"] = gen_opts.get("refiner_prompt", "") + "(UHD,8K,detail face,detailed skin,perfect eyes:1.2),{lang}" + f",{age}yo"
+        params["prompt_temp"] += "," + ",".join(wd14tagger.tag(face_image)[:12])
 
         if params["denoise"] > 0.5:
             params["controlnet"] = [UseControlnet("Ref Depth", None, 0.6)]
+            # params["controlnet"] = [UseControlnet("Ref Pose", None, 0.6, ref_mode="dwpose_face")]
         
         return params
     
@@ -383,10 +391,16 @@ def ReFace(ref_image, params, pnginfo, gen_opts, face_image):
         return params
 
 def Upscale(ref_image, params, pnginfo, gen_opts):
-    params = {}
+    params = {
+        "model": gen_opts.get("upscale_model"),
+        "factor": gen_opts.get("upscale_factor", 2.0),
+        "repair_face": gen_opts.get("upscale_repair_face", True),
+        "origin_visibility": gen_opts.get("upscale_origin", 0)
+    }
     params["action"] = "upscale"
     params["file_format"] = gen_opts.get("file_format")
     params["image"] = np.array(ref_image)
+    params["pnginfo"] = pnginfo
 
     return params
         

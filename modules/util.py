@@ -1,4 +1,5 @@
 import re
+import traceback
 import cv2
 import dlib
 import fractions
@@ -46,17 +47,21 @@ def webpath(fn):
 
 #     return file_list
 
-def list_files(dir, ext=None, search_subdir=False, excludes=None):
+def list_files(dir, ext=None, search_subdir=False, excludes=None, excludes_dir=None):
     file_list = []
     ext = ext if isinstance(ext, list) or ext is None else [ext]
     excludes = excludes if isinstance(excludes, list) or excludes is None else [excludes]
+    excludes_dir = excludes_dir if isinstance(excludes_dir, list) or excludes_dir is None else [excludes_dir]
+    if excludes_dir is not None:
+        excludes_dir = [os.path.join(dir, x) for x in excludes_dir]
 
     for cur_path, dirs, files in os.walk(dir, topdown=True, followlinks=True):
         # print(root, dirs, files)
-        for filename in files:
-            if  (ext is None or os.path.splitext(filename)[-1][1:] in ext) and \
-                (excludes is None or not any(True if x in filename else False for x in excludes)):
-                file_list.append(os.path.join(cur_path, filename))
+        if excludes_dir is None or cur_path not in excludes_dir:
+            for filename in files:
+                if  (ext is None or os.path.splitext(filename)[-1][1:] in ext) and \
+                    (excludes is None or not any(True if x in filename else False for x in excludes)):
+                    file_list.append(os.path.join(cur_path, filename))
         if not search_subdir:
             break
 
@@ -187,11 +192,15 @@ def state(task, status):
     print(f"- {name} {task['guid']}")
 
 def save_temp_image(image, filename):
-    temp_path = f"{paths.temp_outputs_path}/temp"
-    if not os.path.exists(temp_path):
-        os.mkdir(temp_path)
-    filename = os.path.join(temp_path, filename)
-    Image.fromarray(image).save(filename)
+    try:
+        temp_path = f"{paths.temp_outputs_path}/temp"
+        if not os.path.exists(temp_path):
+            os.mkdir(temp_path)
+        filename = os.path.join(temp_path, filename)
+        Image.fromarray(image).save(filename)
+    except:
+        traceback.print_exc()
+        pass
 
 def read_chunks(file, size=io.DEFAULT_BUFFER_SIZE):
     """Yield pieces of data from a file-like object until EOF."""
@@ -773,8 +782,8 @@ def face_mask(input_image, face_landmarks, blur_size=None):
             max_y, max_x = max(y, max_y), max(x, max_x)
             min_y, min_x = min(y, min_y), min(x, min_x)
         blur_size = max(5, math.sqrt((max_x - min_x) * (max_y - min_y)) / 16)
-    mask = blur(mask, blur_size)
-    mask[mask > 16] = 255
+    mask = blur(mask, blur_size * 2)
+    mask[mask > 0] = 255
     mask = blur(mask, blur_size)
     save_temp_image(mask, "face_mask.png")
 
