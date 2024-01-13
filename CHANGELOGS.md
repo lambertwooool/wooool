@@ -1,7 +1,6 @@
 # Change Logs
 
 ## 0.8.4
-- Support MeshGraphormer Hand Refiner
 - New finetune interface, supports extracting Lora from prompt words into finetune list, as well as selecting number of Lora models
 - Enable or disable individual ref image or Lora model
 - Upscale UI, including upscale factor, model selection, face restoration etc. options
