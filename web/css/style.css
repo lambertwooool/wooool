@@ -97,7 +97,7 @@ div:has(#radio_mc, #ckb_mc_other), #radio_mc, #ckb_mc_other { background-color: 
     opacity: 0.3
 }
 
-.panel_ref_block:has(input[disabled]), .panel_lora_block:has(input[disabled]) {
+.panel_ref_block:has(div[id^="refer_enable_"] input:not(:checked)), .panel_lora_block:has(div[id^="refer_lora_enable_"] input:not(:checked)) {
     div[id^="refer_img_"], div[id^="refer_lora_img_"] {
         opacity: 0.3
     }

@@ -38,6 +38,9 @@
     "densepose_r50_fpn_dl.torchscript": "https://huggingface.co/LayerNorm/DensePose-TorchScript-with-hint-image/resolve/main/densepose_r50_fpn_dl.torchscript",
     "erika.pth": "https://huggingface.co/lllyasviel/Annotators/resolve/main/erika.pth",
     "mobile_sam.pt": "https://huggingface.co/dhkim2810/MobileSAM/resolve/main/mobile_sam.pt",
+    "UNet.pth": "https://huggingface.co/bdsqlsz/qinglong_controlnet-lllite/resolve/main/Annotators/UNet.pth",
+    "isnetis.ckpt": "https://huggingface.co/skytnt/anime-seg/resolve/main/isnetis.ckpt",
+    "ControlNetLama.pth": "https://huggingface.co/lllyasviel/Annotators/resolve/main/ControlNetLama.pth",
 
     "add_detail.safetensors": "https://civitai.com/api/download/models/62833",
     "add-detail-xl.safetensors": "https://civitai.com/api/download/models/135867",

@@ -20,13 +20,13 @@ def handler(task):
     
     file_format = task.get("file_format", "") or "jpeg"
     filename = task.get("filename", f"{time.strftime('%Y%m%d%H%M%S')}.{file_format}")
-    filename = "_4x".join(os.path.splitext(filename))
 
     upscale_model = task.get("upscale_model")
     repair_face = task.get("repair_face", True)
-    factor = task.get("upscale_factor", 2.0)
+    factor = task.get("factor", 2.0)
     origin_visibility = task.get("origin_visibility", 0)
     factor_w, factor_h = int(w * factor), int(h * factor)
+    filename = f"_{round(factor, 1)}x".join(os.path.splitext(filename))
 
     print(  '[Model]:', upscale_model, \
             '\n[Repair face]:', repair_face, \

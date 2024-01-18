@@ -140,7 +140,7 @@ def LoraBlock(opt_dict, loraCount=6, showCount=3):
                 gr.HTML(html)
 
     for i in range(loraCount):
-        with gr.Column(min_width=260, visible=i < showCount, elem_classes="panel_lora_block") as block:
+        with gr.Column(min_width=200, visible=i < showCount, elem_classes="panel_lora_block") as block:
             image_lora = gr.Image(show_label=False, height=200, show_download_button=False, type="filepath", interactive=False, elem_id=f"refer_lora_img_{i}", elem_classes="lora_preview")
             with gr.Row():
                 ckb_enable = gr.Checkbox(label="", value=True, min_width=40, elem_id=f"refer_lora_enable_{i}", scale=1)
@@ -201,13 +201,13 @@ def RefBlock(opt_base_model, opt_dict, refCount=5, showCount=3):
     
     def get_annotators(opt_type, opt_model, opt_annotator):
         if opt_type in ["Ref Content", "Base Image"]:
-            return gr.Dropdown(visible=False)
+            return gr.Dropdown(), gr.Row(visible=False)
         else:
             ctrl_annotators, default_annotator = get_annotators_inner(opt_type, opt_model)
             if opt_annotator in ctrl_annotators:
-                return gr.Dropdown(choices=ctrl_annotators, visible=len(ctrl_annotators) > 1)
+                return gr.Dropdown(choices=ctrl_annotators), gr.Row(visible=len(ctrl_annotators) > 0)
             else:
-                return gr.Dropdown(choices=ctrl_annotators, value=default_annotator, visible=len(ctrl_annotators) > 1)
+                return gr.Dropdown(choices=ctrl_annotators, value=default_annotator), gr.Row(visible=len(ctrl_annotators) > 0)
 
     default_ref_mode = opts.default["ref_mode"]
     ctrl_models, default_model = ui_process.GetControlnets(default_ref_mode, "sdxl")
@@ -230,25 +230,28 @@ def RefBlock(opt_base_model, opt_dict, refCount=5, showCount=3):
             ckb_words = gr.CheckboxGroup(show_label=False, visible=False, elem_id=f"refer_wd14_{i}", elem_classes="refer_words")
             
             opt_ctrl_model = gr.Dropdown(choices=ctrl_models, value=default_model, visible=(len(ctrl_models) > 1),  container=False, filterable=False, min_width=80, elem_id=f"ref_ctrl_model_{i}", elem_classes="gr_dropdown")
-            opt_annotator = gr.Dropdown(choices=ctrl_annotators, value=default_annotator, visible=(len(ctrl_annotators) > 1),  container=False, filterable=False, min_width=80, elem_id=f"ref_annotator_{i}", elem_classes="gr_dropdown")
+            with gr.Row(visible=(len(ctrl_annotators) > 1)) as panel_annotator:
+                ckb_annotator = gr.Checkbox(label="", value=True, min_width=40, elem_id=f"refer_use_annotator_{i}", scale=1)
+                opt_annotator = gr.Dropdown(choices=ctrl_annotators, value=default_annotator,  container=False, filterable=False, min_width=80, elem_id=f"ref_annotator_{i}", elem_classes="gr_dropdown", scale=9)
 
         opt_dict[f"refer_type_{i}"] = opt_type
 
         opt_type.change(get_tags, [opt_type, image_refer], [ckb_words], queue=False) \
             .then(lambda x, y: gr.CheckboxGroup(visible=x == "Ref Content" and y is not None), [opt_type, image_refer], ckb_words, queue=False) \
             .then(get_models, [opt_type, opt_base_model, opt_ctrl_model], [opt_ctrl_model], queue=False) \
-            .then(get_annotators, [opt_type, opt_ctrl_model, opt_annotator], opt_annotator, queue=False)
+            .then(get_annotators, [opt_type, opt_ctrl_model, opt_annotator], [opt_annotator, panel_annotator], queue=False)
 
         opt_base_model.change(get_models, [opt_type, opt_base_model, opt_ctrl_model], opt_ctrl_model, queue=False)
-        opt_ctrl_model.change(get_annotators, [opt_type, opt_ctrl_model, opt_annotator], opt_annotator, queue=False)
+        opt_ctrl_model.change(get_annotators, [opt_type, opt_ctrl_model, opt_annotator], [opt_annotator, panel_annotator], queue=False)
 
         image_refer.change(lambda x: (gr.Slider(visible=x is not None), gr.Slider(visible=x is not None), gr.Slider(visible=x is not None)), image_refer, [sl_rate, sl_start_percent, sl_end_percent], queue=False) \
             .then(get_tags, [opt_type, image_refer], [ckb_words], queue=False)
 
         ckb_enable.change(lambda x: gr.Dropdown(interactive=x), ckb_enable, opt_type, queue=False)
+        ckb_annotator.change(lambda x: gr.Dropdown(interactive=x), ckb_annotator, opt_annotator, queue=False)
 
         blocks.append(block)
-        ctrls += [opt_type, ckb_enable, image_refer, sl_rate, ckb_words, opt_ctrl_model, opt_annotator, sl_start_percent, sl_end_percent]
+        ctrls += [opt_type, ckb_enable, image_refer, sl_rate, ckb_words, opt_ctrl_model, ckb_annotator, opt_annotator, sl_start_percent, sl_end_percent]
     
     return blocks, ctrls
 
@@ -284,6 +287,8 @@ def VaryCustomUI(panel_action_btns, panel_action_interface, btn_vary_custom_inte
     with gr.Row(visible=False) as panel_vary_custom:
         opt_dict["vary_custom_strength"] = MakeSlider(["vary_custom_strength"], min_width=160)["vary_custom_strength"]
         opt_dict["vary_custom_area"] = MakeOpts(["vary_custom_area"], opt_type="Radio", min_width=160)["vary_custom_area"]
+        ckb_mask_lama = gr.Checkbox(label="Vary after Erase", value=False, elem_id="ckb_mask_lama")      
+        opt_dict["mask_use_lama"] = ckb_mask_lama
         opt_dict["vary_prompt"] = gr.Text(label="Prompt Content", elem_id="txt_vary_prompt", elem_classes="prompt")
         btn_vary_custom = gr.Button("Vary", min_width=100, variant="primary", elem_id="btn_vary_custom", elem_classes="btn_action")
         btn_vary_custom_cancel = gr.Button("Close", min_width=100, elem_id="btn_vary_custom_cancel", elem_classes="btn_action")

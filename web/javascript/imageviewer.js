@@ -124,6 +124,9 @@ function modalKeyHandler(event) {
         case "Escape":
             closeModal();
             break;
+        case "Delete":
+            modelDeleteImage();
+            break;
     }
 }
 
@@ -184,6 +187,10 @@ function modalTileImageToggle(event) {
     event.stopPropagation();
 }
 
+function modelDeleteImage() {
+    document.getElementById("btn_delete").click();
+}
+
 onAfterUiUpdate(function() {
     var fullImg_preview = gradioApp().querySelectorAll('.image_gallery .thumbnail-item > img');
     if (fullImg_preview != null) {
@@ -194,13 +201,14 @@ onAfterUiUpdate(function() {
 
 function setModalImageInfo(info) {
     modalImageInfo = document.querySelector('#lightboxModal .modalImageInfo');
-    modalImageInfo.innerHTML = info.replace(/[\r\n]+/g, "<br />");
+    // modalImageInfo.innerHTML = info.replace(/[\r\n]+/g, "<br />");
+    modalImageInfo.value = info;
 }
 
 document.addEventListener("DOMContentLoaded", function() {
     //const modalFragment = document.createDocumentFragment();
     const modal = document.createElement('div');
-    modal.onclick = closeModal;
+    // modal.onclick = closeModal;
     modal.id = "lightboxModal";
     modal.tabIndex = 0;
     modal.addEventListener('keydown', modalKeyHandler, true);
@@ -266,8 +274,13 @@ document.addEventListener("DOMContentLoaded", function() {
     modalNext.addEventListener('keydown', modalKeyHandler, true);
     modal.appendChild(modalNext);
 
-    const modalImageInfo = document.createElement('span');
+    const modalImageInfo = document.createElement('textarea');
     modalImageInfo.className = 'modalImageInfo';
+    modalImageInfo.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    }, true);
     modal.appendChild(modalImageInfo);
 
     try {

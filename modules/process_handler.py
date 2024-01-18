@@ -17,6 +17,7 @@ import modules.paths
 from modules import clip_helper, civitai, core, controlnet_helper, devices, lora, prompt_helper, shared, util, vae_helper, upscaler_esrgan, gfpgan_model
 from modules.model.model_base import BaseModel, SDXL, SDXLRefiner
 from modules.model import model_loader, model_helper, sample, samplers
+from modules.controlnet.processor import Processor as controlnet_processor
 
 def handler(task):
     style = task.get("style", None)
@@ -74,7 +75,7 @@ def handler(task):
     size = task.get("size", util.ratios2size(task.get("aspect_ratios", None), pixels ** 2))
     cfg_scale = task.get("cfg_scale", 7.0)
     cfg_scale_to = task.get("cfg_scale_to", cfg_scale)
-    clip_skip = int(task.get("clip_skip") or -2)
+    clip_skip = -1 * abs(int(task.get("clip_skip") or 2))
 
     detail = float(task.get("detail", 0))
     noise_scale = 1 + detail * 0.05
@@ -94,7 +95,6 @@ def handler(task):
         size = util.ratios2size(util.size2ratio(image.shape[1], image.shape[0]) if image is not None else (1, 1), pixels ** 2)
     width, height = size
     size = (width // 8 * 8, height // 8 * 8)
-    single_vae = task.get("single_vae", True)
     controlnets = [[    ref_mode, image_refer, sl_rate,
                         controlnet_helper.controlnet_files.get(opt_model) or opts.options["ref_mode"][opt_type][1][sd_type],
                         start_percent, end_percent ]
@@ -182,7 +182,6 @@ def handler(task):
                 cfg_scale_to=cfg_scale_to,
                 loras=loras,
                 controlnets=controlnets,
-                single_vae=single_vae,
                 round_batch_size=round_batch_size,
                 subseed_strength=subseed_strength,
                 clip_skip=clip_skip,
@@ -255,7 +254,7 @@ class UserStopException(Exception):
 def process_diffusion(task, base_path, refiner_path, positive, negative, steps, skip_step, size, seeds, subseeds,
         callback, sampler_name, scheduler_name,
         latent=None, image=None, denoise=1.0, noise_scale=1.0, cfg_scale=7.0, cfg_scale_to=7.0, batch_size=1, loras=[], controlnets=[],
-        tiled=False, single_vae=True, round_batch_size=8, subseed_strength=1.0, clip_skip=0):
+        tiled=False, round_batch_size=8, subseed_strength=1.0, clip_skip=0):
 
     devices.torch_gc()
     progress_output(task, "load_model")
@@ -332,16 +331,15 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
 
                     image_pixel = cv2.cvtColor(image_pixel, cv2.COLOR_BGR2RGB)
                 
+            if task.get("mask_use_lama", False):
+                lama_inpaint = controlnet_processor("lama_inpaint")
+                image_pixel = lama_inpaint(image_pixel, image_mask)
+                
             for ctrl in controlnets:
                 if ctrl[1] is None:
                     ctrl[1] = image_pixel.copy()
                 elif image_pixel_orgin is not None and image_pixel_orgin.shape == ctrl[1].shape and not np.any(image_pixel_orgin - ctrl[1]):
                     ctrl[1] = image_pixel.copy()
-                
-                ctrl_mask = image_mask[:, :, 0]
-                ctrl_mask = ctrl_mask[..., np.newaxis] 
-                ctrl[1] = np.concatenate([ctrl[1], ctrl_mask], axis=-1)
-                    
         else:
             image_mask = np.ones((height, width, 3), dtype=np.uint8) * 255
         
@@ -357,7 +355,7 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
 
     if controlnets:
         progress_output(task, "controlnet")
-        ctrls, unet_model = controlnet_helper.processor(controlnets, unet_model, width, height)
+        ctrls, unet_model = controlnet_helper.processor(controlnets, unet_model, width, height, image_mask)
     else:
         ctrls = []
     
@@ -469,7 +467,7 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
             else:
                 sampled_latent = latent_image.clone()
 
-            if refiner_unet_model is not None and step_refiner > 0:
+            if refiner_unet_model is not None and step_refiner > 0 and (model_type != "sd15" or refiner_model_type == "sd15"):
                 # org_image = vae_helper.decode_vae(xl_base.vae, sampled_latent)
                 # sampled_latent = vae_interpose.parse(sampled_latent)
                 # sampled_latent = vae_helper.encode_vae(xl_refiner.vae, org_image)["samples"]
@@ -531,11 +529,11 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
             filename = os.path.join(filepath, filename)
             util.save_image_with_geninfo(Image.open(os.path.join(f"{modules.paths.temp_outputs_path}/temp", "generate.png")), "pre_vae: True", filename, quality=60)
 
-            if i > batch_size - 3:
-                vae_worker_running = False
+            # if i > batch_size - 3:
+            #     vae_worker_running = False
 
             sampled_latents.append((sampled_latent, i, cur_seed, cur_subseed, filename))
-            if len(sampled_latents) >= 4:
+            if len(sampled_latents) >= 2:
                 left_vae(sampled_latents)
 
         except UserStopException:

@@ -1,9 +1,11 @@
+import os
 import cv2
 import numpy as np
 
 import modules.paths
 from modules.model import model_helper, model_loader, model_patcher
 from modules.util import HWC3, image_pad
+from .pipeline import MeshGraphormerMediapipe, args
 
 class MeshGraphormerDetector:
     def __init__(self):
@@ -15,7 +17,6 @@ class MeshGraphormerDetector:
 
         args.resume_checkpoint = model_helper.load_torch_file(model_path)
         args.hrnet_checkpoint = model_helper.load_torch_file(hrnet_path)
-        args.seed = seed
         pipeline = MeshGraphormerMediapipe(args)
 
         load_device = model_loader.run_device("annotator")

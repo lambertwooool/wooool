@@ -159,7 +159,7 @@ def assert_model_integrity(xl_base, xl_refiner):
     if xl_refiner is not None:
         if xl_refiner.unet is None or xl_refiner.unet.model is None:
             error_message = 'You have selected an invalid refiner!'
-        elif not isinstance(xl_refiner.unet.model, SDXL) and not isinstance(xl_refiner.unet.model, SDXLRefiner):
+        elif isinstance(xl_refiner.unet.model, SDXL) or isinstance(xl_refiner.unet.model, SDXLRefiner):
             refiner_model_type = "sdxl"
         elif isinstance(xl_base.unet.model, BaseModel):
             refiner_model_type = "sd15"

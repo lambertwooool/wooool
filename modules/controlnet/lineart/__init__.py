@@ -112,12 +112,7 @@ class LineartDetector:
         self.model_coarse = model_patcher.ModelPatcher(model_coarse, load_device, offload_device)
         
     
-    def to(self, device):
-        self.model.to(device)
-        self.model_coarse.to(device)
-        return self
-    
-    def __call__(self, input_image, coarse, invert=False):
+    def __call__(self, input_image, coarse):
         assert input_image.ndim == 3
 
         device = self.model.load_device
@@ -134,9 +129,6 @@ class LineartDetector:
 
             line = line.cpu().numpy()
             line = (line * 255.0).clip(0, 255).astype(np.uint8)
-
-            if invert:
-                line = 255 - line
 
         detected_map = remove_pad(HWC3(line))
             

@@ -65,8 +65,16 @@ def VaryCustom(ref_image, params, pnginfo, gen_opts, img_vary_editor):
     if mask is not None:
         if not gen_opts.get("vary_custom_area", True):
             mask = 255 - mask
-        mask = util.blur(mask, 16)
+        mask = util.blur(mask, 64)
+        mask[mask > 32] = 255
+        mask = util.blur(mask, 32)
+        params["mask_use_lama"] = gen_opts.get("mask_use_lama", False)
         util.save_temp_image(mask, "vary_custom_mask.png")
+        if " (sd15)" in params.get("base_name", ""):
+            # ref_mode = random.choices(["default", "lama_inpaint"])[0]
+            # ref_mode = "lama_inpaint" if weight < 0.5 else "default"
+            ref_mode = "default"
+            params["controlnet"] = [UseControlnet("Others", ref_image, weight, ref_mode=ref_mode, model="control_v11p_sd15_inpaint")]
     util.save_temp_image(ref_image, "vary_custom_image.png")
     
     params["image"] = (ref_image, mask)
@@ -131,6 +139,7 @@ def ZoomOut(ref_image, params, pnginfo, gen_opts, zoom = 1.5):
     mask_pad = 32
     max_pixel = 1280 ** 2
     blur_alpha = gen_opts.get("zoom_blur_alpha", 0.5)
+    orgin_image = ref_image.copy()
 
     if isinstance(zoom, list):
         top, bottom, left, right = zoom
@@ -141,8 +150,6 @@ def ZoomOut(ref_image, params, pnginfo, gen_opts, zoom = 1.5):
     else:
         # zoom = util.diagonal_fov(24) / util.diagonal_fov(24 * focal_zoom)
         zoom = math.sqrt(zoom)
-
-        orgin_image = ref_image.copy()
         height_zoom, width_zoom = ref_image.shape[:2]
         height_zoom, width_zoom = int(height_zoom / zoom), int(width_zoom / zoom)
 
@@ -183,6 +190,13 @@ def ZoomOut(ref_image, params, pnginfo, gen_opts, zoom = 1.5):
     params["image"] = (ref_image, ref_mask)
     params["size"] = (ref_image.shape[1], ref_image.shape[0])
     params["steps"] = (base_step, int(base_step // 2.5))
+
+    if " (sd15)" in params.get("base_name", ""):
+        params["sample"] = "dpmpp_2m"
+        params["controlnet"] = [UseControlnet("Others", ref_image, 0.8, ref_mode="default", model="control_v11p_sd15_inpaint", end_percent=0.3)]
+        params["controlnet"].append(UseControlnet("Ref All", orgin_image, 0.5))
+        params["steps"] = (base_step, 0)
+        # params["denoise"] = 1.0
 
     util.save_temp_image(ref_image, "zoom.png")
     util.save_temp_image(ref_mask, "zoom_mask.png")
@@ -238,8 +252,6 @@ def ChangeStyle(ref_image, params, pnginfo, gen_opts, gl_style_list, num_selecte
 
     if style not in orgin_style:
         if orgin_style not in simple_styles:
-            # ref_mode, _ = opts.options["ref_mode"]["Ref Depth"]
-            # params["controlnet"].append(["Ref Depth", ref_mode, np.array(ref_image), random.randint(50, 80) / 100])
             params["controlnet"].append(UseControlnet("Ref Depth", ref_image, random.randint(50, 80) / 100))
 
             if random.randint(0, 100) > 30 and style not in simple_styles: # random use img2img
@@ -248,17 +260,13 @@ def ChangeStyle(ref_image, params, pnginfo, gen_opts, gl_style_list, num_selecte
         else:
             params["prompt_main"] = re.sub(r"((simple|grey|white) background|spot color)", "", params["prompt_main"], flags=re.IGNORECASE)
             if random.randint(0, 100) > 50:
-                # ref_stuct, _ = opts.options["ref_mode"]["Ref Stuct"]
-                # params["controlnet"].append(["Ref Stuct", ref_stuct, np.array(ref_image), 0.4])
                 params["controlnet"].append(UseControlnet("Ref Stuct", ref_image, 0.4))
             else:
-                # ref_mode, _ = opts.options["ref_mode"]["Ref Depth"]
-                # params["controlnet"].append(["Ref Depth", ref_mode, np.array(ref_image), 0.7])
                 params["controlnet"].append(UseControlnet("Ref Depth", ref_image, 0.7))
     else:
         params["image"] = (ref_image, None)
         params["denoise"] = 0.70
-
+    
     return params
 
 def Resize(ref_image, params, pnginfo, gen_opts):
@@ -315,7 +323,11 @@ def Refiner(ref_image, params, pnginfo, gen_opts, mask=None, type="image"):
     
     detail = gen_opts.get(f"refiner_{type}_detail", 0.3)
     if detail != 0:
-        params["lora"] = [("add-detail-xl.safetensors", detail, "")]
+        if " (sd15)" in params.get("base_name", ""):
+            params["lora"] = [("add-detail.safetensors", detail, "")]
+            params["controlnet"].append(UseControlnet("Others", ref_image, detail, ref_mode="default", model="control_v11f1e_sd15_tile", end_percent=0.8))
+        else:
+            params["lora"] = [("add-detail-xl.safetensors", detail, "")]
 
     params["prompt_temp"] = gen_opts.get("refiner_prompt", "") + "(UHD,8K,ultra detailed)"
     params["prompt_negative"] = params.get("prompt_negative", "") or "ugly,deformed,noisy,blurry,NSFW"
@@ -338,8 +350,6 @@ def Refiner(ref_image, params, pnginfo, gen_opts, mask=None, type="image"):
     params["image"] = (ref_image, mask)
     params["size"] = (width, height)
 
-    # ref_mode, _ = opts.options["ref_mode"]["Ref Stuct"]
-    # params["controlnet"].append(["Ref Stuct", ref_mode, ref_image, 0.75])
     # params["controlnet"].append(UseControlnet("Ref Stuct", ref_image, 0.75))
 
     return params
@@ -372,7 +382,7 @@ def RefinerFace(ref_image, params, pnginfo, gen_opts):
         params["prompt_temp"] = gen_opts.get("refiner_prompt", "") + "(UHD,8K,detail face,detailed skin,perfect eyes:1.2),{lang}" + f",{age}yo"
         params["prompt_temp"] += "," + ",".join(wd14tagger.tag(face_image)[:12])
 
-        if params["denoise"] > 0.5:
+        if params["denoise"] > 0.5 and " (sd15)" not in params.get("base_name", ""):
             params["controlnet"] = [UseControlnet("Ref Depth", None, 0.6)]
             # params["controlnet"] = [UseControlnet("Ref Pose", None, 0.6, ref_mode="dwpose_face")]
         

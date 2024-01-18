@@ -2,7 +2,7 @@ import os
 import torch
 import gc
 import numpy as np
-from controlnet_aux.mesh_graphormer.depth_preprocessor import Preprocessor
+from .depth_preprocessor import Preprocessor
 
 import torchvision.models as models
 from custom_mesh_graphormer.modeling.bert import BertConfig, Graphormer
@@ -25,9 +25,7 @@ from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from torchvision import transforms
 from pathlib import Path
-from controlnet_aux.util import custom_hf_download
 import custom_mesh_graphormer
-from comfy.model_management import soft_empty_cache
 from packaging import version
 
 args = Namespace(
@@ -51,7 +49,7 @@ args = Namespace(
     run_eval_only=True,
     device="cpu",
     seed=88,
-    hrnet_checkpoint=custom_hf_download("hr16/ControlNet-HandRefiner-pruned", 'hrnetv2_w64_imagenet_pretrained.pth')
+    hrnet_checkpoint=None
 )
 
 #Since mediapipe v0.10.5, the hand category has been correct
@@ -168,7 +166,6 @@ class MeshGraphormerMediapipe(Preprocessor):
                 _model.load_state_dict(state_dict, strict=False)
                 del state_dict
                 gc.collect()
-                soft_empty_cache()
 
         # update configs to enable attention outputs
         setattr(_model.trans_encoder[-1].config,'output_attentions', True)

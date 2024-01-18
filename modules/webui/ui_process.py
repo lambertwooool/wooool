@@ -29,6 +29,7 @@ endless_mode = False
 def GenerateOne(img_refer, ckb_pro, txt_setting, *args):
     setting = json.loads(txt_setting)
     setting["pic_num"] = 1
+    setting["show_endless"] = False
     proc_output = Generate(img_refer, ckb_pro, json.dumps(setting), *args)
     while True:
         try:
@@ -117,12 +118,12 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
             ref_mode, _ = opts.options["ref_mode"]["Ref All"]
             params["controlnet"].append(["Ref All", ref_mode, img_refer, 0.5])
     else:
-        len_ref_ctrl = 9
+        len_ref_ctrl = 10
         ref_image_args = args[: ref_image_count[0] * len_ref_ctrl]
         ref_num = int(gen_opts.get("ref_num", ref_image_count[1]))
         args = args[ref_image_count[0] * len_ref_ctrl :]
         for i in range(ref_image_count[0]):
-            opt_type, ckb_enable, image_refer, sl_rate, ckb_words, opt_model, opt_annotator, sl_start_percent, sl_end_percent = ref_image_args[i * len_ref_ctrl : (i + 1) * len_ref_ctrl]
+            opt_type, ckb_enable, image_refer, sl_rate, ckb_words, opt_model, ckb_annotator, opt_annotator, sl_start_percent, sl_end_percent = ref_image_args[i * len_ref_ctrl : (i + 1) * len_ref_ctrl]
             if not ckb_enable or i >= ref_num:
                 continue
 
@@ -136,7 +137,8 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
                 params["prompt_main"] += f",({','.join(ckb_words)}:{sl_rate / 100.0 / 0.8:.2f})"
             else:
                 if image_refer is not None or params.get("image"):
-                    params["controlnet"].append([opt_type, opt_annotator or ref_mode, image_refer, sl_rate / 100.0, opt_model, sl_start_percent / 100.0, sl_end_percent / 100.0])
+                    opt_annotator = opt_annotator or ref_mode if ckb_annotator else "default"
+                    params["controlnet"].append([opt_type, opt_annotator, image_refer, sl_rate / 100.0, opt_model, sl_start_percent / 100.0, sl_end_percent / 100.0])
         
         if params.get("base_image"):
             params["image"] = params.pop("base_image")
@@ -153,7 +155,7 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
                 lora_filename = os.path.split(lora.lora_files.get(opt_lora))[1]
                 params["lora"].append((lora_filename, sl_weight / 100.0, opt_trained_words))
 
-    proc_output = ProcessTask(params, hide_history=gen_opts.get("hide_history", False), show_endless=True)
+    proc_output = ProcessTask(params, hide_history=gen_opts.get("hide_history", False), show_endless=gen_opts.get("show_endless", True))
     while True:
         try:
             yield next(proc_output)
@@ -226,7 +228,7 @@ def ProcessTask(params, default_image=None, hide_history=False, show_endless=Fal
 def ProcessFinishNoRefresh(endless_mode):
     if endless_mode:
         return  gr.HTML(), \
-                gr.HTML(value=progress_html.format(0, 'finished')), \
+                gr.HTML(value=progress_html.format(0, 'batch finished and continue next ...')), \
                 gr.Row(), \
                 gr.Row(), \
                 gr.Column(), \
@@ -258,17 +260,18 @@ def Process(process_handler):
             params["prompt_main"] = params.get("prompt_main", "") or ",".join(wd14tagger.tag(ref_image)[:12])
             params["refiner_name"] = gen_opts.get("refiner_model")
             params["batch"] = gen_opts.get("pic_num")
+            params["clip_skip"] = -1 * abs(int(params.get("clip_skip") or gen_opts.get("clip_skip") or 2))
             params["quality"] = gen_opts.get("quality")
             params["file_format"] = gen_opts.get("file_format")
             params["single_vae"] = gen_opts.get("single_vae")
             params["lang"] = gen_opts.get("lang")
 
-            min_pixel = opts.options["quality_setting"][str(params["quality"])]["sdxl"][0] ** 2
-            h, w = ref_image.shape[:2]
+            # min_pixel = opts.options["quality_setting"][str(params["quality"])]["sdxl"][0] ** 2
+            # h, w = ref_image.shape[:2]
 
-            if w * h < min_pixel:
-                rezoom = math.sqrt(w * h / min_pixel)
-                ref_image = util.resize_image(ref_image, w / rezoom, h / rezoom, size_step=8)
+            # if w * h < min_pixel:
+            #     rezoom = math.sqrt(w * h / min_pixel)
+            #     ref_image = util.resize_image(ref_image, w / rezoom, h / rezoom, size_step=8)
             params.pop("size")
 
             params = process_handler(ref_image, params, pnginfo, gen_opts, *args)
@@ -509,6 +512,8 @@ def GenerateByData(txt_generate_data, txt_setting):
     params["batch"] = gen_opts.pop("pic_num")
     gen_opts["steps"] = (gen_opts.pop("step_base"), gen_opts.pop("step_refiner")) if gen_opts.pop("custom_step") else (None, None)
     
+    params["base_name"] = gen_opts.pop("base_model")
+
     for k, v in gen_opts.items():
         if k in ["quality", "size", "steps", "seed", "sampler", "clip_skip", "scheduler"] and not params.get(k):
             params[k] = v

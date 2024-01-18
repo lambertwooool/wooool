@@ -13,6 +13,7 @@ from einops import rearrange
 import modules.paths
 from modules.model import model_helper, model_loader, model_patcher
 from modules.util import HWC3, image_pad
+from modules import util
 from .saicinpainting.training.trainers import make_training_model
 
 class LamaInpaintdetector:
@@ -36,14 +37,20 @@ class LamaInpaintdetector:
 
     @torch.no_grad()
     @torch.inference_mode()
-    def __call__(self, input_image):
+    def __call__(self, input_image, mask=None):
         input_image, remove_pad = image_pad(input_image)
+        mask, remove_pad_mask = image_pad(mask)
+        input_mask = mask.copy()
 
         device = self.model.load_device
         model_loader.load_model_gpu(self.model)
 
         color = np.ascontiguousarray(input_image[:, :, 0:3]).astype(np.float32) / 255.0
-        mask = np.ascontiguousarray(input_image[:, :, 3:4]).astype(np.float32) / 255.0
+        if mask is None and input_image.shape[3] == 4:
+            mask = input_image[:, :, 3:4]
+        else:
+            mask = input_mask[:, :, :1]
+        mask = np.ascontiguousarray(mask).astype(np.float32) / 255.0
         # color = np.ascontiguousarray(input_image[:, :, :3]).astype(np.float32) / 255.0
         # mask = np.ascontiguousarray(input_mask[:, :, :1]).astype(np.float32) / 255.0
 
@@ -59,6 +66,9 @@ class LamaInpaintdetector:
             detected_map = detected_map * mask + color * (1 - mask)
             detected_map *= 255.0
             detected_map = detected_map.detach().cpu().numpy().clip(0, 255).astype(np.uint8)
+            detected_map_blur = util.blur(detected_map, 16)
+            input_mask = input_mask.astype(np.float32) / 255
+            detected_map = (input_image * (1 - input_mask) + detected_map_blur * input_mask).astype(np.uint8)
 
         detected_map = remove_pad(detected_map)
 

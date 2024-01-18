@@ -299,8 +299,8 @@ def patched_unet_forward(self, x, timesteps=None, context=None, y=None, control=
     t_emb = timestep_embedding(timesteps, self.model_channels, repeat_only=False).to(self.dtype)
     emb = self.time_embed(t_emb)
 
-    if self.num_classes is not None:
-        assert y.shape[0] == x.shape[0]
+    if self.num_classes is not None and y.shape == emb.shape:
+        # assert y.shape[0] == x.shape[0]
         emb = emb + self.label_emb(y)
 
     h = x.type(self.dtype)

@@ -26,7 +26,7 @@ default["mc"] = "Girl"
 # Aspect ratio
 options["ratios"] = load_ui_config("aspect_ratio")
 title["ratios"] = "Aspect ratio"
-default["ratios"] = "16:9"
+default["ratios"] = "4:3"
 
 options["resize_ratios"] = options["ratios"]
 title["resize_ratios"] = "Aspect ratio"
@@ -69,7 +69,7 @@ default["pic_num"] = "2 Samples"
 # Ref Num
 options["ref_num"] = (1, 5, 1)
 title["ref_num"] = "Ref Count"
-default["ref_num"] = 4
+default["ref_num"] = 3
 
 # Lora Num
 options["lora_num"] = {
@@ -92,10 +92,10 @@ default["quality"] = "Fast Generate"
 
 options["quality_setting"] = {
     # "5": { "sdxl": (1024, 5, 0, "lcm", "lcm"), "sd15": (768, 5, 0, "lcm", "lcm") },
-	"1": { "sdxl": (1024, 16, 0, "dpmpp_2m", "karras"), "sd15": (768, 16, 0, "dpmpp_2m", "karras") },
-	"2": { "sdxl": (1024, 25, 0, "dpmpp_3m_sde_gpu", "karras"), "sd15": (768, 25, 0, "dpmpp_3m_sde_gpu", "karras") },
-	"3": { "sdxl": (1024, 25, int(25 / 2.5), "dpmpp_3m_sde_gpu", "karras"), "sd15": (768, 35, 0, "dpmpp_3m_sde_gpu", "karras") },
-	"4": { "sdxl": (1024, 35, int(35 / 2.5), "dpmpp_3m_sde_gpu", "karras"), "sd15": (768, 50, 0, "dpmpp_3m_sde_gpu", "karras") },
+	"1": { "sdxl": (1184, 16, 0, "dpmpp_2m", "karras"), "sd15": (768, 16, 0, "dpmpp_2m", "karras") },
+	"2": { "sdxl": (1184, 25, 0, "dpmpp_3m_sde_gpu", "karras"), "sd15": (768, 25, 0, "dpmpp_3m_sde_gpu", "karras") },
+	"3": { "sdxl": (1184, 25, int(25 / 2.5), "dpmpp_3m_sde_gpu", "karras"), "sd15": (768, 35, 0, "dpmpp_3m_sde_gpu", "karras") },
+	"4": { "sdxl": (1184, 35, int(35 / 2.5), "dpmpp_3m_sde_gpu", "karras"), "sd15": (768, 50, 0, "dpmpp_3m_sde_gpu", "karras") },
 }
 
 # Ref Mode
@@ -109,7 +109,7 @@ options["ref_mode"] = {
 	"Ref Stuct": (	"canny",
 			   		{	"sdxl": "sai_xl_canny_128lora.safetensors", "sd15": "control_v11p_sd15_canny.pth",
 						"keyword": [r"canny", r"^(?!.*t2i)(?=.*lineart).*$", r".*t2i.*lineart", r"sketch", r"mlsd", r"scribble", r"softedge"],
-						"annotator": ["canny", ["lineart_coarse", "lineart_realistic", "lineart_anime", "lineart_anime_denoise"], ["lineart_coarse_invert", "lineart_realistic_invert", "lineart_anime_invert", "lineart_anime_denoise_invert"], ["scribble_hed", "softedge_hed"], ["mlsd", "canny"], "scribble_hed", "softedge_hed" ]
+						"annotator": ["canny", ["lineart_coarse", "lineart_realistic", "lineart_anime", "lineart_anime_denoise"], ["lineart_coarse,invert", "lineart_realistic,invert", "lineart_anime,invert", "lineart_anime_denoise,invert"], ["scribble_hed", "softedge_hed"], ["mlsd", "canny"], "scribble_hed", "softedge_hed" ]
 					}),
     "Ref Depth": (	"depth_leres",
 				  	{ 	"sdxl": "sai_xl_depth_128lora.safetensors", "sd15": "control_v11f1p_sd15_depth.pth",
@@ -126,11 +126,41 @@ options["ref_mode"] = {
 						"keyword": [r"^(?!.*animal)(?=.*openpose).*$", r".*animal.*openpose"],
 						"annotator": ["dwpose", "animal_pose"]
 					}),
+	"Ref Color": (	"shuffle",
+			  		{ 	"sdxl": None, "sd15": "control_v11e_sd15_shuffle.pth",
+						"keyword": [r"shuffle", r"\bcolor\b"],
+						"annotator": ["shuffle", "color"]
+					}),
+	"Ref Color": (	"shuffle",
+			  		{ 	"sdxl": None, "sd15": "control_v11e_sd15_shuffle.pth",
+						"keyword": [r"shuffle", r"\bcolor\b"],
+						"annotator": ["shuffle", "color"]
+					}),
+	"Ref Brightness": (	"brightness",
+			  		{ 	"sdxl": None, "sd15": "control_v1p_sd15_brightness.safetensors",
+						"keyword": [r"(brightness|qrcode)"],
+						"annotator": [["binary", "binary,invert"]]
+					}), 
+	"Ref Segment": (	"oneformer",
+			  		{ 	"sdxl": None, "sd15": "control_v11p_sd15_seg.pth",
+						"keyword": [r"\bseg\b"],
+						"annotator": [["oneformer", "segment_anything", "remove_bg,anime_segmentation"]]
+					}),
+	"Ref Normalbae": (	"normal_bae",
+			  		{ 	"sdxl": None, "sd15": "control_v11p_sd15_normalbae.pth",
+						"keyword": [r"normalbae"],
+						"annotator": ["normal_bae"]
+					}), 
 	"Base Image": ("base_image", { "sdxl": None, "sd15": None, "keyword": None }),
+	"Recolor":	(	"default",
+			 		{	"sdxl": "sai_xl_recolor_128lora.safetensors", "sd15": "ioclab_sd15_recolor.safetensors",
+						"keyword": [r"recolor"],
+						"annotator": ["default"]
+					}),
 	"Others": (		"default",
 					{	"sdxl": None, "sd15": None,
-	  					"keyword": [r"normalbae", r"shuffle", r"(brightness|qrcode)", r"\bseg\b", r"\bcolor\b", r"^(?!.*(ip adapter|tile|canny|lineart|mlsd|scribble|softedge|sketch|depth|openpose|normalbae|shuffle|brightness|\bseg\b|\bcolor\b)).*$"],
-						"annotator": ["normal_bae", "shuffle", ["binary", "binary_invert"], ["oneformer", "segment_anything"], "color", "default"]
+	  					"keyword": [r"^(?!.*(ip adapter|tile|canny|lineart|mlsd|scribble|softedge|sketch|depth|openpose|normalbae|shuffle|brightness|qrcode|\bseg\b|\bcolor\b|recolor)).*$"],
+						"annotator": ["default"]
 					 }),
 }
 default["ref_mode"] = "Ref All"

@@ -130,12 +130,8 @@ class LineartAnimeDetector:
         offload_device = model_loader.offload_device("annotator")
 
         self.model = model_patcher.ModelPatcher(net, load_device, offload_device)
-
-    def to(self, device):
-        self.model.to(device)
-        return self
     
-    def __call__(self, input_image, invert=False):
+    def __call__(self, input_image):
         assert input_image.ndim == 3
 
         device = self.model.load_device
@@ -156,9 +152,6 @@ class LineartAnimeDetector:
             line = self.model.model(image_feed)[0, 0] * 127.5 + 127.5
             line = line.cpu().numpy()
             line = line.clip(0, 255).astype(np.uint8)
-
-            if invert:
-                line = 255 - line
         
         #A1111 uses INTER AREA for downscaling so ig that is the best choice
         detected_map = remove_pad(HWC3(line))

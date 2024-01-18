@@ -306,7 +306,8 @@ onUiLoaded(async() => {
             );
 
             //Reset Zoom
-            image_container.style.transform = `translate(${0}px, ${0}px) scale(${1})`;
+            image_container.style.transform = `translate(0, 0) scale(1)`;
+            image_container.style.position = "relative";
 
             let parentElement;
 
@@ -387,7 +388,8 @@ onUiLoaded(async() => {
             }
 
             //Reset Zoom
-            image_container.style.transform = `translate(${0}px, ${0}px) scale(${1})`;
+            image_container.style.transform = `translate(0px, 0px) scale(1)`;
+            image_container.style.position = "fixed";
 
             // Get scrollbar width to right-align the image
             const scrollbarWidth =

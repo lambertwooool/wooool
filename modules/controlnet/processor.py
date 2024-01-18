@@ -13,6 +13,7 @@ sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), "custo
 
 from PIL import Image
 
+from .invert import InvertDetector
 from .binary import BinaryDetector
 from .color import ColorDetector
 from .canny import CannyDetector
@@ -34,6 +35,7 @@ from .oneformer import OneformerSegmentor
 from .sam import SamDetector
 from .lama_inpaint import LamaInpaintdetector
 from .anime_face_segment import AnimeFaceSegmentor
+from .remove_bg import RemoveBackgroundDetector
 
 import modules.paths
 from modules.model import controlnet, model_loader, model_patcher
@@ -50,8 +52,8 @@ class DefaultDetector:
 MODELS = {
     # checkpoint models
     'default': { 'class': DefaultDetector },
+    'invert': { 'class': InvertDetector },
     'binary': { 'class': BinaryDetector },
-    'binary_invert': { 'class': BinaryDetector },
     'color': { 'class': ColorDetector },
     'canny': { 'class': CannyDetector },
     'scribble_hed': { 'class': HEDdetector },
@@ -63,10 +65,6 @@ MODELS = {
     'lineart_realistic': { 'class': LineartDetector },
     'lineart_anime': { 'class': LineartAnimeDetector },
     'lineart_anime_denoise': { 'class': LineartMangaDetector },
-    'lineart_realistic_invert': { 'class': LineartDetector },
-    'lineart_coarse_invert': { 'class': LineartDetector },
-    'lineart_anime_invert': { 'class': LineartAnimeDetector },
-    'lineart_anime_denoise_invert': { 'class': LineartMangaDetector },
     'depth_midas': { 'class': MidasDetector },
     'depth_zoe': { 'class': ZoeDetector }, 
     'depth_leres': { 'class': LeresDetector }, 
@@ -84,12 +82,13 @@ MODELS = {
     'segment_anything': { 'class': SamDetector },
     'lama_inpaint': { 'class': LamaInpaintdetector },
     'anime_segmentation': { 'class': AnimeFaceSegmentor },
+    'remove_bg': { 'class': RemoveBackgroundDetector },
 }
 
 MODEL_PARAMS = {
     'default': {},
-    'binary': { 'invert': False },
-    'binary_invert': { 'invert': True },
+    'invert': {},
+    'binary': {},
     'color': {},
     'canny': { 'low_threshold': 64, 'high_threshold': 128 },
     'scribble_hed': { 'scribble': True, 'safe': False },
@@ -100,11 +99,7 @@ MODEL_PARAMS = {
     'lineart_realistic': { 'coarse': False },
     'lineart_coarse': { 'coarse': True },
     'lineart_anime': {},
-    'lineart_anime_denoise': { 'invert': False },
-    'lineart_realistic_invert': { 'coarse': False, 'invert': True },
-    'lineart_coarse_invert': { 'coarse': True, 'invert': True },
-    'lineart_anime_invert': { 'invert': True },
-    'lineart_anime_denoise_invert': { 'invert': True },
+    'lineart_anime_denoise': {},
     'depth_midas': {},
     'depth_zoe': {},
     'depth_leres': { 'boost': False },
@@ -121,7 +116,8 @@ MODEL_PARAMS = {
     'oneformer': {},
     'segment_anything': {},
     'lama_inpaint': {},
-    'anime_segmentation': { 'remove_background': True },
+    'anime_segmentation': {},
+    'remove_bg': {},
 }
 
 class Processor:
@@ -167,7 +163,7 @@ class Processor:
 
     @torch.no_grad()
     @torch.inference_mode()
-    def __call__(self, image: Union[Image.Image, bytes]) -> Image.Image:
+    def __call__(self, image: Union[Image.Image, bytes], mask: Union[Image.Image, bytes]=None) -> Image.Image:
         """processes an image with a controlnet aux processor
 
         Args:
@@ -180,7 +176,7 @@ class Processor:
         if isinstance(image, bytes):
             image = Image.open(io.BytesIO(image)).convert("RGB")
 
-        processed_image = self.processor(image, **self.params)
+        processed_image = self.processor(image, **self.params) if mask is None else self.processor(image, mask, **self.params)
 
         return processed_image
     

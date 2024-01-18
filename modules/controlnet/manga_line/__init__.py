@@ -34,11 +34,7 @@ class LineartMangaDetector:
 
         self.model = model_patcher.ModelPatcher(net, load_device, offload_device)
 
-    def to(self, device):
-        self.model.to(device)
-        return self
-
-    def __call__(self, input_image, invert=True):
+    def __call__(self, input_image):
         detected_map, remove_pad = image_pad(input_image)
         device = self.model.load_device
         model_loader.load_model_gpu(self.model)
@@ -53,8 +49,7 @@ class LineartMangaDetector:
             line[line > 255] = 255
             line[line < 0] = 0
             
-            if not invert:
-                line = 255 - line
+            line = 255 - line
 
             line = line.astype(np.uint8)
         
