@@ -26,7 +26,7 @@ def exists(lora_name):
     return get_lora_path(lora_name) is not None
 
 def get_lora_path(lora_name):
-    return ([file for name, file in lora_files.items() if name == lora_name or os.path.splitext(os.path.split(file)[1])[0] == lora_name] + [None])[0]
+    return ([file for name, file in lora_files.items() if name == lora_name or os.path.splitext(os.path.split(file)[1])[0] == os.path.splitext(lora_name)[0]] + [None])[0]
 
 def get_name_by_path(lora_path):
     lora_name = ([k for k, v in lora_files.items() if v == lora_path] + [None])[0]
