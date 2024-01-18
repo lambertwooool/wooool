@@ -1,5 +1,4 @@
 import os
-import torch
 import torch.nn as nn
 
 import modules.paths
@@ -65,31 +64,34 @@ class LatentInterposer:
 	def __init__(self, latent_src, latent_dst):
 		if latent_src == latent_dst:
 			return
-		filename = f"{latent_src}-to-{latent_dst}_interposer-v{model.version}.safetensors"
-		model_path = os.path.join(modules.paths.vae_approx_path, filename)
-		sd = model_helper.load_torch_file(model_path)
-
+		
 		model = Interposer()
 		model.eval()
 
-		model.load_state_dict(load_file(weights))
+		type_map = {
+			"xl": "xl",
+			"sdxl": "xl",
+			"v1": "v1",
+			"sd15": "v1",
+		}
+
+		filename = f"{type_map.get(latent_src)}-to-{type_map.get(latent_dst)}_interposer-v{model.version}.safetensors"
+		model_path = os.path.join(modules.paths.vae_approx_path, filename)
+		sd = model_helper.load_torch_file(model_path)
+
+		model.load_state_dict(sd)
 
 		load_device = model_loader.run_device("vae")
-        offload_device = model_loader.offload_device("vae")
-        self.model = model_patcher.ModelPatcher(model, load_device, offload_device)
-		
-		lt = samples["samples"]
-		lt = model(lt)
-		del model
-		return ({"samples": lt},)
+		offload_device = model_loader.offload_device("vae")
+		self.model = model_patcher.ModelPatcher(model, load_device, offload_device)
 
-	def __call__(samples):
+
+	def __call__(self, latent):
 		model_loader.load_model_gpu(self.model)
-		device = self.netNetwork.load_device
+		device = self.model.load_device
 
-		sample_latent = samples.pop("samples")
+		sample_latent = latent.clone()
 		sample_latent = sample_latent.to(device)
+		sample_latent = self.model.model(sample_latent).to(latent)
 
-		sample_latent = self.model.model(sample_latent).detach().cpu().numpy().astype(np.float32)
-
-		return { "samples": sample_latent, **samples }
+		return sample_latent

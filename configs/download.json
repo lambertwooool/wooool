@@ -2,6 +2,8 @@
     "sd_xl_base_1.0_0.9vae.safetensors": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0_0.9vae.safetensors",
     "sd_xl_refiner_1.0_0.9vae.safetensors": "https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-1.0/resolve/main/sd_xl_refiner_1.0_0.9vae.safetensors",
     "xlvaeapp.pth": "https://huggingface.co/lllyasviel/misc/resolve/main/xlvaeapp.pth",
+    "v1-to-xl_interposer-v3.1.safetensors": "https://huggingface.co/city96/SD-Latent-Interposer/resolve/main/v1-to-xl_interposer-v3.1.safetensors",
+    "xl-to-v1_interposer-v3.1.safetensors": "https://huggingface.co/city96/SD-Latent-Interposer/resolve/main/xl-to-v1_interposer-v3.1.safetensors",
     "sai_xl_canny_128lora.safetensors": "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/sai_xl_canny_128lora.safetensors",
     "sai_xl_depth_128lora.safetensors": "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/sai_xl_depth_128lora.safetensors",
     "t2i-adapter_xl_openpose.safetensors": "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/t2i-adapter_xl_openpose.safetensors",
