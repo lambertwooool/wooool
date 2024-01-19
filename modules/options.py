@@ -94,8 +94,8 @@ options["quality_setting"] = {
     # "5": { "sdxl": (1024, 5, 0, "lcm", "lcm"), "sd15": (768, 5, 0, "lcm", "lcm") },
 	"1": { "sdxl": (1184, 16, 0, "dpmpp_2m", "karras"), "sd15": (768, 16, 0, "dpmpp_2m", "karras") },
 	"2": { "sdxl": (1184, 25, 0, "dpmpp_3m_sde_gpu", "karras"), "sd15": (768, 25, 0, "dpmpp_3m_sde_gpu", "karras") },
-	"3": { "sdxl": (1184, 25, int(25 / 2.5), "dpmpp_3m_sde_gpu", "karras"), "sd15": (768, 35, 0, "dpmpp_3m_sde_gpu", "karras") },
-	"4": { "sdxl": (1184, 35, int(35 / 2.5), "dpmpp_3m_sde_gpu", "karras"), "sd15": (768, 50, 0, "dpmpp_3m_sde_gpu", "karras") },
+	"3": { "sdxl": (1184, 25, int(25 / 2.5), "dpmpp_3m_sde_gpu", "karras"), "sd15": (768, 25, int(25 / 2.5), "dpmpp_3m_sde_gpu", "karras") },
+	"4": { "sdxl": (1184, 35, int(35 / 2.5), "dpmpp_3m_sde_gpu", "karras"), "sd15": (768, 35, int(35 / 2.5), "dpmpp_3m_sde_gpu", "karras") },
 }
 
 # Ref Mode

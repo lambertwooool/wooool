@@ -80,10 +80,12 @@ def get_model_versions(
             hash_value = util.gen_file_sha256(model_path)[:10]
             url = f"{base_url}{api['model-versions-hash']}{hash_value}"
 
-            data = util.load_url(url)
+            content = util.load_url(url)
+            if content:
+                data = json.load(content)
 
-            with open(config_file, "w") as file:
-                file.write(json.dumps(data, indent=4))
+                with open(config_file, "w") as file:
+                    file.write(json.dumps(data, indent=4))
         else:
             data = None
 

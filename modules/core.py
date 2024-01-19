@@ -70,14 +70,14 @@ def get_refiner_model(model_path):
         shared.xl_refiner = (model_path, xl_refiner)
         print(f'Refiner model loaded: {model_path}')
 
-        if isinstance(xl_refiner.unet.model, SDXL):
-            xl_refiner.clip = None
-            xl_refiner.vae = None
-        elif isinstance(xl_refiner.unet.model, SDXLRefiner):
-            xl_refiner.clip = None
-            xl_refiner.vae = None
-        else:
-            xl_refiner.clip = None
+        # if isinstance(xl_refiner.unet.model, SDXL):
+        #     xl_refiner.clip = None
+        #     # xl_refiner.vae = None
+        # elif isinstance(xl_refiner.unet.model, SDXLRefiner):
+        #     xl_refiner.clip = None
+        #     # xl_refiner.vae = None
+        # else:
+        #     xl_refiner.clip = None
 
     return xl_refiner
 

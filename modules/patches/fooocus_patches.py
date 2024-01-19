@@ -22,22 +22,23 @@ from .patch_manager import patch, undo
 
 class FooocusPatches:
     def __init__(self):
-        self.calculate_weight = patch(__name__, modules.model.model_patcher.ModelPatcher, 'calculate_weight', calculate_weight_patched)
-        self.ControlNet_forword = patch(__name__, modules.model.cldm.cldm.ControlNet, 'forward', patched_cldm_forward)
-        self.UNetModel_forword = patch(__name__, modules.model.ldm.modules.diffusionmodules.openaimodel.UNetModel, 'forward', patched_unet_forward)
-        self.DDPMDenoiser_forword = patch(__name__, modules.model.k_diffusion.external.DiscreteEpsDDPMDenoiser, 'forward', patched_discrete_eps_ddpm_denoiser_forward)
-        self.SDXL_encode_adm = patch(__name__, modules.model.model_base.SDXL, 'encode_adm', sdxl_encode_adm_patched)
-        self.Clip_encode_token_weights = patch(__name__, modules.model.sd1_clip.ClipTokenWeightEncoder, 'encode_token_weights', encode_token_weights_patched_with_a1111_method)
+        # self.calculate_weight = patch(__name__, modules.model.model_patcher.ModelPatcher, 'calculate_weight', calculate_weight_patched)
+        # self.ControlNet_forword = patch(__name__, modules.model.cldm.cldm.ControlNet, 'forward', patched_cldm_forward)
+        # self.UNetModel_forword = patch(__name__, modules.model.ldm.modules.diffusionmodules.openaimodel.UNetModel, 'forward', patched_unet_forward)
+        # self.DDPMDenoiser_forword = patch(__name__, modules.model.k_diffusion.external.DiscreteEpsDDPMDenoiser, 'forward', patched_discrete_eps_ddpm_denoiser_forward)
+        # self.SDXL_encode_adm = patch(__name__, modules.model.model_base.SDXL, 'encode_adm', sdxl_encode_adm_patched)
+        # self.Clip_encode_token_weights = patch(__name__, modules.model.sd1_clip.ClipTokenWeightEncoder, 'encode_token_weights', encode_token_weights_patched_with_a1111_method)
 
         warnings.filterwarnings(action='ignore', module='torchsde')
 
     def undo(self):
-        self.calculate_weight = undo(__name__, modules.model.model_patcher.ModelPatcher, 'calculate_weight')
-        self.ControlNet_forword = undo(__name__, modules.model.cldm.cldm.ControlNet, 'forward')
-        self.UNetModel_forword = undo(__name__, modules.model.ldm.modules.diffusionmodules.openaimodel.UNetModel, 'forward')
-        self.DDPMDenoiser_forword = undo(__name__, modules.model.k_diffusion.external.DiscreteEpsDDPMDenoiser, 'forward')
-        self.SDXL_encode_adm = undo(__name__, modules.model.model_base.SDXL, 'encode_adm')
-        self.Clip_encode_token_weights = undo(__name__, modules.model.sd1_clip.ClipTokenWeightEncoder, 'encode_token_weights')
+        # self.calculate_weight = undo(__name__, modules.model.model_patcher.ModelPatcher, 'calculate_weight')
+        # self.ControlNet_forword = undo(__name__, modules.model.cldm.cldm.ControlNet, 'forward')
+        # self.UNetModel_forword = undo(__name__, modules.model.ldm.modules.diffusionmodules.openaimodel.UNetModel, 'forward')
+        # self.DDPMDenoiser_forword = undo(__name__, modules.model.k_diffusion.external.DiscreteEpsDDPMDenoiser, 'forward')
+        # self.SDXL_encode_adm = undo(__name__, modules.model.model_base.SDXL, 'encode_adm')
+        # self.Clip_encode_token_weights = undo(__name__, modules.model.sd1_clip.ClipTokenWeightEncoder, 'encode_token_weights')
+        pass
 
 sharpness = 2.0
 

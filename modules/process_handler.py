@@ -14,7 +14,7 @@ from PIL import Image
 
 import modules.options as opts
 import modules.paths
-from modules import clip_helper, civitai, core, controlnet_helper, devices, lora, prompt_helper, shared, util, vae_helper, upscaler_esrgan, gfpgan_model
+from modules import clip_helper, civitai, core, controlnet_helper, devices, latent_interposer, prompt_helper, shared, util, vae_helper, upscaler_esrgan, gfpgan_model
 from modules.model.model_base import BaseModel, SDXL, SDXLRefiner
 from modules.model import model_loader, model_helper, sample, samplers
 from modules.controlnet.processor import Processor as controlnet_processor
@@ -266,14 +266,24 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
 
     clip_model = xl_base_patched.clip
     clip_model.clip_layer(clip_skip)
+    if xl_refiner is not None:
+        clip_refiner_model = xl_refiner.clip
+        clip_refiner_model.clip_layer(clip_skip)
+    else:
+        clip_refiner_model = None
     positive_template = positive.pop(0)
     negative_template = negative.pop(0)
     positive_cond = []
     negative_cond = []
+    positive_refiner_cond = []
+    negative_refiner_cond = []
     def clip_worker(positive, negative):
         for x, y in zip(positive, negative):
             positive_cond.append(clip_helper.clip_encode(clip_model, x, model_type))
             negative_cond.append(clip_helper.clip_encode(clip_model, y, model_type))
+            if clip_refiner_model is not None:
+                positive_refiner_cond.append(clip_helper.clip_encode(clip_refiner_model, x, refiner_model_type))
+                negative_refiner_cond.append(clip_helper.clip_encode(clip_refiner_model, y, refiner_model_type))
     
     thread_clip = threading.Thread(target=clip_worker, args=(positive, negative)).start()
 
@@ -427,6 +437,10 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
     latent_image = latent["samples"]
     latent_mask = latent.get("noise_mask", None)
 
+    # latent_convert = None
+    # if model_type != refiner_model_type and step_refiner > 0:
+    #     latent_convert = latent_interposer.LatentInterposer(model_type, refiner_model_type)
+
     for i in range(batch_size):
         task["cur_batch"] = i + 1
 
@@ -453,7 +467,8 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
                     negative=cur_negative_cond,
                     latent_image=latent_image,
                     noise=cur_noise,
-                    steps=step_total, start_step=start_step, last_step=step_base,
+                    # steps=step_total, start_step=start_step, last_step=step_base,
+                    steps=step_base, start_step=start_step, last_step=step_base,
                     cfg=cfg_scale,
                     seed=cur_seed,
                     sampler_name=sampler_name,
@@ -467,10 +482,13 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
             else:
                 sampled_latent = latent_image.clone()
 
-            if refiner_unet_model is not None and step_refiner > 0 and (model_type != "sd15" or refiner_model_type == "sd15"):
-                # org_image = vae_helper.decode_vae(xl_base.vae, sampled_latent)
-                # sampled_latent = vae_interpose.parse(sampled_latent)
-                # sampled_latent = vae_helper.encode_vae(xl_refiner.vae, org_image)["samples"]
+            # if refiner_unet_model is not None and step_refiner > 0 and (model_type != "sd15" or refiner_model_type == "sd15"):
+            if refiner_unet_model is not None and step_refiner > 0:
+                # if latent_convert is not None:
+                if model_type != refiner_model_type and step_refiner > 0:
+                    # sampled_latent = latent_convert(sampled_latent)
+                    sampled_latent = vae_helper.decode_vae(xl_base.vae, sampled_latent)
+                    sampled_latent = vae_helper.encode_vae(xl_refiner.vae, sampled_latent)["samples"]
 
                 if latent_mask is not None:
                     pre_mask = sample.prepare_mask(latent_mask, sampled_latent.shape, torch.device("cpu"))
@@ -479,10 +497,14 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
 
                 sigmas = None
 
-                refiner_positive = clip_helper.clip_separate(cur_positive_cond, target_model=refiner_unet_model.model, target_clip=clip_model)
+                # refiner_positive = clip_helper.clip_separate(cur_positive_cond, target_model=refiner_unet_model.model, target_clip=clip_model)
                 del cur_positive_cond
-                refiner_negative = clip_helper.clip_separate(cur_negative_cond, target_model=refiner_unet_model.model, target_clip=clip_model)
+                # refiner_negative = clip_helper.clip_separate(cur_negative_cond, target_model=refiner_unet_model.model, target_clip=clip_model)
                 del cur_negative_cond
+                # refiner_positive, refiner_negative = controlnet_helper.apply_controlnets(positive_refiner_cond.pop(0), negative_refiner_cond.pop(0), ctrls)
+                refiner_positive, refiner_negative = positive_refiner_cond.pop(0), negative_refiner_cond.pop(0)
+                refiner_positive = clip_helper.clip_separate(refiner_positive, target_model=refiner_unet_model.model, target_clip=clip_refiner_model)
+                refiner_negative = clip_helper.clip_separate(refiner_negative, target_model=refiner_unet_model.model, target_clip=clip_refiner_model)
 
                 # model_loader.free_memory(1024 ** 4, devices.get_torch_device())
 

@@ -4,6 +4,7 @@
 - Inpaint adds vary after erase
 - Controlnet supports multiple preprocessors
 - Vary use inpaint controlnet at sd15 and Refiner use tile controlnet at sd15
+- Any combination of sd15 and sdxl, used as a base model or refiner model
 
 ## 0.8.4
 - New finetune interface, supports extracting Lora from prompt words into finetune list, as well as selecting number of Lora models
