@@ -1,4 +1,5 @@
 import os
+import torch
 from .patch_manager import patch, undo, original
 from modules import util
 
@@ -13,6 +14,7 @@ download_urls = util.load_json(os.path.join("./configs", "download.json"))
 class DownloadPatches:
     def __init__(self):
         self.load_torch_file = patch(__name__, modules.model.model_helper, 'load_torch_file', load_torch_file)
+        self.torch_load = patch(__name__, torch, 'load', torch_load)
         self.GFPGan_get_model_path = patch(__name__, modules.gfpgan_model.GFPGan, 'get_model_path', GFPGan_get_model_path)
         self.wd14_tag = patch(__name__, modules.wd14tagger, 'tag', wd14_tag)
         self.model_zoo_get_model = patch(__name__, insightface.model_zoo, 'get_model', model_zoo_get_model)
@@ -20,6 +22,7 @@ class DownloadPatches:
 
     def undo(self):
         self.load_torch_file = undo(__name__, modules.model.model_helper, 'load_torch_file')
+        self.torch_load = patch(__name__, torch, 'load')
         self.GFPGan_get_model_path = undo(__name__, modules.gfpgan_model.GFPGan, 'get_model_path')
         self.wd14_tag = undo(__name__, modules.wd14tagger, 'tag')
         self.model_zoo_get_model = undo(__name__, insightface.model_zoo, 'get_model')
@@ -32,6 +35,10 @@ def load_or_download_file(dest):
         util.download_url_to_file(url, dest, download_chunk_size=1*(1024**2))
     
     return os.path.exists(dest)
+
+def torch_load(*args, **kwargs):
+    load_or_download_file(args[0])
+    return original(__name__, torch, "load")(*args, **kwargs)
 
 def load_torch_file(*args, **kwargs):
     load_or_download_file(args[0])

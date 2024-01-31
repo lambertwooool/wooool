@@ -85,9 +85,13 @@ function modalImageSwitch(offset) {
             if (modalImage.style.display === 'none') {
                 modal.style.setProperty('background-image', `url(${modalImage.src})`);
             }
-            setTimeout(function() {
-                modal.focus();
-            }, 10);
+            const timeFocus = function() {
+                if (document.activeElement != modal) {
+                    modal.focus();
+                    setTimeout(timeFocus, 10);
+                }
+            };
+            setTimeout(timeFocus, 10)
         }
     }
 }

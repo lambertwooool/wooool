@@ -1,10 +1,12 @@
 """
 This file contains a Processor that can be used to process images with controlnet processors
 """
+import cv2
 import io
 import logging
 import os
 import torch
+import numpy as np
 from typing import Any, Dict, Optional, Union
 
 import sys
@@ -15,7 +17,7 @@ from PIL import Image
 
 from .invert import InvertDetector
 from .binary import BinaryDetector
-from .color import ColorDetector
+from .color import ColorDetector, GrayDetector, ColorMapDetector
 from .canny import CannyDetector
 from .hed import HEDdetector
 from .midas import MidasDetector
@@ -36,9 +38,12 @@ from .sam import SamDetector
 from .lama_inpaint import LamaInpaintdetector
 from .anime_face_segment import AnimeFaceSegmentor
 from .remove_bg import RemoveBackgroundDetector
+from .teed import TEEDDector
+from .depth_anything import DepthAnythingDetector
 
 import modules.paths
 from modules.model import controlnet, model_loader, model_patcher
+from modules import util
 
 LOGGER = logging.getLogger(__name__)
 
@@ -55,11 +60,14 @@ MODELS = {
     'invert': { 'class': InvertDetector },
     'binary': { 'class': BinaryDetector },
     'color': { 'class': ColorDetector },
+    'gray': { 'class':  GrayDetector },
+    'colormap': { 'class':  ColorMapDetector },
     'canny': { 'class': CannyDetector },
     'scribble_hed': { 'class': HEDdetector },
     'softedge_hed': { 'class': HEDdetector },
     'scribble_hedsafe': { 'class': HEDdetector },
     'softedge_hedsafe': { 'class': HEDdetector },
+    'teed': { 'class': TEEDDector },
     'normal_bae': { 'class': NormalBaeDetector },
     'lineart_coarse': { 'class': LineartDetector },
     'lineart_realistic': { 'class': LineartDetector },
@@ -69,6 +77,7 @@ MODELS = {
     'depth_zoe': { 'class': ZoeDetector }, 
     'depth_leres': { 'class': LeresDetector }, 
     'depth_leres++': { 'class': LeresDetector },
+    'depth_anything': { 'class': DepthAnythingDetector },
     'mlsd': {'class': MLSDdetector },
     'dwpose': { 'class': DwposeDetector },
     'dwpose_face': { 'class': DwposeDetector },
@@ -90,11 +99,14 @@ MODEL_PARAMS = {
     'invert': {},
     'binary': {},
     'color': {},
+    'gray': {},
+    'colormap': {},
     'canny': { 'low_threshold': 64, 'high_threshold': 128 },
     'scribble_hed': { 'scribble': True, 'safe': False },
     'softedge_hed': { 'scribble': False, 'safe': False },
     'scribble_hedsafe': { 'scribble': True, 'safe': True },
     'softedge_hedsafe': { 'scribble': False, 'safe': True },
+    'teed': {},
     'normal_bae': {},
     'lineart_realistic': { 'coarse': False },
     'lineart_coarse': { 'coarse': True },
@@ -104,6 +116,7 @@ MODEL_PARAMS = {
     'depth_zoe': {},
     'depth_leres': { 'boost': False },
     'depth_leres++': { 'boost': True },
+    'depth_anything': { 'colored': True },
     'mlsd': {},
     'dwpose': { 'include_body': True, 'include_hand': True, 'include_face': True },
     'dwpose_face': { 'include_body': False, 'include_hand': False, 'include_face': True },
@@ -119,6 +132,16 @@ MODEL_PARAMS = {
     'anime_segmentation': {},
     'remove_bg': {},
 }
+
+def cached_filepath(processor_id, image, mask, params):
+    image_hash = util.gen_byte_sha256(np.array(image))
+    mask_hash = util.gen_byte_sha256(np.array(mask)) if mask else ""
+    input_hash = f"{image_hash}_{mask_hash}_{str(params)}"
+    input_hash = util.gen_byte_sha256(bytes(input_hash, encoding="utf-8"))[:10]
+    filename = f"annotator/{processor_id}_{input_hash}.png"
+    filepath = os.path.join(modules.paths.temp_outputs_path, filename)
+
+    return filepath
 
 class Processor:
     def __init__(self, processor_id: str, params: Optional[Dict] = None) -> None:
@@ -136,7 +159,7 @@ class Processor:
             raise ValueError(f"{processor_id} is not a valid processor id. Please make sure to choose one of {', '.join(MODELS.keys())}")
 
         self.processor_id = processor_id
-        self.processor = self.load_processor(self.processor_id)
+        self.processor = None
         self.controlnet = None
 
         # load default params
@@ -168,17 +191,35 @@ class Processor:
 
         Args:
             image (Union[Image.Image, bytes]): input image in bytes or PIL Image
+            mask (Union[Image.Image, bytes]): mask in bytes or PIL Image
 
         Returns:
             Image.Image: processed image
         """
         # check if bytes or PIL Image
+
         if isinstance(image, bytes):
             image = Image.open(io.BytesIO(image)).convert("RGB")
 
-        processed_image = self.processor(image, **self.params) if mask is None else self.processor(image, mask, **self.params)
+        if isinstance(mask, bytes):
+            mask = Image.open(io.BytesIO(mask)).convert("RGB")
+
+        filepath = cached_filepath(self.processor_id ,image, mask, self.params)
+
+        if os.path.exists(filepath):
+            processed_image = cv2.imread(filepath)
+        else:
+            if self.processor is None:
+                self.processor = self.load_processor(self.processor_id)
+
+            processed_image = self.processor(image, **self.params) if mask is None else self.processor(image, mask, **self.params)
+            annotator_path = os.path.join(modules.paths.temp_outputs_path, "annotator")
+            if not os.path.exists(annotator_path):
+                os.mkdir(annotator_path)
+            Image.fromarray(processed_image).save(filepath)
 
         return processed_image
+
     
     def load_controlnet(self, filename: str):
         filename = os.path.join(modules.paths.controlnet_models_path, filename)

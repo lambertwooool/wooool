@@ -102,7 +102,7 @@ options["quality_setting"] = {
 options["ref_mode"] = {
 	"Ref All": (	"ip_adapter",
 			 		{	"sdxl": "ip-adapter-plus_sdxl_vit-h.bin", "sd15": "ip-adapter_sd15_plus.pth",
-	   					"keyword": [r"ip adapter.*plus(?! face)", "tile"],
+	   					"keyword": [r"ip adapter.*plus(?! face)", r"tile"],
 						"annotator": ["ip_adapter", "tile"]
 					}),
 	"Ref Content": ("content", { "sdxl": None, "sd15": None, "keyword": None }),

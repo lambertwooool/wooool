@@ -22,6 +22,8 @@
     "wd-v1-4-moat-tagger-v2.csv": "https://huggingface.co/SmilingWolf/wd-v1-4-moat-tagger-v2/resolve/main/selected_tags.csv",
     
     "ControlNetHED.pth": "https://huggingface.co/lllyasviel/Annotators/resolve/main/ControlNetHED.pth",
+    "res101.pth": "https://huggingface.co/lllyasviel/Annotators/resolve/main/res101.pth",
+    "latest_net_G.pth": "https://huggingface.co/lllyasviel/Annotators/resolve/main/latest_net_G.pth",
     "dpt_hybrid-midas-501f0c75.pt": "https://huggingface.co/lllyasviel/Annotators/resolve/main/dpt_hybrid-midas-501f0c75.pt",
     "ZoeD_M12_N.pt": "https://huggingface.co/lllyasviel/Annotators/resolve/main/ZoeD_M12_N.pt",
     "sk_model.pth": "https://huggingface.co/lllyasviel/Annotators/resolve/main/sk_model.pth",
@@ -43,6 +45,8 @@
     "UNet.pth": "https://huggingface.co/bdsqlsz/qinglong_controlnet-lllite/resolve/main/Annotators/UNet.pth",
     "isnetis.ckpt": "https://huggingface.co/skytnt/anime-seg/resolve/main/isnetis.ckpt",
     "ControlNetLama.pth": "https://huggingface.co/lllyasviel/Annotators/resolve/main/ControlNetLama.pth",
+    "7_model.pth": "https://huggingface.co/bdsqlsz/qinglong_controlnet-lllite/resolve/main/Annotators/7_model.pth",
+    "depth_anything_vitl14.pth": "https://huggingface.co/spaces/LiheYoung/Depth-Anything/resolve/main/checkpoints/depth_anything_vitl14.pth",
 
     "add_detail.safetensors": "https://civitai.com/api/download/models/62833",
     "add-detail-xl.safetensors": "https://civitai.com/api/download/models/135867",

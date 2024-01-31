@@ -41,7 +41,7 @@ class LeresDetector:
 
     @torch.no_grad()
     @torch.inference_mode()
-    def __call__(self, input_image, thr_a=0, thr_b=0, boost=False):
+    def __call__(self, input_image, thr_a=0, thr_b=0, boost=False, colored=False):
         detected_map, remove_pad = image_pad(input_image)
 
         model_loader.load_model_gpu(self.model)
@@ -81,7 +81,10 @@ class LeresDetector:
             # remove bg
             if thr_b != 0:
                 thr_b = ((thr_b/100)*255)
-                depth_image = cv2.threshold(depth_image, thr_b, 255, cv2.THRESH_TOZERO)[1]  
+                depth_image = cv2.threshold(depth_image, thr_b, 255, cv2.THRESH_TOZERO)[1]
+
+            if colored:
+                depth_image = cv2.applyColorMap(depth_image, cv2.COLORMAP_INFERNO)[:, :, ::-1]
 
         detected_map = HWC3(remove_pad(depth_image))
 

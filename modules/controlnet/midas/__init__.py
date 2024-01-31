@@ -22,7 +22,7 @@ class MidasDetector:
     
     @torch.no_grad()
     @torch.inference_mode()
-    def __call__(self, input_image, a=np.pi * 2.0, bg_th=0.1, depth_and_normal=False):
+    def __call__(self, input_image, a=np.pi * 2.0, bg_th=0.1, depth_and_normal=False, colored=False):
         detected_map, remove_pad = image_pad(input_image)
         image_depth = detected_map
 
@@ -59,6 +59,9 @@ class MidasDetector:
         depth_image = remove_pad(depth_image)
         if depth_and_normal:
             normal_image = remove_pad(normal_image)
+
+        if colored:
+            depth_image = cv2.applyColorMap(depth_image, cv2.COLORMAP_INFERNO)[:, :, ::-1]
         
         if depth_and_normal:
             return depth_image, normal_image

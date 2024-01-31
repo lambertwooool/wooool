@@ -75,7 +75,7 @@ div:has(#radio_mc, #ckb_mc_other), #radio_mc, #ckb_mc_other { background-color: 
 #progress progress { width: 100%; }
 #gl_style_list { resize: vertical; }
 #gl_style_list { min-height: 150px;}
-#gl_style_list button { width: 126px; height: 88px; display: inline-block; margin: 4px; }
+#gl_style_list button { width: 136px; height: 88px; display: inline-block; margin: 4px; }
 #gl_style_list .grid-wrap { overflow-y: auto; }
 #gl_style_list .grid-wrap .grid-container { display: block; /* white-space: nowrap;*/ }
 #gl_style_list .grid-wrap .grid-container .caption-label { font-size: 10px;}
@@ -97,6 +97,7 @@ div:has(#radio_mc, #ckb_mc_other), #radio_mc, #ckb_mc_other { background-color: 
     opacity: 0.3
 }
 
+.panel_ref_block .image-frame img { object-fit: contain; }
 .panel_ref_block:has(div[id^="refer_enable_"] input:not(:checked)), .panel_lora_block:has(div[id^="refer_lora_enable_"] input:not(:checked)) {
     div[id^="refer_img_"], div[id^="refer_lora_img_"] {
         opacity: 0.3

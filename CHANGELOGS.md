@@ -1,5 +1,9 @@
 # Change Logs
 
+## 0.8.6
+- Support new controlnet, depth anythiny, teed
+- controlnet annotator cache
+
 ## 0.8.5
 - Inpaint adds vary after erase
 - Controlnet supports multiple preprocessors

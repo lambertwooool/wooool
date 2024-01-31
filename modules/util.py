@@ -225,6 +225,13 @@ def gen_file_sha256(filename):
 
     return hash_value
 
+def gen_byte_sha256(bytes):
+    h = hashlib.sha256()
+    h.update(bytes)
+    hash_value = h.hexdigest()
+
+    return hash_value
+
 def get_faces(input_image):
     detector = dlib.get_frontal_face_detector()
     gray = cv2.cvtColor(input_image, cv2.COLOR_BGR2GRAY)

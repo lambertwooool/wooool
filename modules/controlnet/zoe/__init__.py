@@ -1,5 +1,5 @@
 import os
-
+import cv2
 import numpy as np
 import torch
 from einops import rearrange
@@ -25,12 +25,8 @@ class ZoeDetector:
         offload_device = model_loader.offload_device("annotator")
 
         self.model = model_patcher.ModelPatcher(model, load_device, offload_device)
-
-    def to(self, device):
-        self.model.to(device)
-        return self
     
-    def __call__(self, input_image):
+    def __call__(self, input_image, colored=False):
         device = self.model.load_device
         input_image, remove_pad = image_pad(input_image)
 
@@ -52,6 +48,9 @@ class ZoeDetector:
             depth /= vmax - vmin
             depth = 1.0 - depth
             depth_image = (depth * 255.0).clip(0, 255).astype(np.uint8)
+
+            if colored:
+                depth_image = cv2.applyColorMap(depth_image, cv2.COLORMAP_INFERNO)[:, :, ::-1]
 
         detected_map = remove_pad(HWC3(depth_image))
             
