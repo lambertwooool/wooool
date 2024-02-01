@@ -36,10 +36,7 @@ class DepthAnythingDetector:
         model_path = os.path.join(modules.paths.annotator_models_path, filename)
         state_dict = model_helper.load_torch_file(model_path)
 
-        model = DPT_DINOv2(
-                features=256,
-                out_channels=[256, 512, 1024, 1024],
-            ).eval()
+        model = DPT_DINOv2()
 
         model.load_state_dict(state_dict)
 

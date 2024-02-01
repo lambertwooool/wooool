@@ -116,7 +116,7 @@ MODEL_PARAMS = {
     'depth_zoe': {},
     'depth_leres': { 'boost': False },
     'depth_leres++': { 'boost': True },
-    'depth_anything': { 'colored': True },
+    'depth_anything': { 'colored': False },
     'mlsd': {},
     'dwpose': { 'include_body': True, 'include_hand': True, 'include_face': True },
     'dwpose_face': { 'include_body': False, 'include_hand': False, 'include_face': True },

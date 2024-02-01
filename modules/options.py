@@ -109,12 +109,12 @@ options["ref_mode"] = {
 	"Ref Stuct": (	"canny",
 			   		{	"sdxl": "sai_xl_canny_128lora.safetensors", "sd15": "control_v11p_sd15_canny.pth",
 						"keyword": [r"canny", r"^(?!.*t2i)(?=.*lineart).*$", r".*t2i.*lineart", r"sketch", r"mlsd", r"scribble", r"softedge"],
-						"annotator": ["canny", ["lineart_coarse", "lineart_realistic", "lineart_anime", "lineart_anime_denoise"], ["lineart_coarse,invert", "lineart_realistic,invert", "lineart_anime,invert", "lineart_anime_denoise,invert"], ["scribble_hed", "softedge_hed"], ["mlsd", "canny"], "scribble_hed", "softedge_hed" ]
+						"annotator": ["canny", ["lineart_coarse", "lineart_realistic", "lineart_anime", "lineart_anime_denoise"], ["lineart_coarse,invert", "lineart_realistic,invert", "lineart_anime,invert", "lineart_anime_denoise,invert"], ["scribble_hed", "softedge_hed", "teed"], ["mlsd", "canny"], "scribble_hed", ["softedge_hed", "teed"] ]
 					}),
     "Ref Depth": (	"depth_leres",
 				  	{ 	"sdxl": "sai_xl_depth_128lora.safetensors", "sd15": "control_v11f1p_sd15_depth.pth",
-						"keyword": [r"^(?!.*t2i)(?=.*depth).*$", r"depth midas", r"depth zoe"],
-						"annotator": [["depth_leres", "depth_midas", "depth_zoe"], "depth_midas", "depth_zoe"]
+						"keyword": [r"^(?!.*t2i)(?!.*depth anything)(?=.*depth).*$", r"depth midas", r"depth zoe", r"depth anything"],
+						"annotator": [["depth_leres", "depth_midas", "depth_zoe", "depth_anything"], "depth_midas", "depth_zoe", ["depth_leres,colormap", "depth_midas,colormap", "depth_zoe,colormap", "depth_anything,colormap"]]
 					}),
     "Ref Face": (	"ip_adapter_face",
 				 	{	"sdxl": "ip-adapter-plus-face_sdxl_vit-h.bin", "sd15": "ip-adapter-plus-face_sd15.bin",

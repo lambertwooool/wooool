@@ -51,6 +51,6 @@ class TEEDDector:
             edge = (edge * 255.0).clip(0, 255).astype(np.uint8)
             
         detected_map = HWC3(edge)
-        detected_map = remove_pad(255 - detected_map)
+        detected_map = remove_pad(detected_map)
             
         return detected_map

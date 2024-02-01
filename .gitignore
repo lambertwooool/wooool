@@ -1,5 +1,6 @@
 .vscode
 configs/user_paths.json
+models/embeddings/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

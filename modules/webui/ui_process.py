@@ -319,7 +319,7 @@ def GetModelInfo(opt_model):
 def GetSampleList(show_count=0, page=0, start_time=None, end_time=None, return_page_count=False):
     page = int(page)
     show_count = show_count if show_count > 0 else page_size
-    files = util.list_files(modules.paths.temp_outputs_path, ["jpg", "jpeg", "png"], excludes_dir=["recycled", "temp"], search_subdir=True)
+    files = util.list_files(modules.paths.temp_outputs_path, ["jpg", "jpeg", "png"], excludes_dir=["recycled", "temp", "annotator"], search_subdir=True)
     files = sorted(files, key=lambda x: os.path.getmtime(x), reverse=True)
     if start_time is not None and end_time is not None:
         files = filter(lambda x: os.path.getmtime(x) > start_time and os.path.getmtime(x) < end_time, files)
