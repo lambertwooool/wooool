@@ -80,6 +80,7 @@ def load_controlnets_by_task(cn_types):
                 if cn_item in controlnet_processor.model_keys() and cn_model_name is not None and end_percent > start_percent:
                     if cn_item in ["ip_adapter", "ip_adapter_face"]:
                         proc = controlnet_processor(cn_item)
+                        proc.load_processor()
                         proc.processor.load(cn_item, cn_model_name)
                     else:
                         proc = controlnet_processor(cn_item)

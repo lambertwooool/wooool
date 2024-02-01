@@ -25,6 +25,7 @@ cur_taskid = None
 action_btns = []
 page_size = 128
 endless_mode = False
+mask_num_selected_sample = -1
 
 def GenerateOne(img_refer, ckb_pro, txt_setting, *args):
     setting = json.loads(txt_setting)
@@ -137,7 +138,7 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
                 params["prompt_main"] += f",({','.join(ckb_words)}:{sl_rate / 100.0 / 0.8:.2f})"
             else:
                 if image_refer is not None or params.get("image"):
-                    opt_annotator = opt_annotator or ref_mode if ckb_annotator else "default"
+                    opt_annotator = opt_annotator or ref_mode if ckb_annotator or opt_annotator in ["ip_adapter", "ip_adapter_face"] else "default"
                     params["controlnet"].append([opt_type, opt_annotator, image_refer, sl_rate / 100.0, opt_model, sl_start_percent / 100.0, sl_end_percent / 100.0])
         
         if params.get("base_image"):
@@ -319,7 +320,7 @@ def GetModelInfo(opt_model):
 def GetSampleList(show_count=0, page=0, start_time=None, end_time=None, return_page_count=False):
     page = int(page)
     show_count = show_count if show_count > 0 else page_size
-    files = util.list_files(modules.paths.temp_outputs_path, ["jpg", "jpeg", "png"], excludes_dir=["recycled", "temp", "annotator"], search_subdir=True)
+    files = util.list_files(modules.paths.temp_outputs_path, ["jpg", "jpeg", "png"], excludes_dir=["annotator", "recycled", "temp"], search_subdir=True)
     files = sorted(files, key=lambda x: os.path.getmtime(x), reverse=True)
     if start_time is not None and end_time is not None:
         files = filter(lambda x: os.path.getmtime(x) > start_time and os.path.getmtime(x) < end_time, files)
@@ -376,7 +377,7 @@ def GetRefinerModels(base_model):
     return renfiner_models
 
 def GetSelectSamplePath(gl_sample_list, num_selected_sample):
-    selected_index = max(0, int(num_selected_sample))
+    selected_index = int(max(0, num_selected_sample or 0))
     file_path = None
 
     if selected_index >= 0:
@@ -595,6 +596,15 @@ def ChangePageSize(sl_sample_pagesize):
 def SetPageSize(sl_sample_pagesize):
     global page_size
     page_size = int(sl_sample_pagesize)
+
+def VaryClearMask(num_selected_sample):
+    global mask_num_selected_sample
+
+    if num_selected_sample == mask_num_selected_sample:
+        return gr.Image()
+    else:
+        mask_num_selected_sample = num_selected_sample
+        return gr.Image(value=None)
 
 def VaryCustomInterface(gl_sample_list, num_selected_sample):
     file_path, image = GetSampleImage(gl_sample_list, num_selected_sample)

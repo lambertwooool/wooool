@@ -135,7 +135,7 @@ MODEL_PARAMS = {
 
 def cached_filepath(processor_id, image, mask, params):
     image_hash = util.gen_byte_sha256(np.array(image))
-    mask_hash = util.gen_byte_sha256(np.array(mask)) if mask else ""
+    mask_hash = util.gen_byte_sha256(np.array(mask)) if mask is not None else ""
     input_hash = f"{image_hash}_{mask_hash}_{str(params)}"
     input_hash = util.gen_byte_sha256(bytes(input_hash, encoding="utf-8"))[:10]
     filename = f"annotator/{processor_id}_{input_hash}.png"
@@ -171,18 +171,12 @@ class Processor:
     def model_keys():
         return MODELS.keys()
 
-    def load_processor(self, processor_id: str) -> 'Processor':
+    def load_processor(self):
         """Load controlnet processors
 
-        Args:
-            processor_id (str): processor name
-
-        Returns:
-            Processor: controlnet processor
         """
 
-        processor = MODELS[processor_id]['class']()
-        return processor
+        self.processor = MODELS[self.processor_id]['class']()
 
     @torch.no_grad()
     @torch.inference_mode()
@@ -210,7 +204,7 @@ class Processor:
             processed_image = cv2.imread(filepath)
         else:
             if self.processor is None:
-                self.processor = self.load_processor(self.processor_id)
+                self.load_processor()
 
             processed_image = self.processor(image, **self.params) if mask is None else self.processor(image, mask, **self.params)
             annotator_path = os.path.join(modules.paths.temp_outputs_path, "annotator")

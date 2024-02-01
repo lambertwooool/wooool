@@ -94,14 +94,14 @@ def SetMCShowCount(opt_lang, radio_mc):
 def SampleGallery():
     # img_preview = gr.Image(label='Preview', show_label=True, visible=False, elem_id="img_preview", scale=20)
     # with gr.Column(scale=85):
-    gl_sample_list = gr.Gallery(label="Generated images", show_label=False, columns=[8], rows=[1], object_fit="contain", allow_preview=False, elem_id="gl_sample_list", elem_classes="image_gallery")
+    gl_sample_list = gr.Gallery(label="Generated images", show_label=False, columns=[8], rows=[1], object_fit="contain", interactive=False, allow_preview=False, elem_id="gl_sample_list", elem_classes="image_gallery")
     num_selected_sample = gr.Number(gl_sample_list.selected_index or -1, visible=False, elem_id="num_selected_sample")
     txt_sample_info = gr.Text(visible=False, show_label=False, container=False, lines=5, elem_id="txt_sample_info")
     
     return gl_sample_list, num_selected_sample, txt_sample_info
 
 def StyleGallery():
-    gl_style_list = gr.Gallery(value=ui_process.GetStyleList(opts.default['style']), show_label=False, selected_index=0, height=135, columns=[11], rows=[2], show_download_button=False, allow_preview=False, object_fit="cover", elem_id="gl_style_list")
+    gl_style_list = gr.Gallery(value=ui_process.GetStyleList(opts.default['style']), show_label=False, selected_index=0, interactive=False, height=135, columns=[10], rows=[2], show_download_button=False, allow_preview=False, object_fit="cover", elem_id="gl_style_list")
     num_selected_style = gr.Number(gl_style_list.selected_index or 0, visible=False, elem_id="txt_selected_style")
     
     def on_select(evt: gr.SelectData):  # SelectData is a subclass of EventData
@@ -166,6 +166,10 @@ def LoraBlock(opt_dict, loraCount=6, showCount=3):
 def RefBlock(opt_base_model, opt_dict, refCount=5, showCount=3):
     blocks = []
     ctrls = []
+
+    def opt_type_change(opt_type, image_refer):
+        range_visible = str(opt_type) not in ["Ref Content", "Base Image"]
+        return gr.CheckboxGroup(visible=opt_type == "Ref Content" and image_refer is not None), gr.Row(visible=range_visible)
     
     def get_tags(opt_type, img_refer):
         words = []
@@ -173,6 +177,19 @@ def RefBlock(opt_base_model, opt_dict, refCount=5, showCount=3):
             words = wd14tagger.tag(img_refer)[:12]
             
         return gr.CheckboxGroup(choices=words, value=words)
+
+    def get_ref_types_inner(opt_base_model):
+        # opt_type_list = list(opts.options['ref_mode'].keys())
+        model_type = "sd15" if opt_base_model and "(sd15)" in str(opt_base_model) else "sdxl"
+        opt_type_list = [k for k, v in opts.options['ref_mode'].items() \
+            if k in ["Ref Content", "Base Image"] or v[1].get(model_type) is not None]
+
+        return opt_type_list
+
+    def get_ref_types(opt_base_model):
+        ref_list = get_ref_types_inner(opt_base_model)
+
+        return gr.Dropdown(choices=ref_list)
 
     def get_models(opt_type, opt_base_model, opt_ctrl_model):
         if opt_type in ["Ref Content", "Base Image"]:
@@ -186,6 +203,8 @@ def RefBlock(opt_base_model, opt_dict, refCount=5, showCount=3):
                 return gr.Dropdown(choices=ctrl_models, value=default_model, visible=len(ctrl_models) > 1)
     
     def get_annotators_inner(opt_type, opt_ctrl_model):
+        if opt_type is None:
+            return None, None
         opt_config = opts.options["ref_mode"][opt_type][1]
         keyword = opt_config.get("keyword", [None])
         keyword = keyword if isinstance(keyword, list) else [keyword]
@@ -204,10 +223,11 @@ def RefBlock(opt_base_model, opt_dict, refCount=5, showCount=3):
             return gr.Dropdown(), gr.Row(visible=False)
         else:
             ctrl_annotators, default_annotator = get_annotators_inner(opt_type, opt_model)
+            visible = len(ctrl_annotators) > 0 and ctrl_annotators != ["ip_adapter"] and ctrl_annotators != ["ip_adapter_face"]
             if opt_annotator in ctrl_annotators:
-                return gr.Dropdown(choices=ctrl_annotators), gr.Row(visible=len(ctrl_annotators) > 0)
+                return gr.Dropdown(choices=ctrl_annotators), gr.Row(visible=visible)
             else:
-                return gr.Dropdown(choices=ctrl_annotators, value=default_annotator), gr.Row(visible=len(ctrl_annotators) > 0)
+                return gr.Dropdown(choices=ctrl_annotators, value=default_annotator), gr.Row(visible=visible)
 
     default_ref_mode = opts.default["ref_mode"]
     ctrl_models, default_model = ui_process.GetControlnets(default_ref_mode, "sdxl")
@@ -215,16 +235,16 @@ def RefBlock(opt_base_model, opt_dict, refCount=5, showCount=3):
 
     for i in range(refCount):
         with gr.Column(min_width=100, visible=i < showCount, elem_classes="panel_ref_block") as block:
-            image_refer = gr.Image(label=opts.title['ref_image'], height=200, elem_id=f"refer_img_{i}")
+            image_refer = gr.Image(label=opts.title['ref_image'], height=280, elem_id=f"refer_img_{i}")
             
-            opt_type_list = list(opts.options['ref_mode'].keys())
-            opt_type_list = [x for x in opt_type_list if i == 0 or x != "Base Image"]
+            opt_type_list = get_ref_types_inner(opt_base_model)
+            # opt_type_list = [x for x in opt_type_list if i == 0 or x != "Base Image"]
             with gr.Row():
                 ckb_enable = gr.Checkbox(label="", value=True, min_width=40, elem_id=f"refer_enable_{i}", scale=1)
                 opt_type = gr.Dropdown(choices=opt_type_list, value=opts.default["ref_mode"], container=False, filterable=False, min_width=80, elem_id=f"refer_type_{i}", elem_classes="gr_dropdown refer_type", scale=9)
 
             sl_rate = gr.Slider(minimum=5, maximum=100, value=60, step=5, label="Ref Rate", visible=False, elem_id=f"refer_rate_{i}")
-            with gr.Row():
+            with gr.Row() as panel_step_range:
                 sl_start_percent = gr.Slider(minimum=0, maximum=100, value=0, step=5, min_width=120, label="Start At %", visible=False, elem_id=f"refer_start_{i}", elem_classes="refer_start_at")
                 sl_end_percent = gr.Slider(minimum=0, maximum=100, value=50, step=5, min_width=120, label="End At %", visible=False, elem_id=f"refer_end_{i}", elem_classes="refer_end_at")
             ckb_words = gr.CheckboxGroup(show_label=False, visible=False, elem_id=f"refer_wd14_{i}", elem_classes="refer_words")
@@ -237,11 +257,12 @@ def RefBlock(opt_base_model, opt_dict, refCount=5, showCount=3):
         opt_dict[f"refer_type_{i}"] = opt_type
 
         opt_type.change(get_tags, [opt_type, image_refer], [ckb_words], queue=False) \
-            .then(lambda x, y: gr.CheckboxGroup(visible=x == "Ref Content" and y is not None), [opt_type, image_refer], ckb_words, queue=False) \
+            .then(opt_type_change, [opt_type, image_refer], [ckb_words, panel_step_range], queue=False) \
             .then(get_models, [opt_type, opt_base_model, opt_ctrl_model], [opt_ctrl_model], queue=False) \
             .then(get_annotators, [opt_type, opt_ctrl_model, opt_annotator], [opt_annotator, panel_annotator], queue=False)
 
-        opt_base_model.change(get_models, [opt_type, opt_base_model, opt_ctrl_model], opt_ctrl_model, queue=False)
+        opt_base_model.change(get_ref_types, opt_base_model, opt_type, queue=False) \
+            .then(get_models, [opt_type, opt_base_model, opt_ctrl_model], opt_ctrl_model, queue=False)
         opt_ctrl_model.change(get_annotators, [opt_type, opt_ctrl_model, opt_annotator], [opt_annotator, panel_annotator], queue=False)
 
         image_refer.change(lambda x: (gr.Slider(visible=x is not None), gr.Slider(visible=x is not None), gr.Slider(visible=x is not None)), image_refer, [sl_rate, sl_start_percent, sl_end_percent], queue=False) \
@@ -293,7 +314,7 @@ def VaryCustomUI(panel_action_btns, panel_action_interface, btn_vary_custom_inte
         btn_vary_custom = gr.Button("Vary", min_width=100, variant="primary", elem_id="btn_vary_custom", elem_classes="btn_action")
         btn_vary_custom_cancel = gr.Button("Close", min_width=100, elem_id="btn_vary_custom_cancel", elem_classes="btn_action")
     
-    btn_vary_custom_interface.click(lambda: gr.Image(value=None), None, img_vary_editor, queue=False) \
+    btn_vary_custom_interface.click(ui_process.VaryClearMask, [num_selected_sample], img_vary_editor, queue=False) \
         .then(ui_process.VaryCustomInterface, [gl_sample_list, num_selected_sample], [panel_action_btns, panel_action_interface, panel_vary_custom, panel_sample_gallery, panel_editor, img_vary_editor], queue=False)
     btn_vary_custom.click(lambda:(gr.Column(visible=True), gr.Column(visible=False), gr.Row(visible=False), gr.Column(visible=True), gr.Column(visible=False)), None, [panel_action_btns, panel_action_interface, panel_vary_custom, panel_sample_gallery, panel_editor], queue=False)
     btn_vary_custom_cancel.click(lambda:(gr.Column(visible=True), gr.Column(visible=False), gr.Row(visible=False), gr.Column(visible=True), gr.Column(visible=False)), None, [panel_action_btns, panel_action_interface, panel_vary_custom, panel_sample_gallery, panel_editor], queue=False)
