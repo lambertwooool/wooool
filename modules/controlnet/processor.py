@@ -40,6 +40,7 @@ from .anime_face_segment import AnimeFaceSegmentor
 from .remove_bg import RemoveBackgroundDetector
 from .teed import TEEDDector
 from .depth_anything import DepthAnythingDetector
+from .kps import KpsDetector
 
 import modules.paths
 from modules.model import controlnet, model_loader, model_patcher
@@ -92,6 +93,7 @@ MODELS = {
     'lama_inpaint': { 'class': LamaInpaintdetector },
     'anime_segmentation': { 'class': AnimeFaceSegmentor },
     'remove_bg': { 'class': RemoveBackgroundDetector },
+    'kps': { 'class': KpsDetector },
 }
 
 MODEL_PARAMS = {
@@ -131,6 +133,7 @@ MODEL_PARAMS = {
     'lama_inpaint': {},
     'anime_segmentation': {},
     'remove_bg': {},
+    'kps': {},
 }
 
 def cached_filepath(processor_id, image, mask, params):

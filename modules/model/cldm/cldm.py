@@ -13,7 +13,7 @@ from modules.model.ldm.modules.diffusionmodules.util import (
 from modules.model.ldm.modules.attention import SpatialTransformer
 from modules.model.ldm.modules.diffusionmodules.openaimodel import UNetModel, TimestepEmbedSequential, ResBlock, Downsample
 from modules.model.ldm.util import exists
-import modules.model.ops
+from modules.model.ops import disable_weight_init as ops
 
 class ControlledUnetModel(UNetModel):
     #implemented in the ldm unet
@@ -53,7 +53,7 @@ class ControlNet(nn.Module):
         adm_in_channels=None,
         transformer_depth_middle=None,
         device=None,
-        operations=modules.model.ops,
+        operations=ops,
     ):
         super().__init__()
         assert use_spatial_transformer == True, "use_spatial_transformer has to be true"

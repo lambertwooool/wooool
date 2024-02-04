@@ -92,6 +92,11 @@ def is_pytorch_attention_enable() -> bool:
 
     return is_available
 
+def device_supports_non_blocking(device):
+    if has_mps():
+        return False #pytorch bug? mps doesn't support non blocking
+    return True
+
 def should_use_fp16(device=None):
     if device == None:
         device = get_torch_device()
@@ -143,6 +148,20 @@ def cast_to_device(tensor, device, dtype, copy=False):
             return tensor.to(device).to(dtype)
     else:
         return tensor.to(dtype).to(device, copy=copy)
+
+# None means no manual cast
+def unet_manual_cast(weight_dtype, inference_device):
+    if weight_dtype == torch.float32:
+        return None
+
+    fp16_supported = should_use_fp16(inference_device)
+    if fp16_supported and weight_dtype == torch.float16:
+        return None
+
+    if fp16_supported:
+        return torch.float16
+    else:
+        return torch.float32
 
 def is_typeof(device, types) -> bool:
     return hasattr(device, 'type') and \

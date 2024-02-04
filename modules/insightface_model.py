@@ -8,8 +8,13 @@ import modules.paths
 insightface.utils.storage.BASE_REPO_URL = "https://github.com/deepinsight/insightface/releases/download/v0.7"
 
 class Analysis():
-    def __init__(self):
-        model = FaceAnalysis(root=modules.paths.face_models_path, download=True, download_zip=True)
+    def __init__(self, name="buffalo_l"):
+        model = FaceAnalysis(
+            name=name,
+            providers=['CUDAExecutionProvider', 'CPUExecutionProvider'],
+            root=modules.paths.face_models_path,
+            download=True,
+            download_zip=True)
         model.prepare(ctx_id=0, det_size=(640, 640))
 
         self.model = model

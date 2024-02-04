@@ -15,7 +15,7 @@ from .util import (
 )
 from ..attention import SpatialTransformer
 from modules.model.ldm.util import exists
-from modules.model import ops
+from modules.model.ops import disable_weight_init as ops
 
 class TimestepBlock(nn.Module):
     """

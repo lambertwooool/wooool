@@ -3,6 +3,8 @@
 ## 0.8.6
 - Support new controlnet, depth anythiny, teed
 - controlnet annotator cache
+- Support new IPAdapters faceid and portrait
+- Better integration of multiple IPAdapters
 
 ## 0.8.5
 - Inpaint adds vary after erase

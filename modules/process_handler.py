@@ -75,7 +75,7 @@ def handler(task):
     size = task.get("size", util.ratios2size(task.get("aspect_ratios", None), pixels ** 2))
     cfg_scale = task.get("cfg_scale", 7.0)
     cfg_scale_to = task.get("cfg_scale_to", cfg_scale)
-    clip_skip = -1 * abs(int(task.get("clip_skip") or 2))
+    clip_skip = -1 * abs(int(task.get("clip_skip") or 1))
 
     detail = float(task.get("detail", 0))
     noise_scale = 1 + detail * 0.05

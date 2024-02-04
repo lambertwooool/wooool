@@ -6,6 +6,7 @@ from modules.model import model_loader, model_detection, model_patcher, model_he
 
 import modules.model.cldm.cldm as cldm
 import modules.model.t2i_adapter.adapter as t2i_adapter
+import modules.model.ops as ops
 
 
 def broadcast_image_to(tensor, target_batch_size, batched_number):
@@ -32,13 +33,13 @@ class ControlBase:
         self.cond_hint = None
         self.strength = 1.0
         self.timestep_percent_range = (0.0, 1.0)
+        self.global_average_pooling = False
         self.timestep_range = None
 
         if device is None:
             device = devices.get_torch_device()
         self.device = device
         self.previous_controlnet = None
-        self.global_average_pooling = False
 
     def set_cond_hint(self, cond_hint, strength=1.0, timestep_percent_range=(0.0, 1.0)):
         self.cond_hint_original = cond_hint
@@ -73,6 +74,7 @@ class ControlBase:
         c.cond_hint_original = self.cond_hint_original
         c.strength = self.strength
         c.timestep_percent_range = self.timestep_percent_range
+        c.global_average_pooling = self.global_average_pooling
 
     def inference_memory_requirements(self, dtype):
         if self.previous_controlnet is not None:
@@ -121,16 +123,21 @@ class ControlBase:
                         if o[i] is None:
                             o[i] = prev_val
                         else:
-                            o[i] += prev_val
+                            if o[i].shape[0] < prev_val.shape[0]:
+                                o[i] = prev_val + o[i]
+                            else:
+                                o[i] += prev_val
         return out
 
 class ControlNet(ControlBase):
-    def __init__(self, control_model, global_average_pooling=False, device=None):
+    def __init__(self, control_model, global_average_pooling=False, device=None, load_device=None, manual_cast_dtype=None):
         super().__init__(device)
         self.control_model = control_model
+        self.load_device = load_device
         self.control_model_wrapped = model_patcher.ModelPatcher(self.control_model, load_device=model_loader.run_device("controlnet"), offload_device=model_loader.offload_device("controlnet"))
         self.global_average_pooling = global_average_pooling
         self.model_sampling_current = None
+        self.manual_cast_dtype = manual_cast_dtype
 
     def get_control(self, x_noisy, t, cond, batched_number):
         control_prev = None
@@ -144,28 +151,31 @@ class ControlNet(ControlBase):
                 else:
                     return None
 
+        dtype = self.control_model.dtype
+        if self.manual_cast_dtype is not None:
+            dtype = self.manual_cast_dtype
+
         output_dtype = x_noisy.dtype
         if self.cond_hint is None or x_noisy.shape[2] * 8 != self.cond_hint.shape[2] or x_noisy.shape[3] * 8 != self.cond_hint.shape[3]:
             if self.cond_hint is not None:
                 del self.cond_hint
             self.cond_hint = None
-            self.cond_hint = model_helper.common_upscale(self.cond_hint_original, x_noisy.shape[3] * 8, x_noisy.shape[2] * 8, 'nearest-exact', "center").to(self.control_model.dtype).to(self.device)
+            self.cond_hint = model_helper.common_upscale(self.cond_hint_original, x_noisy.shape[3] * 8, x_noisy.shape[2] * 8, 'nearest-exact', "center").to(dtype).to(self.device)
         if x_noisy.shape[0] != self.cond_hint.shape[0]:
             self.cond_hint = broadcast_image_to(self.cond_hint, x_noisy.shape[0], batched_number)
-
 
         context = cond['c_crossattn']
         y = cond.get('y', None)
         if y is not None:
-            y = y.to(self.control_model.dtype)
+            y = y.to(dtype)
         timestep = self.model_sampling_current.timestep(t)
         x_noisy = self.model_sampling_current.calculate_input(t, x_noisy)
 
-        control = self.control_model(x=x_noisy.to(self.control_model.dtype), hint=self.cond_hint, timesteps=timestep.float(), context=context.to(self.control_model.dtype), y=y)
+        control = self.control_model(x=x_noisy.to(dtype), hint=self.cond_hint, timesteps=timestep.float(), context=context.to(dtype), y=y)
         return self.control_merge(None, control, control_prev, output_dtype)
 
     def copy(self):
-        c = ControlNet(self.control_model, global_average_pooling=self.global_average_pooling)
+        c = ControlNet(self.control_model, global_average_pooling=self.global_average_pooling, load_device=self.load_device, manual_cast_dtype=self.manual_cast_dtype)
         self.copy_to(c)
         return c
 
@@ -196,10 +206,11 @@ class ControlLoraOps:
             self.bias = None
 
         def forward(self, input):
+            weight, bias = ops.cast_bias_weight(self, input)
             if self.up is not None:
-                return torch.nn.functional.linear(input, self.weight.to(input.device) + (torch.mm(self.up.flatten(start_dim=1), self.down.flatten(start_dim=1))).reshape(self.weight.shape).type(input.dtype), self.bias)
+                return torch.nn.functional.linear(input, weight + (torch.mm(self.up.flatten(start_dim=1), self.down.flatten(start_dim=1))).reshape(self.weight.shape).type(input.dtype), bias)
             else:
-                return torch.nn.functional.linear(input, self.weight.to(input.device), self.bias)
+                return torch.nn.functional.linear(input, weight, bias)
 
     class Conv2d(torch.nn.Module):
         def __init__(
@@ -235,16 +246,11 @@ class ControlLoraOps:
 
 
         def forward(self, input):
+            weight, bias = ops.cast_bias_weight(self, input)
             if self.up is not None:
-                return torch.nn.functional.conv2d(input, self.weight.to(input.device) + (torch.mm(self.up.flatten(start_dim=1), self.down.flatten(start_dim=1))).reshape(self.weight.shape).type(input.dtype), self.bias, self.stride, self.padding, self.dilation, self.groups)
+                return torch.nn.functional.conv2d(input, weight + (torch.mm(self.up.flatten(start_dim=1), self.down.flatten(start_dim=1))).reshape(self.weight.shape).type(input.dtype), bias, self.stride, self.padding, self.dilation, self.groups)
             else:
-                return torch.nn.functional.conv2d(input, self.weight.to(input.device), self.bias, self.stride, self.padding, self.dilation, self.groups)
-
-    def conv_nd(self, dims, *args, **kwargs):
-        if dims == 2:
-            return self.Conv2d(*args, **kwargs)
-        else:
-            raise ValueError(f"unsupported dimensions: {dims}")
+                return torch.nn.functional.conv2d(input, weight, bias, self.stride, self.padding, self.dilation, self.groups)
 
 
 class ControlLora(ControlNet):
@@ -258,17 +264,27 @@ class ControlLora(ControlNet):
         controlnet_config = model.model_config.unet_config.copy()
         controlnet_config.pop("out_channels")
         controlnet_config["hint_channels"] = self.control_weights["input_hint_block.0.weight"].shape[1]
-        controlnet_config["operations"] = ControlLoraOps()
-        self.control_model = cldm.ControlNet(**controlnet_config)
+        # self.manual_cast_dtype = model.manual_cast_dtype
+        self.manual_cast_dtype = None
         dtype = model.get_dtype()
-        self.control_model.to(dtype)
+        if self.manual_cast_dtype is None:
+            class control_lora_ops(ControlLoraOps, ops.disable_weight_init):
+                pass
+        else:
+            class control_lora_ops(ControlLoraOps, ops.manual_cast):
+                pass
+            dtype = self.manual_cast_dtype
+
+        controlnet_config["operations"] = control_lora_ops
+        controlnet_config["dtype"] = dtype
+        self.control_model = cldm.ControlNet(**controlnet_config)
         self.control_model.to(devices.get_torch_device())
         diffusion_model = model.diffusion_model
         sd = diffusion_model.state_dict()
         cm = self.control_model.state_dict()
 
         for k in sd:
-            weight = model_helper.resolve_lowvram_weight(sd[k], diffusion_model, k)
+            weight = sd[k]
             try:
                 model_helper.set_attr(self.control_model, k, weight)
             except:
@@ -365,6 +381,10 @@ def load_controlnet(ckpt_path, model=None):
     if controlnet_config is None:
         unet_dtype = devices.dtype()
         controlnet_config = model_detection.model_config_from_unet(controlnet_data, prefix, unet_dtype, True).unet_config
+    load_device = model_loader.run_device("controlnet")
+    manual_cast_dtype = devices.unet_manual_cast(unet_dtype, load_device)
+    if manual_cast_dtype is not None:
+        controlnet_config["operations"] = ops.manual_cast
     controlnet_config.pop("out_channels")
     controlnet_config["hint_channels"] = controlnet_data["{}input_hint_block.0.weight".format(prefix)].shape[1]
     control_model = cldm.ControlNet(**controlnet_config)
@@ -392,15 +412,16 @@ def load_controlnet(ckpt_path, model=None):
     else:
         missing, unexpected = control_model.load_state_dict(controlnet_data, strict=False)
     print(missing, unexpected)
-
-    control_model = control_model.to(unet_dtype)
+    
+    if devices.dtype != torch.float32:
+        control_model.half().eval()
 
     global_average_pooling = False
     filename = os.path.splitext(ckpt_path)[0]
     if filename.endswith("_shuffle") or filename.endswith("_shuffle_fp16"): #TODO: smarter way of enabling global_average_pooling
         global_average_pooling = True
 
-    control = ControlNet(control_model, global_average_pooling=global_average_pooling)
+    control = ControlNet(control_model, global_average_pooling=global_average_pooling, load_device=load_device, manual_cast_dtype=manual_cast_dtype)
     return control
 
 class T2IAdapter(ControlBase):

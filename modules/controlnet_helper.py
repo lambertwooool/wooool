@@ -1,4 +1,5 @@
 import os
+import cv2
 import numpy as np
 import torch
 from PIL import Image
@@ -29,13 +30,18 @@ def processor(controlnets, unet_model, width, height, image_mask):
         cn_type, cn_img, cn_weight, cn_model_name, start_percent, end_percent = cn
         cn_items = cn_type.split(",")
         cn_model = None
+        cn_img = cv2.cvtColor(cn_img, cv2.COLOR_BGR2RGB)
 
         for cn_item in cn_items:
-            if cn_item in ctrl_procs.keys():
+            # if cn_item in ctrl_procs.keys():
+            if cn_model_name in ctrl_procs.keys():
                 if cn_item in ["lama_inpaint"]:
                     cn_mask = image_mask.copy()
                     cn_mask = cn_mask[..., np.newaxis]
                     cn_img = np.concatenate([cn_img[:cn_mask.shape[0], :cn_mask.shape[1], :], cn_mask], axis=-1)
+
+                # ctrl_proc = ctrl_procs[cn_item]
+                ctrl_proc = ctrl_procs[cn_model_name]
 
                 if cn_item in ["ip_adapter", "ip_adapter_face"]:
                     if cn_item == "ip_adapter_face":
@@ -45,15 +51,15 @@ def processor(controlnets, unet_model, width, height, image_mask):
                     ip_img = util.resize_image(cn_img, width=224, height=224) # , resize_mode=0
                     util.save_temp_image(ip_img, f"{cn_item}_224.png")
                     clip_vision_model = clip_vision_model or clip_vision.load(clip_vision_path)
-                    ip_proc = ctrl_procs[cn_item].processor
-                    ip_proc.preprocess(ip_img, clip_vision_model)
+                    ip_proc = ctrl_proc.processor
+                    image_emb, uncond_image_emb = ip_proc.preprocess(ip_img, clip_vision_model)
                     # ip_adapters.append((ip_proc.preprocess(ip_img, clip_vision_model), 1, cn_weight))
-                    unet_model = ip_proc.patch_model(unet_model, cn_weight)
+                    unet_model = ip_proc.patch_model(unet_model, image_emb, uncond_image_emb, cn_weight, start_percent, end_percent)
                 else:
                     cn_img = util.resize_image(cn_img, width=width, height=height)
-                    cn_img = util.HWC3(ctrl_procs[cn_item](cn_img))
+                    cn_img = util.HWC3(ctrl_proc(cn_img))
                     if cn_model is None:
-                        cn_model = ctrl_procs[cn_item].load_controlnet(cn_model_name)
+                        cn_model = ctrl_proc.load_controlnet(cn_model_name)
 
                 util.save_temp_image(cn_img, f"{cn_item}.png")
             else:
@@ -76,7 +82,8 @@ def load_controlnets_by_task(cn_types):
     for cn_type, cn_image, cn_weight, cn_model_name, start_percent, end_percent in cn_types:
         cn_items = cn_type.split(",")
         for cn_item in cn_items:
-            if cn_item not in ctrls:
+            # if cn_item not in ctrls:
+            if cn_model_name not in ctrls:
                 if cn_item in controlnet_processor.model_keys() and cn_model_name is not None and end_percent > start_percent:
                     if cn_item in ["ip_adapter", "ip_adapter_face"]:
                         proc = controlnet_processor(cn_item)
@@ -85,7 +92,7 @@ def load_controlnets_by_task(cn_types):
                     else:
                         proc = controlnet_processor(cn_item)
                     
-                    ctrls[cn_item] = proc
+                    ctrls[cn_model_name] = proc
 
     return ctrls
 

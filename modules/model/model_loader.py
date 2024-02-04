@@ -95,20 +95,21 @@ def load_models_gpu(models, memory_required=0):
     for device in models_to_load:
         # Prioritize switch model over load model
         all_load_models = models_to_load[device]["switch"] + models_to_load[device]["load"]
-        is_loaded = loaded_model in current_loaded_models
 
         if device != device_cpu:
             memory_required = sum([x[1] for x in all_load_models])
             free_memory(memory_required * 1.3 + extra_mem, device, models_already_loaded)
 
         for loaded_model, use_memory in all_load_models:
+            is_loaded = loaded_model in current_loaded_models
             model = loaded_model.model
             device_to = device
 
             if device != device_cpu:
                 free_ram, free_vram = devices.get_free_memory(get_all=True)
                 # when not enough vram to load model, try free ram to load
-                if use_memory > (free_vram - extra_mem) and not free_memory(use_memory + extra_mem, device, models_already_loaded):
+                keep_loaded = [x for x in models_already_loaded] + [x[0] for x in all_load_models]
+                if use_memory > (free_vram - extra_mem) and not free_memory(use_memory + extra_mem, device, keep_loaded):
                     # lowvram_model_memory = int(max(256 * (1024 ** 2), (current_free_mem - 1024 ** 3) / 1.3 ))
                     # device_to = device_cpu
                     print("memory lower ...", [(x.real_model.__class__.__name__, sys.getrefcount(x)) for x in current_loaded_models])

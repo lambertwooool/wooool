@@ -102,7 +102,7 @@ options["quality_setting"] = {
 options["ref_mode"] = {
 	"Ref All": (	"ip_adapter",
 			 		{	"sdxl": "ip-adapter-plus_sdxl_vit-h.bin", "sd15": "ip-adapter_sd15_plus.pth",
-	   					"keyword": [r"ip adapter.*plus(?! face)", r"tile"],
+	   					"keyword": [r"ip adapter(?!.*(face|instant id))", r"tile"],
 						"annotator": ["ip_adapter", "tile"]
 					}),
 	"Ref Content": ("content", { "sdxl": None, "sd15": None, "keyword": None }),
@@ -118,7 +118,7 @@ options["ref_mode"] = {
 					}),
     "Ref Face": (	"ip_adapter_face",
 				 	{	"sdxl": "ip-adapter-plus-face_sdxl_vit-h.bin", "sd15": "ip-adapter-plus-face_sd15.bin",
-	   					"keyword": [r"(ip adapter plus.*face|ip adapter face.*plus)", r"^(?!.*xl)(?!.*animal)(?=.*openpose)(?!.*xl).*$"],
+	   					"keyword": [r"ip adapter.*(face)", r"^(?!.*xl)(?!.*animal)(?=.*openpose)(?!.*xl).*$"],
 						"annotator": ["ip_adapter_face", "dwpose_face"]
 					}),
 	"Ref Pose": (	"dwpose",
@@ -234,7 +234,7 @@ title["subseed_strength"] = "Subseed Strength %"
 default["subseed_strength"] = 100
 
 # Clip Skip
-options["clip_skip"] = (0, 10, 1)
+options["clip_skip"] = (1, 10, 1)
 mul["clip_skip"] = -1
 title["clip_skip"] = "Clip Skip"
 default["clip_skip"] = 5

@@ -10,7 +10,7 @@ from .diffusionmodules.util import checkpoint
 from .sub_quadratic_attention import efficient_dot_product_attention
 
 from modules import devices
-from modules.model import ops
+from modules.model.ops import disable_weight_init as ops
 
 if devices.is_xformers_enable():
     import xformers
@@ -310,6 +310,23 @@ else:
 #         print("Using sub quadratic optimization for cross attention, if you have memory or speed issues try using: --use-split-cross-attention")
 #         optimized_attention = attention_sub_quad
 
+optimized_attention_masked = optimized_attention
+
+def optimized_attention_for_device(device, mask=False, small_input=False):
+    if small_input:
+        if devices.is_pytorch_attention_enable():
+            return attention_pytorch #TODO: need to confirm but this is probably slightly faster for small inputs in all cases
+        else:
+            return attention_basic
+
+    if device == torch.device("cpu"):
+        return attention_sub_quad
+
+    if mask:
+        return optimized_attention_masked
+
+    return optimized_attention
+
 class CrossAttention(nn.Module):
     def __init__(self, query_dim, context_dim=None, heads=8, dim_head=64, dropout=0., dtype=None, device=None, operations=ops):
         super().__init__()
@@ -335,58 +352,80 @@ class CrossAttention(nn.Module):
         else:
             v = self.to_v(context)
 
-        out = optimized_attention(q, k, v, self.heads, mask)
+        if mask is None:
+            out = optimized_attention(q, k, v, self.heads)
+        else:
+            out = optimized_attention_masked(q, k, v, self.heads, mask)
         return self.to_out(out)
 
 
 class BasicTransformerBlock(nn.Module):
-    def __init__(self, dim, n_heads, d_head, dropout=0., context_dim=None, gated_ff=True, checkpoint=True,
-                 disable_self_attn=False, dtype=None, device=None, operations=ops):
+    def __init__(self, dim, n_heads, d_head, dropout=0., context_dim=None, gated_ff=True, checkpoint=True, ff_in=False, inner_dim=None,
+                 disable_self_attn=False, disable_temporal_crossattention=False, switch_temporal_ca_to_sa=False, dtype=None, device=None, operations=ops):
         super().__init__()
+
+        self.ff_in = ff_in or inner_dim is not None
+        if inner_dim is None:
+            inner_dim = dim
+
+        self.is_res = inner_dim == dim
+
+        if self.ff_in:
+            self.norm_in = operations.LayerNorm(dim, dtype=dtype, device=device)
+            self.ff_in = FeedForward(dim, dim_out=inner_dim, dropout=dropout, glu=gated_ff, dtype=dtype, device=device, operations=operations)
+
         self.disable_self_attn = disable_self_attn
-        self.attn1 = CrossAttention(query_dim=dim, heads=n_heads, dim_head=d_head, dropout=dropout,
+        self.attn1 = CrossAttention(query_dim=inner_dim, heads=n_heads, dim_head=d_head, dropout=dropout,
                               context_dim=context_dim if self.disable_self_attn else None, dtype=dtype, device=device, operations=operations)  # is a self-attention if not self.disable_self_attn
-        self.ff = FeedForward(dim, dropout=dropout, glu=gated_ff, dtype=dtype, device=device, operations=operations)
-        self.attn2 = CrossAttention(query_dim=dim, context_dim=context_dim,
-                              heads=n_heads, dim_head=d_head, dropout=dropout, dtype=dtype, device=device, operations=operations)  # is self-attn if context is none
-        self.norm1 = nn.LayerNorm(dim, dtype=dtype, device=device)
-        self.norm2 = nn.LayerNorm(dim, dtype=dtype, device=device)
-        self.norm3 = nn.LayerNorm(dim, dtype=dtype, device=device)
+        self.ff = FeedForward(inner_dim, dim_out=dim, dropout=dropout, glu=gated_ff, dtype=dtype, device=device, operations=operations)
+
+        if disable_temporal_crossattention:
+            if switch_temporal_ca_to_sa:
+                raise ValueError
+            else:
+                self.attn2 = None
+        else:
+            context_dim_attn2 = None
+            if not switch_temporal_ca_to_sa:
+                context_dim_attn2 = context_dim
+
+            self.attn2 = CrossAttention(query_dim=inner_dim, context_dim=context_dim_attn2,
+                                heads=n_heads, dim_head=d_head, dropout=dropout, dtype=dtype, device=device, operations=operations)  # is self-attn if context is none
+            self.norm2 = operations.LayerNorm(inner_dim, dtype=dtype, device=device)
+
+        self.norm1 = operations.LayerNorm(inner_dim, dtype=dtype, device=device)
+        self.norm3 = operations.LayerNorm(inner_dim, dtype=dtype, device=device)
         self.checkpoint = checkpoint
         self.n_heads = n_heads
         self.d_head = d_head
+        self.switch_temporal_ca_to_sa = switch_temporal_ca_to_sa
 
     def forward(self, x, context=None, transformer_options={}):
         return checkpoint(self._forward, (x, context, transformer_options), self.parameters(), self.checkpoint)
 
     def _forward(self, x, context=None, transformer_options={}):
         extra_options = {}
-        block = None
-        block_index = 0
-        if "current_index" in transformer_options:
-            extra_options["transformer_index"] = transformer_options["current_index"]
-        if "block_index" in transformer_options:
-            block_index = transformer_options["block_index"]
-            extra_options["block_index"] = block_index
-        if "original_shape" in transformer_options:
-            extra_options["original_shape"] = transformer_options["original_shape"]
-        if "block" in transformer_options:
-            block = transformer_options["block"]
-            extra_options["block"] = block
-        if "cond_or_uncond" in transformer_options:
-            extra_options["cond_or_uncond"] = transformer_options["cond_or_uncond"]
-        if "patches" in transformer_options:
-            transformer_patches = transformer_options["patches"]
-        else:
-            transformer_patches = {}
+        block = transformer_options.get("block", None)
+        block_index = transformer_options.get("block_index", 0)
+        transformer_patches = {}
+        transformer_patches_replace = {}
+
+        for k in transformer_options:
+            if k == "patches":
+                transformer_patches = transformer_options[k]
+            elif k == "patches_replace":
+                transformer_patches_replace = transformer_options[k]
+            else:
+                extra_options[k] = transformer_options[k]
 
         extra_options["n_heads"] = self.n_heads
         extra_options["dim_head"] = self.d_head
 
-        if "patches_replace" in transformer_options:
-            transformer_patches_replace = transformer_options["patches_replace"]
-        else:
-            transformer_patches_replace = {}
+        if self.ff_in:
+            x_skip = x
+            x = self.ff_in(self.norm_in(x))
+            if self.is_res:
+                x += x_skip
 
         n = self.norm1(x)
         if self.disable_self_attn:
@@ -435,31 +474,34 @@ class BasicTransformerBlock(nn.Module):
             for p in patch:
                 x = p(x, extra_options)
 
-        n = self.norm2(x)
-
-        context_attn2 = context
-        value_attn2 = None
-        if "attn2_patch" in transformer_patches:
-            patch = transformer_patches["attn2_patch"]
-            value_attn2 = context_attn2
-            for p in patch:
-                n, context_attn2, value_attn2 = p(n, context_attn2, value_attn2, extra_options)
-
-        attn2_replace_patch = transformer_patches_replace.get("attn2", {})
-        block_attn2 = transformer_block
-        if block_attn2 not in attn2_replace_patch:
-            block_attn2 = block
-
-        if block_attn2 in attn2_replace_patch:
-            if value_attn2 is None:
+        if self.attn2 is not None:
+            n = self.norm2(x)
+            if self.switch_temporal_ca_to_sa:
+                context_attn2 = n
+            else:
+                context_attn2 = context
+            value_attn2 = None
+            if "attn2_patch" in transformer_patches:
+                patch = transformer_patches["attn2_patch"]
                 value_attn2 = context_attn2
-            n = self.attn2.to_q(n)
-            context_attn2 = self.attn2.to_k(context_attn2)
-            value_attn2 = self.attn2.to_v(value_attn2)
-            n = attn2_replace_patch[block_attn2](n, context_attn2, value_attn2, extra_options)
-            n = self.attn2.to_out(n)
-        else:
-            n = self.attn2(n, context=context_attn2, value=value_attn2)
+                for p in patch:
+                    n, context_attn2, value_attn2 = p(n, context_attn2, value_attn2, extra_options)
+
+            attn2_replace_patch = transformer_patches_replace.get("attn2", {})
+            block_attn2 = transformer_block
+            if block_attn2 not in attn2_replace_patch:
+                block_attn2 = block
+
+            if block_attn2 in attn2_replace_patch:
+                if value_attn2 is None:
+                    value_attn2 = context_attn2
+                n = self.attn2.to_q(n)
+                context_attn2 = self.attn2.to_k(context_attn2)
+                value_attn2 = self.attn2.to_v(value_attn2)
+                n = attn2_replace_patch[block_attn2](n, context_attn2, value_attn2, extra_options)
+                n = self.attn2.to_out(n)
+            else:
+                n = self.attn2(n, context=context_attn2, value=value_attn2)
 
         if "attn2_output_patch" in transformer_patches:
             patch = transformer_patches["attn2_output_patch"]
@@ -467,7 +509,12 @@ class BasicTransformerBlock(nn.Module):
                 n = p(n, extra_options)
 
         x += n
-        x = self.ff(self.norm3(x)) + x
+        if self.is_res:
+            x_skip = x
+        x = self.ff(self.norm3(x))
+        if self.is_res:
+            x += x_skip
+
         return x
 
 
