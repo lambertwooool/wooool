@@ -145,7 +145,7 @@
     "Quality": "Quality",
     "Sampler": "Sampler",
     "Scheduler": "Scheduler",
-    "Ref Rate": "Reference rate",
+    "Ref Rate %": "Reference rate %",
     "Weight": "Weight",
     "Professional Mode": "Professional Mode",
     "Input prompt.": "Please describe the characters, scene, or other content in the image.",

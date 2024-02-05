@@ -243,10 +243,10 @@ def RefBlock(opt_base_model, opt_dict, refCount=5, showCount=3):
                 ckb_enable = gr.Checkbox(label="", value=True, min_width=40, elem_id=f"refer_enable_{i}", scale=1)
                 opt_type = gr.Dropdown(choices=opt_type_list, value=opts.default["ref_mode"], container=False, filterable=False, min_width=80, elem_id=f"refer_type_{i}", elem_classes="gr_dropdown refer_type", scale=9)
 
-            sl_rate = gr.Slider(minimum=5, maximum=100, value=60, step=5, label="Ref Rate", visible=False, elem_id=f"refer_rate_{i}")
+            sl_rate = gr.Slider(minimum=5, maximum=150, value=60, step=5, label="Ref Rate %", visible=False, elem_id=f"refer_rate_{i}")
             with gr.Row() as panel_step_range:
                 sl_start_percent = gr.Slider(minimum=0, maximum=100, value=0, step=5, min_width=120, label="Start At %", visible=False, elem_id=f"refer_start_{i}", elem_classes="refer_start_at")
-                sl_end_percent = gr.Slider(minimum=0, maximum=100, value=50, step=5, min_width=120, label="End At %", visible=False, elem_id=f"refer_end_{i}", elem_classes="refer_end_at")
+                sl_end_percent = gr.Slider(minimum=0, maximum=100, value=80, step=5, min_width=120, label="End At %", visible=False, elem_id=f"refer_end_{i}", elem_classes="refer_end_at")
             ckb_words = gr.CheckboxGroup(show_label=False, visible=False, elem_id=f"refer_wd14_{i}", elem_classes="refer_words")
             
             opt_ctrl_model = gr.Dropdown(choices=ctrl_models, value=default_model, visible=(len(ctrl_models) > 1),  container=False, filterable=False, min_width=80, elem_id=f"ref_ctrl_model_{i}", elem_classes="gr_dropdown")

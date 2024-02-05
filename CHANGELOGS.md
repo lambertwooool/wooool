@@ -4,6 +4,7 @@
 - Support new controlnet, depth anythiny, teed
 - controlnet annotator cache
 - Support new IPAdapters faceid and portrait
+- IPAdapter can use the start and end percent
 - Better integration of multiple IPAdapters
 
 ## 0.8.5

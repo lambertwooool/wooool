@@ -145,7 +145,7 @@
     "Quality": "质量",
     "Sampler": "采样器",
     "Scheduler": "调度器",
-    "Ref Rate": "参考率",
+    "Ref Rate %": "参考率 %",
     "Weight": "权重",
     "Professional Mode": "专家模式",
     "Input prompt.": "请描述画面中的人物、场景或其他内容。(选填)",
