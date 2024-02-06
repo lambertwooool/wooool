@@ -78,6 +78,7 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
         "fixed_seed": fixed_seed,
         "subseed_strength": gen_opts.pop("subseed_strength"),
         "quality": gen_opts.pop("quality"),
+        "style_aligned_scale": gen_opts.pop("style_aligned"),
         # "step_scale": gen_opts.pop("step_scale", 1.0),
         # "refiner_step_scale": gen_opts.pop("refiner_step_scale", 1.0),
         "steps": (gen_opts.pop("step_base"), gen_opts.pop("step_refiner")) if gen_opts.pop("custom_step") else (None, None),

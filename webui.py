@@ -166,6 +166,8 @@ with gr.Blocks(theme=my_theme, title=app_name).queue() as wooool:
                             opt_refiner_model = gr.Dropdown(choices=[opts.title["disable_refiner"]] + ui_process.GetRefinerModels("sdxl"), value=model_helper.default_refiner_name or opts.title["disable_refiner"], label="Refiner Model", filterable=False, elem_id=f"opt_refiner_model", elem_classes="gr_dropdown")
                             btn_refresh_model = gr.Button("🔄 Refresh Models", elem_id="btn_refresh_model")
                             opt_dict = opt_dict | ui_compent.MakeSlider(["denoise"])
+                            opt_dict = opt_dict | ui_compent.MakeSlider(["style_aligned"])
+
                             btn_refresh_model.click(ui_process.RefreshModels, None, [opt_base_model, opt_vary_model, opt_refiner_model])
                             # opt_dict = opt_dict | ui_compent.MakeOpts(["single_vae"], opt_type="Radio")
                         with gr.Column(scale=20, min_width=200):

@@ -59,6 +59,9 @@ def get_base_model(model_path):
         shared.xl_base = (model_path, xl_base)
         print(f'Base model loaded: {model_path}')
     
+    if "patches" in xl_base.unet.model_options["transformer_options"]:
+        xl_base.unet.model_options["transformer_options"].pop("patches")
+    
     return xl_base
 
 def get_refiner_model(model_path):

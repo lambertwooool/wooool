@@ -6,6 +6,7 @@
 - Support new IPAdapters faceid and portrait
 - IPAdapter can use the start and end percent
 - Better integration of multiple IPAdapters
+- Use style aligned when generating multiple images
 
 ## 0.8.5
 - Inpaint adds vary after erase

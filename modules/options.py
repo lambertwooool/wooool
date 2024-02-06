@@ -187,6 +187,12 @@ mul["cfg_scale_to"] = 1
 title["cfg_scale_to"] = "CFG Work-up to"
 default["cfg_scale_to"] = 9
 
+# Style Aligned
+options["style_aligned"] = (0, 100, 5)
+mul["style_aligned"] = 0.01
+title["style_aligned"] = "Style Aligned %"
+default["style_aligned"] = 0
+
 # File Format
 options["file_format"] = {
 	"JPEG": "jpeg",

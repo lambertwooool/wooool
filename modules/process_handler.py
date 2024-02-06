@@ -14,7 +14,7 @@ from PIL import Image
 
 import modules.options as opts
 import modules.paths
-from modules import clip_helper, civitai, core, controlnet_helper, devices, latent_interposer, prompt_helper, shared, util, vae_helper, upscaler_esrgan, gfpgan_model
+from modules import clip_helper, civitai, core, controlnet_helper, devices, style_aligned, prompt_helper, shared, util, vae_helper, upscaler_esrgan, gfpgan_model
 from modules.model.model_base import BaseModel, SDXL, SDXLRefiner
 from modules.model import model_loader, model_helper, sample, samplers
 from modules.controlnet.processor import Processor as controlnet_processor
@@ -87,6 +87,7 @@ def handler(task):
         more_art_lora = { "sd15": "", "sdxl": "xl_more_art-full_v1.safetensors" }[sd_type]
         loras.append((more_art_lora, more_art, ""))
     denoise = round(task.get("denoise", 1.0), 2)
+    style_aligned_scale = round(task.get("style_aligned_scale", 0.0), 2)
     sampler = task.get("sampler", "") or default_sampler
     scheduler = task.get("scheduler", "") or default_scheduler
     file_format = task.get("file_format", "jpeg").lower()   
@@ -138,6 +139,7 @@ def handler(task):
             '\n[clip_skip]:', clip_skip, \
             '\n[noise_scale]:', noise_scale, \
             '\n[denoise]:', denoise, \
+            '\n[style_aligned_scale]:', style_aligned_scale, \
             '\n[batch_size]:', batch_size, \
             '\n[quality]:', quality, \
             '\n[steps]:', steps, \
@@ -177,6 +179,7 @@ def handler(task):
                 image=(image, mask),
                 noise_scale=noise_scale,
                 denoise=denoise,
+                style_aligned_scale=style_aligned_scale,
                 tiled=tiled,
                 cfg_scale=cfg_scale,
                 cfg_scale_to=cfg_scale_to,
@@ -253,7 +256,7 @@ class UserStopException(Exception):
 @torch.inference_mode()
 def process_diffusion(task, base_path, refiner_path, positive, negative, steps, skip_step, size, seeds, subseeds,
         callback, sampler_name, scheduler_name,
-        latent=None, image=None, denoise=1.0, noise_scale=1.0, cfg_scale=7.0, cfg_scale_to=7.0, batch_size=1, loras=[], controlnets=[],
+        latent=None, image=None, denoise=1.0, noise_scale=1.0, cfg_scale=7.0, cfg_scale_to=7.0, style_aligned_scale=0.0, batch_size=1, loras=[], controlnets=[],
         tiled=False, round_batch_size=8, subseed_strength=1.0, clip_skip=0):
 
     devices.torch_gc()
@@ -437,6 +440,14 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
     latent_image = latent["samples"]
     latent_mask = latent.get("noise_mask", None)
 
+    use_style_align = True if batch_size > 1 and style_aligned_scale > 0 else False
+
+    if use_style_align:
+        # style_patch = style_aligned.StyleAlignedPatch()
+        # style_patch.register_shared_norm(unet_model.model, True, True)
+        style_args = style_aligned.StyleAlignedParams(adain_queries=True, adain_keys=True, adain_values=True)
+        unet_model.set_model_attn1_patch(style_aligned.SharedAttentionProcessor(unet_model, model_type, style_args, scale=style_aligned_scale, start_at=0.0, end_at=style_aligned_scale))
+
     # latent_convert = None
     # if model_type != refiner_model_type and step_refiner > 0:
     #     latent_convert = latent_interposer.LatentInterposer(model_type, refiner_model_type)
@@ -459,6 +470,10 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
                 # sub_seed = cur_seed + i
                 sub_noise = sample.prepare_noise(latent_image, cur_subseed, None)
                 cur_noise = util.slerp(subseed_strength, cur_noise, sub_noise)
+            
+            if use_style_align:
+                latent_image = latent_image.repeat(batch_size, 1, 1, 1)
+                cur_noise = cur_noise.repeat(batch_size, 1, 1, 1)
 
             if step_base > start_step:
                 sampled_latent = sample.sample(
@@ -563,7 +578,7 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
             if 'refiner_positive' in vars(): del refiner_positive, refiner_negative
             model_loader.free_memory(1024 ** 4, devices.get_torch_device())            
 
-        if task.get("stop", False):
+        if task.get("stop", False) or use_style_align:
             break
 
     del ctrls, unet_model
