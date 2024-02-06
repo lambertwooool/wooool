@@ -16,6 +16,14 @@ device_config = {
     "face": (True, False),
 }
 
+def module_size(module):
+    module_mem = 0
+    sd = module.state_dict()
+    for k in sd:
+        t = sd[k]
+        module_mem += t.nelement() * t.element_size()
+    return module_mem
+
 class LoadedModel:
     def __init__(self, model):
         self.model = model

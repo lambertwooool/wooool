@@ -8,6 +8,7 @@ import subprocess
 import sys
 import version
 import warnings
+import torchvision.transforms
 
 from modules import shared
 
@@ -22,6 +23,7 @@ REINSTALL_ALL = False
 logging.getLogger("torch.distributed.nn").setLevel(logging.ERROR)  # sshh...
 logging.getLogger("xformers").addFilter(lambda record: 'A matching Triton is not available' not in record.getMessage())
 warnings.filterwarnings(action="ignore", category=UserWarning, module="torchvision.transforms.functional_tensor")
+torchvision.transforms.functional_tensor = torchvision.transforms.functional
 
 re_requirement = re.compile(r"\s*([-_a-zA-Z0-9]+)\s*(?:==\s*([-+_.a-zA-Z0-9]+))?\s*")
 
@@ -34,7 +36,7 @@ print("Wooool Version:", version.version)
 def prepare_environment():
     torch_index_url = os.environ.get('TORCH_INDEX_URL', "https://download.pytorch.org/whl/cu121")
     torch_command = os.environ.get('TORCH_COMMAND',
-                                   f"pip install torch==2.1.0 torchvision==0.16.0 --extra-index-url {torch_index_url}")
+                                   f"pip install torch==2.2.0 torchvision==0.17.0 --extra-index-url {torch_index_url}")
     requirements_file = os.environ.get('REQS_FILE', "requirements.txt")
 
     print(f"Python {sys.version}")
@@ -43,7 +45,7 @@ def prepare_environment():
         run(f'"{python}" -m {torch_command}', "Installing torch and torchvision", "Couldn't install torch", live=True)
 
     if REINSTALL_ALL or not is_installed("xformers"):
-        xformers_package = os.environ.get('XFORMERS_PACKAGE', 'xformers==0.0.20')
+        xformers_package = os.environ.get('XFORMERS_PACKAGE', 'xformers==0.0.24')
         if platform.system() == "Windows":
             if platform.python_version().startswith("3.10"):
                 run_pip(f"install -U -I --no-deps {xformers_package}", "xformers", live=True)

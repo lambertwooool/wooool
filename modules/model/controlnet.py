@@ -413,8 +413,7 @@ def load_controlnet(ckpt_path, model=None):
         missing, unexpected = control_model.load_state_dict(controlnet_data, strict=False)
     print(missing, unexpected)
     
-    if devices.dtype != torch.float32:
-        control_model.half().eval()
+    control_model.to(unet_dtype)
 
     global_average_pooling = False
     filename = os.path.splitext(ckpt_path)[0]
