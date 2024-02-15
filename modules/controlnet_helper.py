@@ -21,6 +21,7 @@ def get_controlnets():
 def processor(controlnets, unet_model, width, height, image_mask):
     ctrl_procs = load_controlnets_by_task(controlnets)
     ctrls = []
+    ip_procs = []
 
     clip_vision_path = os.path.join(modules.paths.clip_vision_models_path, 'clip_vision_vit_h.safetensors')
     clip_vision_model = None
@@ -55,6 +56,7 @@ def processor(controlnets, unet_model, width, height, image_mask):
                     image_emb, uncond_image_emb = ip_proc.preprocess(ip_img, clip_vision_model)
                     # ip_adapters.append((ip_proc.preprocess(ip_img, clip_vision_model), 1, cn_weight))
                     unet_model = ip_proc.patch_model(unet_model, image_emb, uncond_image_emb, cn_weight, start_percent, end_percent)
+                    ip_procs.append(ip_proc)
                 else:
                     cn_img = util.resize_image(cn_img, width=width, height=height)
                     cn_img = util.HWC3(ctrl_proc(cn_img))
@@ -67,14 +69,11 @@ def processor(controlnets, unet_model, width, height, image_mask):
         
         
         if cn_model is not None:
-            # start_percent = 0
-            # end_percent = 0.5
             if "recolor" in cn_model_name:
                 end_percent = 1.0
-            # ctrls.append((cn_item, cn_img, cn_weight, cn_model, ctrl_procs[cn_item]))
             ctrls.append((cn_type, cn_img, cn_weight, cn_model, start_percent, end_percent))
     
-    return ctrls, unet_model
+    return ctrls, ip_procs, unet_model
 
 def load_controlnets_by_task(cn_types):
     ctrls = {}

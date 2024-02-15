@@ -59,3 +59,6 @@ class IPAdapterModel(torch.nn.Module):
         uncond_clip_image_embeds = torch.zeros_like(clip_image_embeds)
 
         return clip_image_embeds, uncond_clip_image_embeds
+    
+    def apply_conds(self, positive_cond, negative_cond, cond, uncond):
+        return positive_cond, negative_cond

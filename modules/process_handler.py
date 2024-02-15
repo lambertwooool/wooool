@@ -299,6 +299,7 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
     refiner_unet_model = xl_refiner.unet if xl_refiner is not None else None
     
     vae_model = xl_refiner.vae if xl_refiner is not None and xl_refiner.vae is not None else xl_base_patched.vae
+    model_loader.load_model_gpu(vae_model.patcher)
 
     width, height = size
     image_pixel, image_mask = image
@@ -368,9 +369,10 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
 
     if controlnets:
         progress_output(task, "controlnet")
-        ctrls, unet_model = controlnet_helper.processor(controlnets, unet_model, width, height, image_mask)
+        ctrls, ip_procs, unet_model = controlnet_helper.processor(controlnets, unet_model, width, height, image_mask)
     else:
         ctrls = []
+        ip_procs = []
     
     sampled_latents = []
     vae_worker_running = True
@@ -458,7 +460,11 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
         while not (positive_cond and negative_cond):
             time.sleep(0.01)
         
-        cur_positive_cond, cur_negative_cond = controlnet_helper.apply_controlnets(positive_cond.pop(0), negative_cond.pop(0), ctrls)
+        cur_positive_cond, cur_negative_cond = positive_cond.pop(0), negative_cond.pop(0)
+        for ip_proc in ip_procs:
+            cur_positive_cond, cur_negative_cond = ip_proc.apply_conds(cur_positive_cond, cur_negative_cond)
+        cur_positive_cond, cur_negative_cond = controlnet_helper.apply_controlnets(cur_positive_cond, cur_negative_cond, ctrls)
+
         cur_seed = seeds.pop(0)
         cur_subseed = subseeds.pop(0)
 

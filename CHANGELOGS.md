@@ -2,6 +2,7 @@
 
 ## 0.8.7
 - Base and Controlnet Model use FP8
+- Support instant id
 
 ## 0.8.6
 - Support new controlnet, depth anythiny, teed

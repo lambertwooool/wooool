@@ -118,8 +118,8 @@ options["ref_mode"] = {
 					}),
     "Ref Face": (	"ip_adapter_face",
 				 	{	"sdxl": "ip-adapter-plus-face_sdxl_vit-h.bin", "sd15": "ip-adapter-plus-face_sd15.bin",
-	   					"keyword": [r"ip adapter.*(face)", r"^(?!.*xl)(?!.*animal)(?=.*openpose)(?!.*xl).*$"],
-						"annotator": ["ip_adapter_face", "dwpose_face"]
+	   					"keyword": [r"ip adapter.*(face|instant id)", r"control.*instant id", r"^(?!.*xl)(?!.*animal)(?=.*openpose)(?!.*xl).*$"],
+						"annotator": ["ip_adapter_face", "kps", "dwpose_face"]
 					}),
 	"Ref Pose": (	"dwpose",
 			  		{ 	"sdxl": "thibaud_xl_openpose_256lora.safetensors", "sd15": "control_v11p_sd15_openpose.pth",

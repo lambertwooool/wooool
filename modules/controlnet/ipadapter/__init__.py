@@ -28,7 +28,8 @@ def NPToTensor(image):
 
 class IPAdapterDetector:
     def __init__(self) -> None:
-        pass
+        self.cond = None
+        self.uncond = None
 
     def load_state_dict(self, ip_adapter_path):
         ip_state_dict = model_helper.load_torch_file(ip_adapter_path)
@@ -99,6 +100,8 @@ class IPAdapterDetector:
             model_loader.load_model_gpu(self.ip_adapter.image_proj_model)
             cond = self.ip_adapter.image_proj_model.model(clip_image_embeds, **cond_params).to(device=self.load_device, dtype=self.dtype)
             uncond = self.ip_adapter.image_proj_model.model(uncond_clip_image_embeds, **uncond_params).to(cond)
+            self.cond = cond
+            self.uncond = uncond
 
             model_loader.load_model_gpu(self.ip_adapter.ip_layers)
 
@@ -128,5 +131,11 @@ class IPAdapterDetector:
             "sdxl": self.ip_adapter.sdxl,
         }
 
-        return patch_unet_model(model, patch_kwargs)
-        
+        new_model = patch_unet_model(model, patch_kwargs)
+
+        return new_model
+
+    def apply_conds(self, positive_cond, negative_cond):
+        cond, uncond = self.cond, self.uncond
+        positive_cond, negative_cond = self.ip_adapter.apply_conds(positive_cond, negative_cond, cond, uncond)
+        return positive_cond, negative_cond
