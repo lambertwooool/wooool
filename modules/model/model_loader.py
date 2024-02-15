@@ -4,7 +4,7 @@ from modules import devices
 
 current_loaded_models = []
 
-# True use GPU, value is (run, offload)
+# True use GPU, value is (run, offload, dtype)
 device_config = {
     "clip": (False, False),
     "clip_vision": (True, False),
