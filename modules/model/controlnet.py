@@ -164,7 +164,7 @@ class ControlNet(ControlBase):
         if x_noisy.shape[0] != self.cond_hint.shape[0]:
             self.cond_hint = broadcast_image_to(self.cond_hint, x_noisy.shape[0], batched_number)
 
-        context = cond['c_crossattn']
+        context = cond.get('crossattn_controlnet', cond['c_crossattn'])
         y = cond.get('y', None)
         if y is not None:
             y = y.to(dtype)
@@ -264,8 +264,7 @@ class ControlLora(ControlNet):
         controlnet_config = model.model_config.unet_config.copy()
         controlnet_config.pop("out_channels")
         controlnet_config["hint_channels"] = self.control_weights["input_hint_block.0.weight"].shape[1]
-        # self.manual_cast_dtype = model.manual_cast_dtype
-        self.manual_cast_dtype = None
+        self.manual_cast_dtype = model.manual_cast_dtype
         dtype = model.get_dtype()
         if self.manual_cast_dtype is None:
             class control_lora_ops(ControlLoraOps, ops.disable_weight_init):

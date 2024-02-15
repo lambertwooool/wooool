@@ -106,9 +106,11 @@ def should_use_fp16(device=None):
     
     return torch.cuda.is_bf16_supported()
 
-def dtype(device=None, use_bf16=False):
+def dtype(device=None, want_use_dtype=torch.float16):
     if should_use_fp16(device=device):
-        if use_bf16 and torch.cuda.is_bf16_supported():
+        if want_use_dtype in [torch.float8_e4m3fn, torch.float8_e4m3fnuz, torch.float8_e5m2, torch.float8_e5m2fnuz, torch.float32]:
+            return want_use_dtype
+        if want_use_dtype == torch.bfloat16 and torch.cuda.is_bf16_supported():
             return torch.bfloat16
         else:
             return torch.float16
@@ -116,8 +118,12 @@ def dtype(device=None, use_bf16=False):
 
 def dtype_size(dtype):
     dtype_size = 4
-    if dtype == torch.float16 or dtype == torch.bfloat16:
+    if hasattr(dtype, "itemsize"):
+        dtype_size = dtype.itemsize
+    elif dtype == torch.float16 or dtype == torch.bfloat16:
         dtype_size = 2
+    elif dtype == torch.float32:
+        dtype_size = 4
     return dtype_size
 
 def get_autocast_device(device):
@@ -139,15 +145,17 @@ def cast_to_device(tensor, device, dtype, copy=False):
         if hasattr(device, 'type') and device.type.startswith("cuda"):
             device_supports_cast = True
 
+    non_blocking = device_supports_non_blocking(device)
+
     if device_supports_cast:
         if copy:
             if tensor.device == device:
-                return tensor.to(dtype, copy=copy)
-            return tensor.to(device, copy=copy).to(dtype)
+                return tensor.to(dtype, copy=copy, non_blocking=non_blocking)
+            return tensor.to(device, copy=copy, non_blocking=non_blocking).to(dtype, non_blocking=non_blocking)
         else:
-            return tensor.to(device).to(dtype)
+            return tensor.to(device, non_blocking=non_blocking).to(dtype, non_blocking=non_blocking)
     else:
-        return tensor.to(dtype).to(device, copy=copy)
+        return tensor.to(device, dtype, copy=copy, non_blocking=non_blocking)
 
 # None means no manual cast
 def unet_manual_cast(weight_dtype, inference_device):
@@ -162,6 +170,9 @@ def unet_manual_cast(weight_dtype, inference_device):
         return torch.float16
     else:
         return torch.float32
+
+def intermediate_device():
+    return torch.device("cpu")
 
 def is_typeof(device, types) -> bool:
     return hasattr(device, 'type') and \

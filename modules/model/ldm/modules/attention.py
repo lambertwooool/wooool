@@ -186,17 +186,32 @@ def attention_sub_quad(query, key, value, heads, mask=None):
     return hidden_states
 
 def attention_split(q, k, v, heads, mask=None):
-    scale = (q.shape[-1] // heads) ** -0.5
+    b, _, dim_head = q.shape
+    dim_head //= heads
+    scale = dim_head ** -0.5
+
     h = heads
-    q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h=h), (q, k, v))
+    q, k, v = map(
+        lambda t: t.unsqueeze(3)
+        .reshape(b, -1, heads, dim_head)
+        .permute(0, 2, 1, 3)
+        .reshape(b * heads, -1, dim_head)
+        .contiguous(),
+        (q, k, v),
+    )
 
     r1 = torch.zeros(q.shape[0], q.shape[1], v.shape[2], device=q.device, dtype=q.dtype)
 
     mem_free_total = devices.get_free_memory(q.device)
 
+    if _ATTN_PRECISION =="fp32":
+        element_size = 4
+    else:
+        element_size = q.element_size()
+
     gb = 1024 ** 3
-    tensor_size = q.shape[0] * q.shape[1] * k.shape[1] * q.element_size()
-    modifier = 3 if q.element_size() == 2 else 2.5
+    tensor_size = q.shape[0] * q.shape[1] * k.shape[1] * element_size
+    modifier = 3
     mem_required = tensor_size * modifier
     steps = 1
 
@@ -224,17 +239,23 @@ def attention_split(q, k, v, heads, mask=None):
                         s1 = einsum('b i d, b j d -> b i j', q[:, i:end].float(), k.float()) * scale
                 else:
                     s1 = einsum('b i d, b j d -> b i j', q[:, i:end], k) * scale
-                first_op_done = True
+
+                if mask is not None:
+                    if len(mask.shape) == 2:
+                        s1 += mask[i:end]
+                    else:
+                        s1 += mask[:, i:end]
 
                 s2 = s1.softmax(dim=-1).to(v.dtype)
                 del s1
+                first_op_done = True
 
                 r1[:, i:end] = einsum('b i j, b j d -> b i d', s2, v)
                 del s2
             break
         except devices.OOM_EXCEPTION as e:
             if first_op_done == False:
-                devices.torch_gc(True)
+                devices.torch_gc()
                 if cleared_cache == False:
                     cleared_cache = True
                     print("out of memory error, emptying cache and trying again")
@@ -248,31 +269,51 @@ def attention_split(q, k, v, heads, mask=None):
 
     del q, k, v
 
-    r2 = rearrange(r1, '(b h) n d -> b n (h d)', h=h)
-    del r1
-    return r2
+    r1 = (
+        r1.unsqueeze(0)
+        .reshape(b, heads, -1, dim_head)
+        .permute(0, 2, 1, 3)
+        .reshape(b, -1, heads * dim_head)
+    )
+    return r1
+
+BROKEN_XFORMERS = False
+try:
+    x_vers = xformers.__version__
+    #I think 0.0.23 is also broken (q with bs bigger than 65535 gives CUDA error)
+    BROKEN_XFORMERS = x_vers.startswith("0.0.21") or x_vers.startswith("0.0.22") or x_vers.startswith("0.0.23")
+except:
+    pass
 
 def attention_xformers(q, k, v, heads, mask=None):
-    b, _, _ = q.shape
+    b, _, dim_head = q.shape
+    dim_head //= heads
+    if BROKEN_XFORMERS:
+        if b * heads > 65535:
+            return attention_pytorch(q, k, v, heads, mask)
+
     q, k, v = map(
         lambda t: t.unsqueeze(3)
-        .reshape(b, t.shape[1], heads, -1)
+        .reshape(b, -1, heads, dim_head)
         .permute(0, 2, 1, 3)
-        .reshape(b * heads, t.shape[1], -1)
+        .reshape(b * heads, -1, dim_head)
         .contiguous(),
         (q, k, v),
     )
 
-    # actually compute the attention, what we cannot get enough of
-    out = xformers.ops.memory_efficient_attention(q, k, v, attn_bias=None)
+    if mask is not None:
+        pad = 8 - q.shape[1] % 8
+        mask_out = torch.empty([q.shape[0], q.shape[1], q.shape[1] + pad], dtype=q.dtype, device=q.device)
+        mask_out[:, :, :mask.shape[-1]] = mask
+        mask = mask_out[:, :, :mask.shape[-1]]
 
-    if exists(mask):
-        raise NotImplementedError
+    out = xformers.ops.memory_efficient_attention(q, k, v, attn_bias=mask)
+
     out = (
         out.unsqueeze(0)
-        .reshape(b, heads, out.shape[1], -1)
+        .reshape(b, heads, -1, dim_head)
         .permute(0, 2, 1, 3)
-        .reshape(b, out.shape[1], -1)
+        .reshape(b, -1, heads * dim_head)
     )
     return out
 
@@ -285,9 +326,6 @@ def attention_pytorch(q, k, v, heads, mask=None):
     )
 
     out = torch.nn.functional.scaled_dot_product_attention(q, k, v, attn_mask=mask, dropout_p=0.0, is_causal=False)
-
-    if exists(mask):
-        raise NotImplementedError
     out = (
         out.transpose(1, 2).reshape(b, -1, heads * dim_head)
     )
@@ -536,7 +574,7 @@ class SpatialTransformer(nn.Module):
             context_dim = [context_dim] * depth
         self.in_channels = in_channels
         inner_dim = n_heads * d_head
-        self.norm = Normalize(in_channels, dtype=dtype, device=device)
+        self.norm = operations.GroupNorm(num_groups=32, num_channels=in_channels, eps=1e-6, affine=True, dtype=dtype, device=device)
         if not use_linear:
             self.proj_in = operations.Conv2d(in_channels,
                                      inner_dim,

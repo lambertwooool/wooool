@@ -8,7 +8,7 @@ from typing import Optional, Any
 
 # from fcbh import model_management
 from modules import devices
-from modules.model import ops
+from modules.model.ops import disable_weight_init as ops
 
 # if model_management.xformers_enabled_vae():
 if devices.is_xformers_enable():

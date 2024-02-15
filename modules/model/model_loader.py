@@ -9,9 +9,9 @@ device_config = {
     "clip": (False, False),
     "clip_vision": (True, False),
     "annotator": (True, False),
-    "unet": (True, False),
+    "unet": (True, False, torch.float8_e4m3fn),
     "upscaler": (True, False),
-    "controlnet": (True, False),
+    "controlnet": (True, False, torch.float8_e4m3fn),
     "vae": (True, False),
     "face": (True, False),
 }
@@ -195,3 +195,8 @@ def offload_device(type):
         return devices.get_torch_device()
     else:
         return torch.device("cpu")
+
+def dtype(type):
+    device = run_device(type)
+    want_use_dtype = device_config[type][2] if len(device_config[type]) > 2 else None
+    return devices.dtype(device, want_use_dtype)

@@ -1,5 +1,8 @@
 # Change Logs
 
+## 0.8.7
+- Base and Controlnet Model use FP8
+
 ## 0.8.6
 - Support new controlnet, depth anythiny, teed
 - controlnet annotator cache

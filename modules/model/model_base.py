@@ -11,17 +11,21 @@ from modules import util, devices
 class ModelType(Enum):
     EPS = 1
     V_PREDICTION = 2
+    V_PREDICTION_EDM = 3
 
 
-from .model_sampling import EPS, V_PREDICTION, ModelSamplingDiscrete
+from .model_sampling import EPS, V_PREDICTION, ModelSamplingDiscrete, ModelSamplingContinuousEDM
 
 def model_sampling(model_config, model_type):
+    s = ModelSamplingDiscrete
+
     if model_type == ModelType.EPS:
         c = EPS
     elif model_type == ModelType.V_PREDICTION:
         c = V_PREDICTION
-
-    s = ModelSamplingDiscrete
+    elif model_type == ModelType.V_PREDICTION_EDM:
+        c = V_PREDICTION
+        s = ModelSamplingContinuousEDM
 
     class ModelSampling(s, c):
         pass
@@ -147,6 +151,10 @@ class BaseModel(torch.nn.Module):
         cross_attn = kwargs.get("cross_attn", None)
         if cross_attn is not None:
             out['c_crossattn'] = conds.CONDCrossAttn(cross_attn)
+
+        cross_attn_cnet = kwargs.get("cross_attn_controlnet", None)
+        if cross_attn_cnet is not None:
+            out['crossattn_controlnet'] = conds.CONDCrossAttn(cross_attn_cnet)
 
         return out
 
