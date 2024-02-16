@@ -82,7 +82,8 @@ def get_model_versions(
 
             content = util.load_url(url)
             if content:
-                data = json.load(content)
+                # data = json.load(content)
+                data = content
 
                 with open(config_file, "w") as file:
                     file.write(json.dumps(data, indent=4))
