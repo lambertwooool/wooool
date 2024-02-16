@@ -45,15 +45,9 @@ def processor(controlnets, unet_model, width, height, image_mask):
                 ctrl_proc = ctrl_procs[cn_model_name]
 
                 if cn_item in ["ip_adapter", "ip_adapter_face"]:
-                    if cn_item == "ip_adapter_face":
-                        _, face_img = util.get_faces(cn_img)
-                        cn_img = face_img if face_img is not None else cn_img
-                    # https://github.com/tencent-ailab/IP-Adapter/blob/d580c50a291566bbf9fc7ac0f760506607297e6d/README.md?plain=1#L75
-                    ip_img = util.resize_image(cn_img, width=224, height=224) # , resize_mode=0
-                    util.save_temp_image(ip_img, f"{cn_item}_224.png")
                     clip_vision_model = clip_vision_model or clip_vision.load(clip_vision_path)
                     ip_proc = ctrl_proc.processor
-                    image_emb, uncond_image_emb = ip_proc.preprocess(ip_img, clip_vision_model)
+                    image_emb, uncond_image_emb = ip_proc.preprocess(cn_img, clip_vision_model)
                     # ip_adapters.append((ip_proc.preprocess(ip_img, clip_vision_model), 1, cn_weight))
                     unet_model = ip_proc.patch_model(unet_model, image_emb, uncond_image_emb, cn_weight, start_percent, end_percent)
                     ip_procs.append(ip_proc)

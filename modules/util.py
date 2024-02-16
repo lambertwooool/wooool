@@ -915,9 +915,12 @@ def face_mask(input_image, face_landmarks, blur_size=None):
             max_y, max_x = max(y, max_y), max(x, max_x)
             min_y, min_x = min(y, min_y), min(x, min_x)
         blur_size = max(5, math.sqrt((max_x - min_x) * (max_y - min_y)) / 16)
-    mask = blur(mask, blur_size * 2)
-    mask[mask > 0] = 255
-    mask = blur(mask, blur_size)
+    
+    if blur_size > 0:
+        mask = blur(mask, blur_size * 2)
+        mask[mask > 0] = 255
+        mask = blur(mask, blur_size)
+        
     save_temp_image(mask, "face_mask.png")
 
     return mask

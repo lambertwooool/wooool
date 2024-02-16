@@ -2,6 +2,7 @@ import os
 from typing import Any
 import insightface
 from insightface.app import FaceAnalysis
+from insightface.utils import face_align
 
 import modules.paths
 
@@ -18,6 +19,7 @@ class Analysis():
         model.prepare(ctx_id=0, det_size=(640, 640))
 
         self.model = model
+        self.face_align = face_align
     
     def __call__(self, input_image):
         faces = self.model.get(input_image)
