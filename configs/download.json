@@ -50,5 +50,7 @@
 
     "add_detail.safetensors": "https://civitai.com/api/download/models/62833",
     "add-detail-xl.safetensors": "https://civitai.com/api/download/models/135867",
-    "xl_more_art-full_v1.safetensors": "https://civitai.com/api/download/models/152309"
+    "xl_more_art-full_v1.safetensors": "https://civitai.com/api/download/models/152309",
+    "sd15_lcm_lora_rank1.safetensors": "https://huggingface.co/bdsqlsz/LCM_FIX_RANK1/resolve/main/sd15_lcm_lora_rank1.safetensors",
+    "sdxl_lightning_4step_lora.safetensors": "https://huggingface.co/ByteDance/SDXL-Lightning/resolve/main/sdxl_lightning_4step_lora.safetensors"
 }

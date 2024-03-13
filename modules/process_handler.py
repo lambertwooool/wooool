@@ -1,4 +1,3 @@
-import copy
 import json
 import math
 import os
@@ -53,7 +52,8 @@ def handler(task):
     positive, negative, style, loras = prompt_helper.generate(task.get("main_character", ("", "")), task.get("prompt_main", ""), task.get("prompt_temp", ""), task.get("prompt_negative", ""),
                                                         round_batch_size, style, task.get("style_weight", 1.0), task.get("options", {}), loras, task.get("lang", ""), seeds, sd_type, skip_prompt)
     
-    quality = opts.options["quality_setting"][str(task.get("quality", 1))][sd_type]
+    quality_id = task.get("quality", 1)
+    quality = opts.options["quality_setting"][str(quality_id)][sd_type]
     pixels, default_base_step, default_refiner_step, default_sampler, default_scheduler = quality
     
     # base_step_scale, refiner_step_scale = task.get("step_scale", 1.0), task.get("refiner_step_scale", 1.0)
@@ -75,6 +75,7 @@ def handler(task):
     size = task.get("size", util.ratios2size(task.get("aspect_ratios", None), pixels ** 2))
     cfg_scale = task.get("cfg_scale", 7.0)
     cfg_scale_to = task.get("cfg_scale_to", cfg_scale)
+    cfg_multiplier = task.get("cfg_multiplier", 1.0)
     clip_skip = -1 * abs(int(task.get("clip_skip") or 1))
 
     detail = float(task.get("detail", 0))
@@ -86,6 +87,11 @@ def handler(task):
     if more_art != 0:
         more_art_lora = { "sd15": "", "sdxl": "xl_more_art-full_v1.safetensors" }[sd_type]
         loras.append((more_art_lora, more_art, ""))
+    if quality_id == 5:
+        cfg_scale = round(cfg_scale * (1.5 / 7.0), 1)
+        cfg_scale_to = round(cfg_scale_to * (1.5 / 7.0), 1)
+        lightning_lora = { "sd15": "sd15_lcm_lora_rank1.safetensors", "sdxl": "sdxl_lightning_4step_lora.safetensors" }[sd_type]
+        loras.append((lightning_lora, 1.0, ""))
     denoise = round(task.get("denoise", 1.0), 2)
     style_aligned_scale = round(task.get("style_aligned_scale", 0.0), 2)
     sampler = task.get("sampler", "") or default_sampler
@@ -115,6 +121,7 @@ def handler(task):
     task["refiner_hash"] = refiner_hash
     task["cfg_scale"] = cfg_scale
     task["cfg_scale_to"] = cfg_scale_to
+    task["cfg_multiplier"] = cfg_multiplier
     task["noise_scale"] = noise_scale
     task["denoise"] = denoise
     task["seed"] = seeds
@@ -134,7 +141,7 @@ def handler(task):
             '\n[style]:', style, \
             '\n[model]:', (f"{base_name}({base_hash})", f"{refiner_name}({refiner_hash})"), \
             '\n[size]:', size, \
-            '\n[cfg_scale]:', (cfg_scale, cfg_scale_to), \
+            '\n[cfg_scale]:', (cfg_scale, cfg_scale_to, cfg_multiplier), \
             '\n[image & mask]:', (True if image is not None else False, True if mask is not None else False), \
             '\n[clip_skip]:', clip_skip, \
             '\n[noise_scale]:', noise_scale, \
@@ -183,6 +190,7 @@ def handler(task):
                 tiled=tiled,
                 cfg_scale=cfg_scale,
                 cfg_scale_to=cfg_scale_to,
+                cfg_multiplier=cfg_multiplier,
                 loras=loras,
                 controlnets=controlnets,
                 round_batch_size=round_batch_size,
@@ -256,7 +264,7 @@ class UserStopException(Exception):
 @torch.inference_mode()
 def process_diffusion(task, base_path, refiner_path, positive, negative, steps, skip_step, size, seeds, subseeds,
         callback, sampler_name, scheduler_name,
-        latent=None, image=None, denoise=1.0, noise_scale=1.0, cfg_scale=7.0, cfg_scale_to=7.0, style_aligned_scale=0.0, batch_size=1, loras=[], controlnets=[],
+        latent=None, image=None, denoise=1.0, noise_scale=1.0, cfg_scale=7.0, cfg_scale_to=7.0, cfg_multiplier=1.0, style_aligned_scale=0.0, batch_size=1, loras=[], controlnets=[],
         tiled=False, round_batch_size=8, subseed_strength=1.0, clip_skip=0):
 
     devices.torch_gc()
@@ -388,21 +396,6 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
             sampled_latent, cur_batch, cur_seed, cur_subseed, filename = left_sampled_latents.pop(0)
             core.vae_sampled(sampled_latent, vae_model, tiled, task, cur_batch, cur_seed, cur_subseed, filename, image_pixel, image_mask, image_pixel_orgin, re_zoom_point)
             print("cuda", len(left_sampled_latents))
-    
-    # def vae_worker():
-    #     while True and None not in sampled_latents:
-    #         if sampled_latents and vae_worker_running:
-    #             progress_output(task, "vae")
-    #             sampled_latent, cur_batch, cur_seed, subseeds, filename = sampled_latents.pop(0)
-    #             core.vae_sampled(sampled_latent, vae_model, tiled, task, cur_batch, cur_seed, subseeds, filename, image_pixel, image_mask, image_pixel_orgin, re_zoom_point)
-    #             if sampled_latents is not None:
-    #                 print("cpu", len(sampled_latents))
-    #             else:
-    #                 print("cpu", "last")
-    #         time.sleep(0.01)
-    
-    # thread_vae = threading.Thread(target=vae_worker)
-    # thread_vae.start()
 
     def callback_base_sample(step, x0, x, total_steps, is_refiner=False):
         if task.get("stop", False) or task.get("skip", False):
@@ -424,20 +417,12 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
     def callback_refine_sample(step, x0, x, total_steps):
         callback_base_sample(step + step_base, x0, x, total_steps, is_refiner=True)
     
-    def sampler_cfg_function(args):
-        cond = args.get("cond")
-        uncond = args.get("uncond")
-        cond_scale = args.get("cond_scale")
-        timestep = args.get("timestep")
-        alpha = cfg_scale_to + (cond_scale - cfg_scale_to) * timestep[0] / 15
-        return uncond + (cond - uncond) * alpha
-    
     def model_function_wrapper(func, args):
         cond_or_uncond = args.pop("cond_or_uncond")
         return func(args.pop("input"), args.pop("timestep"), **args.pop("c"))
 
-    unet_model.model_options["sampler_cfg_function"] = sampler_cfg_function
     unet_model.model_options["model_function_wrapper"] = model_function_wrapper
+    core.rescale_cfg(unet_model, cfg_multiplier, cfg_scale_to)
     
     latent_image = latent["samples"]
     latent_mask = latent.get("noise_mask", None)

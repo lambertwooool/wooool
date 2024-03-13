@@ -1,5 +1,10 @@
 # Change Logs
 
+## 0.8.8
+- Support sdxl and sd15 lightning generate, 6 step generate an image
+- add sdxl tile controlnet
+- Optimize the CFG algorithm and add CFG scaling
+
 ## 0.8.7
 - Base and Controlnet Model use FP8
 - Support instant id

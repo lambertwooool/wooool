@@ -98,6 +98,33 @@ def get_loras(model, loras):
 
     return xl_base_patched
 
+def rescale_cfg(model, cfg_multiplier, cfg_scale_to):
+    def patch_cfg(args):
+        cond = args["cond"]
+        uncond = args["uncond"]
+        cond_scale = args["cond_scale"]
+        sigma = args["sigma"]   
+        sigma = sigma.view(sigma.shape[:1] + (1,) * (cond.ndim - 1))
+        x_orig = args["input"]
+
+        #rescale cfg has to be done on v-pred model output
+        x = x_orig / (sigma * sigma + 1.0)
+        cond = ((x - (x_orig - cond)) * (sigma ** 2 + 1.0) ** 0.5) / (sigma)
+        uncond = ((x - (x_orig - uncond)) * (sigma ** 2 + 1.0) ** 0.5) / (sigma)
+
+        #rescalecfg
+        cond_scale = cfg_scale_to + (cond_scale - cfg_scale_to) * sigma[0] / 15
+        x_cfg = uncond + cond_scale * (cond - uncond)
+        ro_pos = torch.std(cond, dim=(1,2,3), keepdim=True)
+        ro_cfg = torch.std(x_cfg, dim=(1,2,3), keepdim=True)
+
+        x_rescaled = x_cfg * (ro_pos / ro_cfg)
+        x_final = cfg_multiplier * x_rescaled + (1.0 - cfg_multiplier) * x_cfg
+
+        return x_orig - (x - x_final * sigma / (sigma * sigma + 1.0) ** 0.5)
+    
+    model.set_model_sampler_cfg_function(patch_cfg)
+
 @torch.no_grad()
 @torch.inference_mode()
 def vae_sampled(sampled_latent, vae_model, tiled, task, cur_batch, cur_seed, cur_subseed, filename, image_pixel, image_mask, image_pixel_orgin, re_zoom_point):

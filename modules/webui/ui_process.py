@@ -69,6 +69,7 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
         "prompt_negative": prompt_negative,
         "cfg_scale": gen_opts.pop("cfg_scale"),
         "cfg_scale_to": gen_opts.pop("cfg_scale_to"),
+        "cfg_multiplier": gen_opts.pop("cfg_multiplier"),
         "aspect_ratios": gen_opts.pop("ratios"),
         "batch": gen_opts.pop("pic_num"),
         "style": style_item if not gen_opts.pop("disable_style", False) else None,
