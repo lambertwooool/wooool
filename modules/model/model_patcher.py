@@ -3,6 +3,7 @@ import copy
 import inspect
 from modules import devices, util
 from modules.model import model_helper, model_loader
+import logging
 
 class ModelPatcher:
     def __init__(self, model, load_device, offload_device, size=0, current_device=None, weight_inplace_update=False):
@@ -65,6 +66,9 @@ class ModelPatcher:
 
     def set_model_unet_function_wrapper(self, unet_wrapper_function):
         self.model_options["model_function_wrapper"] = unet_wrapper_function
+
+    def set_model_denoise_mask_function(self, denoise_mask_function):
+        self.model_options["denoise_mask_function"] = denoise_mask_function
 
     def set_model_patch(self, patch, name):
         to = self.model_options["transformer_options"]
@@ -175,16 +179,15 @@ class ModelPatcher:
 
     def patch_model(self, device_to=None, patch_weights=True):
         for k in self.object_patches:
-            old = getattr(self.model, k)
+            old = model_helper.set_attr(self.model, k, self.object_patches[k])
             if k not in self.object_patches_backup:
                 self.object_patches_backup[k] = old
-            setattr(self.model, k, self.object_patches[k])
 
         if patch_weights:
             model_sd = self.model_state_dict()
             for key in self.patches:
                 if key not in model_sd:
-                    print("could not patch. key doesn't exist in model:", key)
+                    logging.warning("could not patch. key doesn't exist in model: {}".format(key))
                     continue
 
                 weight = model_sd[key]
@@ -202,7 +205,7 @@ class ModelPatcher:
                 if inplace_update:
                     model_helper.copy_to_param(self.model, key, out_weight)
                 else:
-                    model_helper.set_attr(self.model, key, out_weight)
+                    model_helper.set_attr_param(self.model, key, out_weight)
                 del temp_weight
 
             if device_to is not None:
@@ -233,7 +236,7 @@ class ModelPatcher:
                 w1 = v[0]
                 if alpha != 0.0:
                     if w1.shape != weight.shape:
-                        print("WARNING SHAPE MISMATCH {} WEIGHT NOT MERGED {} != {}".format(key, w1.shape, weight.shape))
+                        logging.warning("WARNING SHAPE MISMATCH {} WEIGHT NOT MERGED {} != {}".format(key, w1.shape, weight.shape))
                     else:
                         weight += alpha * devices.cast_to_device(w1, weight.device, weight.dtype)
             elif patch_type == "lora": #lora/locon
@@ -249,7 +252,7 @@ class ModelPatcher:
                 try:
                     weight += (alpha * torch.mm(mat1.flatten(start_dim=1), mat2.flatten(start_dim=1))).reshape(weight.shape).type(weight.dtype)
                 except Exception as e:
-                    print("ERROR", key, e)
+                    logging.error("ERROR {} {} {}".format(patch_type, key, e))
             elif patch_type == "lokr":
                 w1 = v[0]
                 w2 = v[1]
@@ -317,7 +320,7 @@ class ModelPatcher:
                 try:
                     weight += (alpha * m1 * m2).reshape(weight.shape).type(weight.dtype)
                 except Exception as e:
-                    print("ERROR", key, e)
+                    logging.error("ERROR {} {} {}".format(patch_type, key, e))
             elif patch_type == "glora":
                 if v[4] is not None:
                     alpha *= v[4] / v[0].shape[0]
@@ -327,9 +330,12 @@ class ModelPatcher:
                 b1 = devices.cast_to_device(v[2].flatten(start_dim=1), weight.device, torch.float32)
                 b2 = devices.cast_to_device(v[3].flatten(start_dim=1), weight.device, torch.float32)
 
-                weight += ((torch.mm(b2, b1) + torch.mm(torch.mm(weight.flatten(start_dim=1), a2), a1)) * alpha).reshape(weight.shape).type(weight.dtype)
+                try:
+                    weight += ((torch.mm(b2, b1) + torch.mm(torch.mm(weight.flatten(start_dim=1), a2), a1)) * alpha).reshape(weight.shape).type(weight.dtype)
+                except Exception as e:
+                    logging.error("ERROR {} {} {}".format(patch_type, key, e))
             else:
-                print("patch type not recognized", patch_type, key)
+                logging.warning("patch type not recognized {} {}".format(patch_type, key))
 
         return weight
 
@@ -341,7 +347,7 @@ class ModelPatcher:
                 model_helper.copy_to_param(self.model, k, self.backup[k])
         else:
             for k in keys:
-                model_helper.set_attr(self.model, k, self.backup[k])
+                model_helper.set_attr_param(self.model, k, self.backup[k])
 
         self.backup = {}
 
@@ -351,6 +357,6 @@ class ModelPatcher:
 
         keys = list(self.object_patches_backup.keys())
         for k in keys:
-            setattr(self.model, k, self.object_patches_backup[k])
+            model_helper.set_attr(self.model, k, self.object_patches_backup[k])
 
         self.object_patches_backup = {}

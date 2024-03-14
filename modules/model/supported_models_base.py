@@ -20,13 +20,15 @@ class BASE:
     sampling_settings = {}
     latent_format = latent_formats.LatentFormat
     vae_key_prefix = ["first_stage_model."]
+    text_encoder_key_prefix = ["cond_stage_model."]
+    supported_inference_dtypes = [torch.float16, torch.bfloat16, torch.float32]
 
     manual_cast_dtype = None
 
     @classmethod
     def matches(s, unet_config):
         for k in s.unet_config:
-            if s.unet_config[k] != unet_config[k]:
+            if k not in unet_config or s.unet_config[k] != unet_config[k]:
                 return False
         return True
 
@@ -52,6 +54,7 @@ class BASE:
         return out
 
     def process_clip_state_dict(self, state_dict):
+        state_dict = model_helper.state_dict_prefix_replace(state_dict, {k: "" for k in self.text_encoder_key_prefix}, filter_keys=True)
         return state_dict
 
     def process_unet_state_dict(self, state_dict):
@@ -61,7 +64,7 @@ class BASE:
         return state_dict
 
     def process_clip_state_dict_for_saving(self, state_dict):
-        replace_prefix = {"": "cond_stage_model."}
+        replace_prefix = {"": self.text_encoder_key_prefix[0]}
         return model_helper.state_dict_prefix_replace(state_dict, replace_prefix)
 
     def process_clip_vision_state_dict_for_saving(self, state_dict):
@@ -75,8 +78,9 @@ class BASE:
         return model_helper.state_dict_prefix_replace(state_dict, replace_prefix)
 
     def process_vae_state_dict_for_saving(self, state_dict):
-        replace_prefix = {"": "first_stage_model."}
+        replace_prefix = {"": self.vae_key_prefix[0]}
         return model_helper.state_dict_prefix_replace(state_dict, replace_prefix)
 
-    def set_manual_cast(self, manual_cast_dtype):
+    def set_inference_dtype(self, dtype, manual_cast_dtype):
+        self.unet_config['dtype'] = dtype
         self.manual_cast_dtype = manual_cast_dtype

@@ -2,7 +2,7 @@
 
 Wooool is an AIGC image generator, Refer to the functions from[Stable Diffusion Web UI](https://github.com/AUTOMATIC1111/stable-diffusion-webui) 、Midjourney and [Fooocus](https://github.com/lllyasviel/Fooocus)
 
-- Supports SD1.5 and SDXL Checkpoints , Loras, Controlnets and IPAdapters.
+- Supports SD1.5, SDXL, SDXL Turbo, SDXL Lightning, Playground V2 and V2.5 Checkpoints, Loras, Controlnets and IPAdapters.
 - The redesigned UI interface has greatly improved usability.
 
 ![](screenshot.png)

@@ -1,4 +1,5 @@
 import collections
+import logging
 from modules.model.k_diffusion import sampling as k_diffusion_sampling
 from modules.model.k_diffusion import external as k_diffusion_external
 from modules.model.extra_samplers import uni_pc
@@ -8,7 +9,6 @@ from modules.model.ldm.modules.diffusionmodules.util import make_ddim_timesteps
 import math
 from modules.model import model_base, model_helper
 from modules import devices
-
 
 def get_area_and_mult(conds, x_in, timestep_in):
     area = (x_in.shape[2], x_in.shape[3], 0, 0)
@@ -213,6 +213,7 @@ def calc_cond_uncond_batch(model, cond, uncond, x_in, timestep, model_options):
                         cur_patches[p] = cur_patches[p] + patches[p]
                     else:
                         cur_patches[p] = patches[p]
+                transformer_options["patches"] = cur_patches
             else:
                 transformer_options["patches"] = patches
 
@@ -276,13 +277,16 @@ class CFGNoisePredictor(torch.nn.Module):
         return self.apply_model(*args, **kwargs)
 
 class KSamplerX0Inpaint(torch.nn.Module):
-    def __init__(self, model):
+    def __init__(self, model, sigmas):
         super().__init__()
         self.inner_model = model
+        self.sigmas = sigmas
     def forward(self, x, sigma, uncond, cond, cond_scale, denoise_mask, model_options={}, seed=None):
         if denoise_mask is not None:
+            if "denoise_mask_function" in model_options:
+                denoise_mask = model_options["denoise_mask_function"](sigma, denoise_mask, extra_options={"model": self.inner_model, "sigmas": self.sigmas})
             latent_mask = 1. - denoise_mask
-            x = x * denoise_mask + (self.latent_image + self.noise * sigma.reshape([sigma.shape[0]] + [1] * (len(self.noise.shape) - 1))) * latent_mask
+            x = x * denoise_mask + self.inner_model.inner_model.model_sampling.noise_scaling(sigma.reshape([sigma.shape[0]] + [1] * (len(self.noise.shape) - 1)), self.noise, self.latent_image) * latent_mask
         out = self.inner_model(x, sigma, cond=cond, uncond=uncond, cond_scale=cond_scale, model_options=model_options, seed=seed)
         if denoise_mask is not None:
             out = out * denoise_mask + self.latent_image * latent_mask
@@ -300,7 +304,7 @@ def simple_scheduler(model, steps):
 def ddim_scheduler(model, steps):
     s = model.model_sampling
     sigs = []
-    ss = len(s.sigmas) // steps
+    ss = max(len(s.sigmas) // steps, 1)
     x = 1
     while x < len(s.sigmas):
         sigs += [float(s.sigmas[x])]
@@ -518,14 +522,6 @@ class Sampler:
         sigma = float(sigmas[0])
         return math.isclose(max_sigma, sigma, rel_tol=1e-05) or sigma > max_sigma
 
-class UNIPC(Sampler):
-    def sample(self, model_wrap, sigmas, extra_args, callback, noise, latent_image=None, denoise_mask=None, disable_pbar=False):
-        return uni_pc.sample_unipc(model_wrap, noise, latent_image, sigmas, max_denoise=self.max_denoise(model_wrap, sigmas), extra_args=extra_args, noise_mask=denoise_mask, callback=callback, disable=disable_pbar)
-
-class UNIPCBH2(Sampler):
-    def sample(self, model_wrap, sigmas, extra_args, callback, noise, latent_image=None, denoise_mask=None, disable_pbar=False):
-        return uni_pc.sample_unipc(model_wrap, noise, latent_image, sigmas, max_denoise=self.max_denoise(model_wrap, sigmas), extra_args=extra_args, noise_mask=denoise_mask, callback=callback, variant='bh2', disable=disable_pbar)
-
 KSAMPLER_NAMES = ["euler", "euler_ancestral", "heun", "heunpp2","dpm_2", "dpm_2_ancestral",
                   "lms", "dpm_fast", "dpm_adaptive", "dpmpp_2s_ancestral", "dpmpp_sde", "dpmpp_sde_gpu",
                   "dpmpp_2m", "dpmpp_2m_sde", "dpmpp_2m_sde_gpu", "dpmpp_3m_sde", "dpmpp_3m_sde_gpu", "ddpm", "lcm"]
@@ -538,7 +534,7 @@ class KSAMPLER(Sampler):
 
     def sample(self, model_wrap, sigmas, extra_args, callback, noise, latent_image=None, denoise_mask=None, disable_pbar=False):
         extra_args["denoise_mask"] = denoise_mask
-        model_k = KSamplerX0Inpaint(model_wrap)
+        model_k = KSamplerX0Inpaint(model_wrap, sigmas)
         model_k.latent_image = latent_image
         if self.inpaint_options.get("random", False): #TODO: Should this be the default?
             generator = torch.manual_seed(extra_args.get("seed", 41) + 1)
@@ -546,18 +542,12 @@ class KSAMPLER(Sampler):
         else:
             model_k.noise = noise
 
-        if self.max_denoise(model_wrap, sigmas):
-            noise = noise * torch.sqrt(1.0 + sigmas[0] ** 2.0)
-        else:
-            noise = noise * sigmas[0]
+        noise = model_wrap.inner_model.model_sampling.noise_scaling(sigmas[0], noise, latent_image, self.max_denoise(model_wrap, sigmas))
 
         k_callback = None
         total_steps = len(sigmas) - 1
         if callback is not None:
             k_callback = lambda x: callback(x["i"], x["denoised"], x["x"], total_steps)
-
-        if latent_image is not None:
-            noise += latent_image
 
         samples = self.sampler_function(model_k, noise, sigmas, extra_args=extra_args, callback=k_callback, disable=disable_pbar, **self.extra_options)
         return samples
@@ -600,7 +590,7 @@ def sample(model, noise, positive, negative, cfg, device, sampler, sigmas, model
     calculate_start_end_timesteps(model, negative)
     calculate_start_end_timesteps(model, positive)
 
-    if latent_image is not None:
+    if latent_image is not None and torch.count_nonzero(latent_image) > 0: #Don't shift the empty latent image.
         latent_image = model.process_latent_in(latent_image)
 
     if hasattr(model, 'extra_conds'):
@@ -640,14 +630,14 @@ def calculate_sigmas_scheduler(model, scheduler_name, steps):
     elif scheduler_name == "sgm_uniform":
         sigmas = normal_scheduler(model, steps, sgm=True)
     else:
-        print("error invalid scheduler", scheduler_name)
+        logging.error("error invalid scheduler {}".format(scheduler_name))
     return sigmas
 
 def sampler_object(name):
     if name == "uni_pc":
-        sampler = UNIPC()
+        sampler = KSAMPLER(uni_pc.sample_unipc)
     elif name == "uni_pc_bh2":
-        sampler = UNIPCBH2()
+        sampler = KSAMPLER(uni_pc.sample_unipc_bh2)
     elif name == "ddim":
         sampler = ksampler("euler", inpaint_options={"random": True})
     else:
@@ -657,6 +647,7 @@ def sampler_object(name):
 class KSampler:
     SCHEDULERS = SCHEDULER_NAMES
     SAMPLERS = SAMPLER_NAMES
+    DISCARD_PENULTIMATE_SIGMA_SAMPLERS = set(('dpm_2', 'dpm_2_ancestral', 'uni_pc', 'uni_pc_bh2'))
 
     def __init__(self, model, steps, device, sampler=None, scheduler=None, denoise=None, model_options={}):
         self.model = model
@@ -675,7 +666,7 @@ class KSampler:
         sigmas = None
 
         discard_penultimate_sigma = False
-        if self.sampler in ['dpm_2', 'dpm_2_ancestral', 'uni_pc', 'uni_pc_bh2']:
+        if self.sampler in self.DISCARD_PENULTIMATE_SIGMA_SAMPLERS:
             steps += 1
             discard_penultimate_sigma = True
 

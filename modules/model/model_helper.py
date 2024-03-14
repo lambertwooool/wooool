@@ -1,3 +1,4 @@
+import importlib
 import json
 import math
 import os
@@ -253,6 +254,18 @@ def state_dict_prefix_replace(state_dict, replace_prefix, filter_keys=False):
             out[x[1]] = w
     return out
 
+def clip_text_transformers_convert(sd, prefix_from, prefix_to):
+    sd = transformers_convert(sd, prefix_from, "{}text_model.".format(prefix_to), 32)
+
+    tp = "{}text_projection.weight".format(prefix_from)
+    if tp in sd:
+        sd["{}text_projection.weight".format(prefix_to)] = sd.pop(tp)
+
+    tp = "{}text_projection".format(prefix_from)
+    if tp in sd:
+        sd["{}text_projection.weight".format(prefix_to)] = sd.pop(tp).transpose(0, 1).contiguous()
+    return sd
+
 def transformers_convert(sd, prefix_from, prefix_to, number):
     keys_to_replace = {
         "{}positional_embedding": "{}embeddings.position_embedding.weight",
@@ -460,6 +473,9 @@ def set_attr(obj, attr, value):
     prev = getattr(obj, attrs[-1])
     setattr(obj, attrs[-1], torch.nn.Parameter(value))
     del prev
+
+def set_attr_param(obj, attr, value):
+    return set_attr(obj, attr, torch.nn.Parameter(value, requires_grad=False))
 
 def copy_to_param(obj, attr, value):
     # inplace update tensor instead of replacing it

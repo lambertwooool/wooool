@@ -7,7 +7,7 @@ from modules.model import model_loader, model_detection, model_patcher, model_he
 import modules.model.cldm.cldm as cldm
 import modules.model.t2i_adapter.adapter as t2i_adapter
 import modules.model.ops as ops
-
+import modules.model.ldm.cascade.controlnet
 
 def broadcast_image_to(tensor, target_batch_size, batched_number):
     current_batch_size = tensor.shape[0]
@@ -35,6 +35,8 @@ class ControlBase:
         self.timestep_percent_range = (0.0, 1.0)
         self.global_average_pooling = False
         self.timestep_range = None
+        self.compression_ratio = 8
+        self.upscale_algorithm = 'nearest-exact'
 
         if device is None:
             device = devices.get_torch_device()
@@ -75,6 +77,8 @@ class ControlBase:
         c.strength = self.strength
         c.timestep_percent_range = self.timestep_percent_range
         c.global_average_pooling = self.global_average_pooling
+        c.compression_ratio = self.compression_ratio
+        c.upscale_algorithm = self.upscale_algorithm
 
     def inference_memory_requirements(self, dtype):
         if self.previous_controlnet is not None:
@@ -156,11 +160,11 @@ class ControlNet(ControlBase):
             dtype = self.manual_cast_dtype
 
         output_dtype = x_noisy.dtype
-        if self.cond_hint is None or x_noisy.shape[2] * 8 != self.cond_hint.shape[2] or x_noisy.shape[3] * 8 != self.cond_hint.shape[3]:
+        if self.cond_hint is None or x_noisy.shape[2] * self.compression_ratio != self.cond_hint.shape[2] or x_noisy.shape[3] * self.compression_ratio != self.cond_hint.shape[3]:
             if self.cond_hint is not None:
                 del self.cond_hint
             self.cond_hint = None
-            self.cond_hint = model_helper.common_upscale(self.cond_hint_original, x_noisy.shape[3] * 8, x_noisy.shape[2] * 8, 'nearest-exact', "center").to(dtype).to(self.device)
+            self.cond_hint = model_helper.common_upscale(self.cond_hint_original, x_noisy.shape[3] * self.compression_ratio, x_noisy.shape[2] * self.compression_ratio, self.upscale_algorithm, "center").to(dtype).to(self.device)
         if x_noisy.shape[0] != self.cond_hint.shape[0]:
             self.cond_hint = broadcast_image_to(self.cond_hint, x_noisy.shape[0], batched_number)
 
@@ -285,13 +289,13 @@ class ControlLora(ControlNet):
         for k in sd:
             weight = sd[k]
             try:
-                model_helper.set_attr(self.control_model, k, weight)
+                model_helper.set_attr_param(self.control_model, k, weight)
             except:
                 pass
 
         for k in self.control_weights:
             if k not in {"lora_controlnet"}:
-                model_helper.set_attr(self.control_model, k, self.control_weights[k].to(dtype).to(devices.get_torch_device()))
+                model_helper.set_attr_param(self.control_model, k, self.control_weights[k].to(dtype).to(devices.get_torch_device()))
 
     def copy(self):
         c = ControlLora(self.control_weights, global_average_pooling=self.global_average_pooling)
@@ -316,9 +320,9 @@ def load_controlnet(ckpt_path, model=None):
         return ControlLora(controlnet_data)
 
     controlnet_config = None
+    supported_inference_dtypes = None
     if "controlnet_cond_embedding.conv_in.weight" in controlnet_data: #diffusers format
-        unet_dtype = devices.dtype()
-        controlnet_config = model_detection.unet_config_from_diffusers_unet(controlnet_data, unet_dtype)
+        controlnet_config = model_detection.unet_config_from_diffusers_unet(controlnet_data)
         diffusers_keys = model_helper.unet_to_diffusers(controlnet_config)
         diffusers_keys["controlnet_mid_block.weight"] = "middle_block_out.0.weight"
         diffusers_keys["controlnet_mid_block.bias"] = "middle_block_out.0.bias"
@@ -378,12 +382,20 @@ def load_controlnet(ckpt_path, model=None):
         return net
 
     if controlnet_config is None:
-        unet_dtype = devices.dtype()
-        controlnet_config = model_detection.model_config_from_unet(controlnet_data, prefix, unet_dtype, True).unet_config
-    load_device = model_loader.run_device("controlnet")
+        model_config = model_detection.model_config_from_unet(controlnet_data, prefix, True)
+        supported_inference_dtypes = model_config.supported_inference_dtypes
+        controlnet_config = model_config.unet_config
+
+    load_device = devices.get_torch_device()
+    if supported_inference_dtypes is None:
+        unet_dtype = devices.unet_dtype()
+    else:
+        unet_dtype = devices.unet_dtype(supported_dtypes=supported_inference_dtypes)
+
     manual_cast_dtype = devices.unet_manual_cast(unet_dtype, load_device)
     if manual_cast_dtype is not None:
         controlnet_config["operations"] = ops.manual_cast
+    controlnet_config["dtype"] = unet_dtype
     controlnet_config.pop("out_channels")
     controlnet_config["hint_channels"] = controlnet_data["{}input_hint_block.0.weight".format(prefix)].shape[1]
     control_model = cldm.ControlNet(**controlnet_config)
@@ -423,11 +435,13 @@ def load_controlnet(ckpt_path, model=None):
     return control
 
 class T2IAdapter(ControlBase):
-    def __init__(self, t2i_model, channels_in, device=None):
+    def __init__(self, t2i_model, channels_in, compression_ratio, upscale_algorithm, device=None):
         super().__init__(device)
         self.t2i_model = t2i_model
         self.channels_in = channels_in
         self.control_input = None
+        self.compression_ratio = compression_ratio
+        self.upscale_algorithm = upscale_algorithm
 
     def scale_image_to(self, width, height):
         unshuffle_amount = self.t2i_model.unshuffle_amount
@@ -447,13 +461,13 @@ class T2IAdapter(ControlBase):
                 else:
                     return None
 
-        if self.cond_hint is None or x_noisy.shape[2] * 8 != self.cond_hint.shape[2] or x_noisy.shape[3] * 8 != self.cond_hint.shape[3]:
+        if self.cond_hint is None or x_noisy.shape[2] * self.compression_ratio != self.cond_hint.shape[2] or x_noisy.shape[3] * self.compression_ratio != self.cond_hint.shape[3]:
             if self.cond_hint is not None:
                 del self.cond_hint
             self.control_input = None
             self.cond_hint = None
-            width, height = self.scale_image_to(x_noisy.shape[3] * 8, x_noisy.shape[2] * 8)
-            self.cond_hint = model_helper.common_upscale(self.cond_hint_original, width, height, 'nearest-exact', "center").float().to(self.device)
+            width, height = self.scale_image_to(x_noisy.shape[3] * self.compression_ratio, x_noisy.shape[2] * self.compression_ratio)
+            self.cond_hint = model_helper.common_upscale(self.cond_hint_original, width, height, self.upscale_algorithm, "center").float().to(self.device)
             if self.channels_in == 1 and self.cond_hint.shape[1] > 1:
                 self.cond_hint = torch.mean(self.cond_hint, 1, keepdim=True)
         if x_noisy.shape[0] != self.cond_hint.shape[0]:
@@ -472,11 +486,14 @@ class T2IAdapter(ControlBase):
         return self.control_merge(control_input, mid, control_prev, x_noisy.dtype)
 
     def copy(self):
-        c = T2IAdapter(self.t2i_model, self.channels_in)
+        c = T2IAdapter(self.t2i_model, self.channels_in, self.compression_ratio, self.upscale_algorithm)
         self.copy_to(c)
         return c
 
 def load_t2i_adapter(t2i_data):
+    compression_ratio = 8
+    upscale_algorithm = 'nearest-exact'
+
     if 'adapter' in t2i_data:
         t2i_data = t2i_data['adapter']
     if 'adapter.body.0.resnets.0.block1.weight' in t2i_data: #diffusers format
@@ -504,8 +521,17 @@ def load_t2i_adapter(t2i_data):
         if cin == 256 or cin == 768:
             xl = True
         model_ad = t2i_adapter.Adapter(cin=cin, channels=[channel, channel*2, channel*4, channel*4][:4], nums_rb=2, ksize=ksize, sk=True, use_conv=use_conv, xl=xl)
+    elif "backbone.0.0.weight" in keys:
+        model_ad = modules.model.ldm.cascade.controlnet.ControlNet(c_in=t2i_data['backbone.0.0.weight'].shape[1], proj_blocks=[0, 4, 8, 12, 51, 55, 59, 63])
+        compression_ratio = 32
+        upscale_algorithm = 'bilinear'
+    elif "backbone.10.blocks.0.weight" in keys:
+        model_ad = modules.model.ldm.cascade.controlnet.ControlNet(c_in=t2i_data['backbone.0.weight'].shape[1], bottleneck_mode="large", proj_blocks=[0, 4, 8, 12, 51, 55, 59, 63])
+        compression_ratio = 1
+        upscale_algorithm = 'nearest-exact'
     else:
         return None
+
     missing, unexpected = model_ad.load_state_dict(t2i_data)
     if len(missing) > 0:
         print("t2i missing", missing)
@@ -513,4 +539,4 @@ def load_t2i_adapter(t2i_data):
     if len(unexpected) > 0:
         print("t2i unexpected", unexpected)
 
-    return T2IAdapter(model_ad, model_ad.input_channels)
+    return T2IAdapter(model_ad, model_ad.input_channels, compression_ratio, upscale_algorithm)
