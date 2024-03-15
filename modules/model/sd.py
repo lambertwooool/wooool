@@ -220,7 +220,7 @@ class VAE:
             want_use_dtype = torch.bfloat16
         self.vae_dtype = devices.dtype(device, want_use_dtype=want_use_dtype)
         self.first_stage_model.to(self.vae_dtype)
-        self.output_device = torch.device("cpu")
+        self.output_device = device
 
         self.patcher = model_patcher.ModelPatcher(self.first_stage_model, load_device=self.device, offload_device=offload_device)
 

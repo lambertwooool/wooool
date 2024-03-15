@@ -15,7 +15,7 @@ import modules.options as opts
 import modules.paths
 from modules import clip_helper, civitai, core, controlnet_helper, devices, style_aligned, prompt_helper, shared, util, vae_helper, upscaler_esrgan, gfpgan_model
 from modules.model.model_base import BaseModel, SDXL, SDXLRefiner
-from modules.model import model_loader, model_helper, sample, samplers
+from modules.model import model_loader, model_helper, sample, samplers, latent_formats
 from modules.controlnet.processor import Processor as controlnet_processor
 
 def handler(task):
@@ -369,7 +369,11 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
 
         if image_pixel is None:
             denoise = 1.0
-            latent = core.generate_empty_latent(width=width, height=height, batch_size=1)
+            if not isinstance(unet_model.model.latent_format, latent_formats.SC_Prior):
+                latent = core.generate_empty_latent(width=width, height=height, batch_size=1, channel=4, compression=8)
+            else:
+                latent = core.generate_empty_latent(width=width, height=height, batch_size=1, channel=16, compression=42)
+                latent_scb = core.generate_empty_latent(width=width, height=height, batch_size=1, channel=4, compression=4)
         else:
             image_pixel_torch = util.numpy_to_pytorch(image_pixel)
             image_mask_torch = util.numpy_to_pytorch(image_mask)
@@ -402,7 +406,11 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
             task["skip"] = False
             raise UserStopException()
         
-        preview_image = vae_helper.decode_vae_preview(refiner_unet_model if is_refiner else unet_model, x0)
+        # preview_image = vae_helper.decode_vae_preview(refiner_unet_model if is_refiner else unet_model, x0)
+
+        model = refiner_unet_model if is_refiner else unet_model
+        previewer = vae_helper.get_previewer(model.model.latent_format)
+        preview_image = previewer.decode_latent_to_preview_image(x0)
         
         switch_step = step_base - 1
         if step == switch_step:
@@ -421,7 +429,7 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
         cond_or_uncond = args.pop("cond_or_uncond")
         return func(args.pop("input"), args.pop("timestep"), **args.pop("c"))
 
-    unet_model.model_options["model_function_wrapper"] = model_function_wrapper
+    # unet_model.model_options["model_function_wrapper"] = model_function_wrapper
     core.rescale_cfg(unet_model, cfg_multiplier, cfg_scale_to)
     
     latent_image = latent["samples"]

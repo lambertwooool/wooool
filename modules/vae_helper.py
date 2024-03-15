@@ -9,6 +9,35 @@ from modules import devices
 
 VAE_approx_models = {}
 
+class LatentPreviewer:
+    def decode_latent_to_preview(self, x0):
+        pass
+
+    def decode_latent_to_preview_image(self, x0):
+        preview_image = self.decode_latent_to_preview(x0)
+        return preview_image.cpu().numpy().clip(0, 255).astype(np.uint8)
+
+class Latent2RGBPreviewer(LatentPreviewer):
+    def __init__(self, latent_rgb_factors):
+        self.latent_rgb_factors = torch.tensor(latent_rgb_factors, device="cpu")
+
+    def decode_latent_to_preview(self, x0):
+        latent_image = x0[0].permute(1, 2, 0).cpu() @ self.latent_rgb_factors
+
+        latents_ubyte = (((latent_image + 1) / 2)
+                            .clamp(0, 1)  # change scale from -1..1 to 0..1
+                            .mul(0xFF)  # to 0..255
+                            .byte()).cpu()
+
+        return latents_ubyte
+
+def get_previewer(latent_format):
+    previewer = None
+    if latent_format.latent_rgb_factors is not None:
+        previewer = Latent2RGBPreviewer(latent_format.latent_rgb_factors)
+
+    return previewer
+
 class VAEApprox(torch.nn.Module):
     def __init__(self):
         super(VAEApprox, self).__init__()

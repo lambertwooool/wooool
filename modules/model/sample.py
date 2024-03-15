@@ -26,9 +26,8 @@ def prepare_noise(latent_image, seed, noise_inds=None):
 def prepare_mask(noise_mask, shape, device):
     """ensures noise mask is of proper dimensions"""
     noise_mask = torch.nn.functional.interpolate(noise_mask.reshape((-1, 1, noise_mask.shape[-2], noise_mask.shape[-1])), size=(shape[2], shape[3]), mode="bilinear")
-    noise_mask = noise_mask.round()
     noise_mask = torch.cat([noise_mask] * shape[1], dim=1)
-    noise_mask = util.repeat_to_batch_size(noise_mask, shape[0])
+    noise_mask = model_helper.repeat_to_batch_size(noise_mask, shape[0])
     noise_mask = noise_mask.to(device)
     return noise_mask
 
@@ -45,7 +44,8 @@ def convert_cond(cond):
         temp = c[1].copy()
         model_conds = temp.get("model_conds", {})
         if c[0] is not None:
-            model_conds["c_crossattn"] = conds.CONDCrossAttn(c[0])
+            model_conds["c_crossattn"] = conds.CONDCrossAttn(c[0]) #TODO: remove
+            temp["cross_attn"] = c[0]
         temp["model_conds"] = model_conds
         out.append(temp)
     return out
@@ -81,7 +81,7 @@ def prepare_sampling(model, noise_shape, positive, negative, noise_mask):
 
     real_model = None
     models, inference_memory = get_additional_models(positive, negative, model.model_dtype())
-    model_loader.load_models_gpu([model] + models, model.memory_required(noise_shape) + inference_memory)
+    model_loader.load_models_gpu([model] + models, model.memory_required([noise_shape[0] * 2] + list(noise_shape[1:])) + inference_memory)
     real_model = model.model
 
     return real_model, positive, negative, noise_mask, models
@@ -99,7 +99,7 @@ def sample(model, noise, steps, cfg, sampler_name, scheduler, positive, negative
     samples = samples.cpu()
 
     cleanup_additional_models(models)
-    cleanup_additional_models(set(get_models_from_cond(positive, "control") + get_models_from_cond(negative, "control")))
+    cleanup_additional_models(set(get_models_from_cond(positive_copy, "control") + get_models_from_cond(negative_copy, "control")))
     return samples
 
 def sample_custom(model, noise, cfg, sampler, sigmas, positive, negative, latent_image, noise_mask=None, callback=None, disable_pbar=False, seed=None):
@@ -111,6 +111,6 @@ def sample_custom(model, noise, cfg, sampler, sigmas, positive, negative, latent
     samples = samplers.sample(real_model, noise, positive_copy, negative_copy, cfg, model.load_device, sampler, sigmas, model_options=model.model_options, latent_image=latent_image, denoise_mask=noise_mask, callback=callback, disable_pbar=disable_pbar, seed=seed)
     samples = samples.cpu()
     cleanup_additional_models(models)
-    cleanup_additional_models(set(get_models_from_cond(positive, "control") + get_models_from_cond(negative, "control")))
+    cleanup_additional_models(set(get_models_from_cond(positive_copy, "control") + get_models_from_cond(negative_copy, "control")))
     return samples
 

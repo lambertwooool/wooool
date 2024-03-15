@@ -103,6 +103,8 @@ def rescale_cfg(model, cfg_multiplier, cfg_scale_to):
     cond_alpha = 1.0
     if isinstance(model.model.latent_format, latent_formats.SDXL_Playground_2_5):
         cond_alpha = 3.0 / 7.0
+    elif isinstance(model.model.latent_format, latent_formats.SC_Prior):
+        cond_alpha = 1.0 / 7.0
     cfg_scale_to = round(cfg_scale_to * cond_alpha, 1)
 
     def patch_cfg(args):
@@ -173,8 +175,8 @@ def vae_sampled(sampled_latent, vae_model, tiled, task, cur_batch, cur_seed, cur
             os.utime(filename_idx, (atime, mtime))
         print(filename_idx)
 
-def generate_empty_latent(width=1024, height=1024, batch_size=1):
-    latent = torch.zeros([batch_size, 4, height // 8, width // 8])
+def generate_empty_latent(width=1024, height=1024, batch_size=1, channel=4, compression=8):
+    latent = torch.zeros([batch_size, channel, height // compression, width // compression])
     return {"samples":latent}
 
 def assert_model_integrity(xl_base, xl_refiner):

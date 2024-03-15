@@ -9,9 +9,9 @@ device_config = {
     "clip": (False, False),
     "clip_vision": (True, False),
     "annotator": (True, False),
-    "unet": (True, False, torch.float16),
+    "unet": (True, False, torch.float8_e4m3fn),
     "upscaler": (True, False),
-    "controlnet": (True, False, torch.float16),
+    "controlnet": (True, False, torch.float8_e4m3fn),
     "vae": (True, False),
     "face": (True, False),
 }

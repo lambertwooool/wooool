@@ -1,4 +1,5 @@
 from inspect import isfunction
+import logging
 import math
 import torch
 import torch.nn.functional as F
@@ -81,54 +82,68 @@ class FeedForward(nn.Module):
     def forward(self, x):
         return self.net(x)
 
-
-def zero_module(module):
-    """
-    Zero out the parameters of a module and return it.
-    """
-    for p in module.parameters():
-        p.detach().zero_()
-    return module
-
-
 def Normalize(in_channels, dtype=None, device=None):
     return torch.nn.GroupNorm(num_groups=32, num_channels=in_channels, eps=1e-6, affine=True, dtype=dtype, device=device)
 
 def attention_basic(q, k, v, heads, mask=None):
+    b, _, dim_head = q.shape
+    dim_head //= heads
+    scale = dim_head ** -0.5
+
     h = heads
-    scale = (q.shape[-1] // heads) ** -0.5
-    q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h=h), (q, k, v))
+    q, k, v = map(
+        lambda t: t.unsqueeze(3)
+        .reshape(b, -1, heads, dim_head)
+        .permute(0, 2, 1, 3)
+        .reshape(b * heads, -1, dim_head)
+        .contiguous(),
+        (q, k, v),
+    )
 
     # force cast to fp32 to avoid overflowing
     if _ATTN_PRECISION =="fp32":
-        with torch.autocast(enabled=False, device_type = 'cuda'):
-            q, k = q.float(), k.float()
-            sim = einsum('b i d, b j d -> b i j', q, k) * scale
+        sim = einsum('b i d, b j d -> b i j', q.float(), k.float()) * scale
     else:
         sim = einsum('b i d, b j d -> b i j', q, k) * scale
 
     del q, k
 
     if exists(mask):
-        mask = rearrange(mask, 'b ... -> b (...)')
-        max_neg_value = -torch.finfo(sim.dtype).max
-        mask = repeat(mask, 'b j -> (b h) () j', h=h)
-        sim.masked_fill_(~mask, max_neg_value)
+        if mask.dtype == torch.bool:
+            mask = rearrange(mask, 'b ... -> b (...)') #TODO: check if this bool part matches pytorch attention
+            max_neg_value = -torch.finfo(sim.dtype).max
+            mask = repeat(mask, 'b j -> (b h) () j', h=h)
+            sim.masked_fill_(~mask, max_neg_value)
+        else:
+            if len(mask.shape) == 2:
+                bs = 1
+            else:
+                bs = mask.shape[0]
+            mask = mask.reshape(bs, -1, mask.shape[-2], mask.shape[-1]).expand(b, heads, -1, -1).reshape(-1, mask.shape[-2], mask.shape[-1])
+            sim.add_(mask)
 
     # attention, what we cannot get enough of
     sim = sim.softmax(dim=-1)
 
     out = einsum('b i j, b j d -> b i d', sim.to(v.dtype), v)
-    out = rearrange(out, '(b h) n d -> b n (h d)', h=h)
+    out = (
+        out.unsqueeze(0)
+        .reshape(b, heads, -1, dim_head)
+        .permute(0, 2, 1, 3)
+        .reshape(b, -1, heads * dim_head)
+    )
     return out
 
 
 def attention_sub_quad(query, key, value, heads, mask=None):
-    scale = (query.shape[-1] // heads) ** -0.5
-    query = query.unflatten(-1, (heads, -1)).transpose(1,2).flatten(end_dim=1)
-    key_t = key.transpose(1,2).unflatten(1, (heads, -1)).flatten(end_dim=1)
-    del key
-    value = value.unflatten(-1, (heads, -1)).transpose(1,2).flatten(end_dim=1)
+    b, _, dim_head = query.shape
+    dim_head //= heads
+
+    scale = dim_head ** -0.5
+    query = query.unsqueeze(3).reshape(b, -1, heads, dim_head).permute(0, 2, 1, 3).reshape(b * heads, -1, dim_head)
+    value = value.unsqueeze(3).reshape(b, -1, heads, dim_head).permute(0, 2, 1, 3).reshape(b * heads, -1, dim_head)
+
+    key = key.unsqueeze(3).reshape(b, -1, heads, dim_head).permute(0, 2, 3, 1).reshape(b * heads, dim_head, -1)
 
     dtype = query.dtype
     upcast_attention = _ATTN_PRECISION =="fp32" and query.dtype != torch.float32
@@ -137,7 +152,7 @@ def attention_sub_quad(query, key, value, heads, mask=None):
     else:
         bytes_per_token = torch.finfo(query.dtype).bits//8
     batch_x_heads, q_tokens, _ = query.shape
-    _, _, k_tokens = key_t.shape
+    _, _, k_tokens = key.shape
     qk_matmul_size_bytes = batch_x_heads * bytes_per_token * q_tokens * k_tokens
 
     mem_free_total, mem_free_torch = devices.get_free_memory(get_all=True)
@@ -145,39 +160,36 @@ def attention_sub_quad(query, key, value, heads, mask=None):
     chunk_threshold_bytes = mem_free_torch * 0.5 #Using only this seems to work better on AMD
 
     kv_chunk_size_min = None
+    kv_chunk_size = None
+    query_chunk_size = None
 
-    #not sure at all about the math here
-    #TODO: tweak this
-    if mem_free_total > 8192 * 1024 * 1024 * 1.3:
-        query_chunk_size_x = 1024 * 4
-    elif mem_free_total > 4096 * 1024 * 1024 * 1.3:
-        query_chunk_size_x = 1024 * 2
-    else:
-        query_chunk_size_x = 1024
-    kv_chunk_size_min_x = None
-    kv_chunk_size_x = (int((chunk_threshold_bytes // (batch_x_heads * bytes_per_token * query_chunk_size_x)) * 2.0) // 1024) * 1024
-    if kv_chunk_size_x < 1024:
-        kv_chunk_size_x = None
+    for x in [4096, 2048, 1024, 512, 256]:
+        count = mem_free_total / (batch_x_heads * bytes_per_token * x * 4.0)
+        if count >= k_tokens:
+            kv_chunk_size = k_tokens
+            query_chunk_size = x
+            break
 
-    if chunk_threshold_bytes is not None and qk_matmul_size_bytes <= chunk_threshold_bytes:
-        # the big matmul fits into our memory limit; do everything in 1 chunk,
-        # i.e. send it down the unchunked fast-path
-        query_chunk_size = q_tokens
-        kv_chunk_size = k_tokens
-    else:
-        query_chunk_size = query_chunk_size_x
-        kv_chunk_size = kv_chunk_size_x
-        kv_chunk_size_min = kv_chunk_size_min_x
+    if query_chunk_size is None:
+        query_chunk_size = 512
+
+    if mask is not None:
+        if len(mask.shape) == 2:
+            bs = 1
+        else:
+            bs = mask.shape[0]
+        mask = mask.reshape(bs, -1, mask.shape[-2], mask.shape[-1]).expand(b, heads, -1, -1).reshape(-1, mask.shape[-2], mask.shape[-1])
 
     hidden_states = efficient_dot_product_attention(
         query,
-        key_t,
+        key,
         value,
         query_chunk_size=query_chunk_size,
         kv_chunk_size=kv_chunk_size,
         kv_chunk_size_min=kv_chunk_size_min,
         use_checkpoint=False,
         upcast_attention=upcast_attention,
+        mask=mask,
     )
 
     hidden_states = hidden_states.to(dtype)
@@ -226,6 +238,13 @@ def attention_split(q, k, v, heads, mask=None):
         raise RuntimeError(f'Not enough memory, use lower resolution (max approx. {max_res}x{max_res}). '
                             f'Need: {mem_required/64/gb:0.1f}GB free, Have:{mem_free_total/gb:0.1f}GB free')
 
+    if mask is not None:
+        if len(mask.shape) == 2:
+            bs = 1
+        else:
+            bs = mask.shape[0]
+        mask = mask.reshape(bs, -1, mask.shape[-2], mask.shape[-1]).expand(b, heads, -1, -1).reshape(-1, mask.shape[-2], mask.shape[-1])
+
     # print("steps", steps, mem_required, mem_free_total, modifier, q.element_size(), tensor_size)
     first_op_done = False
     cleared_cache = False
@@ -258,12 +277,12 @@ def attention_split(q, k, v, heads, mask=None):
                 devices.torch_gc()
                 if cleared_cache == False:
                     cleared_cache = True
-                    print("out of memory error, emptying cache and trying again")
+                    logging.warning("out of memory error, emptying cache and trying again")
                     continue
                 steps *= 2
                 if steps > 64:
                     raise e
-                print("out of memory error, increasing steps and trying again", steps)
+                logging.warning("out of memory error, increasing steps and trying again {}".format(steps))
             else:
                 raise e
 
@@ -331,13 +350,14 @@ def attention_pytorch(q, k, v, heads, mask=None):
     )
     return out
 
+
 optimized_attention = attention_basic
 
 if devices.is_xformers_enable():
-    print("Using xformers cross attention")
+    logging.info("Using xformers cross attention")
     optimized_attention = attention_xformers
 elif devices.is_pytorch_attention_enable():
-    print("Using pytorch cross attention")
+    logging.info("Using pytorch cross attention")
     optimized_attention = attention_pytorch
 else:
     optimized_attention = attention_sub_quad
@@ -364,6 +384,7 @@ def optimized_attention_for_device(device, mask=False, small_input=False):
         return optimized_attention_masked
 
     return optimized_attention
+
 
 class CrossAttention(nn.Module):
     def __init__(self, query_dim, context_dim=None, heads=8, dim_head=64, dropout=0., dtype=None, device=None, operations=ops):
@@ -619,6 +640,7 @@ class SpatialTransformer(nn.Module):
         if not self.use_linear:
             x = self.proj_out(x)
         return x + x_in
+
 
 class SpatialVideoTransformer(SpatialTransformer):
     def __init__(
