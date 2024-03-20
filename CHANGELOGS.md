@@ -5,6 +5,8 @@
 - Support playground V2.5 generate
 - add sdxl tile controlnet
 - Optimize the CFG algorithm and add CFG scaling
+- Apply freeU optimize image
+- Apply differential diffusion optimize vary, zoom and resize
 
 ## 0.8.7
 - Base and Controlnet Model use FP8

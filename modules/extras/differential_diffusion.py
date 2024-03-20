@@ -1,7 +1,7 @@
 import torch
 
 def apply(model):
-    def forward(self, sigma: torch.Tensor, denoise_mask: torch.Tensor, extra_options: dict):
+    def forward(sigma: torch.Tensor, denoise_mask: torch.Tensor, extra_options: dict):
         model = extra_options["model"]
         step_sigmas = extra_options["sigmas"]
         sigma_to = model.inner_model.model_sampling.sigma_min

@@ -1,4 +1,5 @@
 import torch
+from modules.model import latent_formats, model_sampling
 
 def Rescale_cfg(model, cfg_multiplier, cfg_scale_to):
     sigma_max = model.model.model_sampling.sigma_max

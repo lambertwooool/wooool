@@ -62,7 +62,7 @@ def get_base_model(model_path):
     if "patches" in xl_base.unet.model_options["transformer_options"]:
         xl_base.unet.model_options["transformer_options"].pop("patches")
 
-    model = xl_base.clone()
+    model = StableDiffusionModel(xl_base.unet.clone(), xl_base.vae, xl_base.clip.clone(), xl_base.clip_vision)
     
     return model
 
@@ -84,11 +84,11 @@ def get_refiner_model(model_path):
         # else:
         #     xl_refiner.clip = None
 
-    model = xl_refiner.clone()
-
+    model = StableDiffusionModel(xl_refiner.unet.clone(), xl_refiner.vae, xl_refiner.clip.clone(), xl_refiner.clip_vision)
+    
     return model
 
-def get_scb_model(model):
+def get_scb_model(model_path):
     if shared.scb_model is not None and shared.scb_model[0] == model_path:
         scb_model = shared.scb_model[1]
         print(f'Cascade stageB model loaded from cache: {model_path}')

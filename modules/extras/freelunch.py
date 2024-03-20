@@ -44,7 +44,16 @@ def FreeU(model, b1=1.1, b2=1.2, s1=0.9, s2=0.2):
 
     model.set_model_output_block_patch(output_block_patch)
 
+def FreeU_V2S(model, scale=1.0):
+    base = { "b1":1.3, "b2":1.4, "s1":0.9, "s2":0.2 }
+    base = { k: round(1 + (v - 1) * scale, 2) for k, v in base.items() }
+    base["s2"] = (base["s2"] + 0.2) / 2
+    FreeU_V2(model, **base)
+
 def FreeU_V2(model, b1=1.3, b2=1.4, s1=0.9, s2=0.2):
+    if not "model_channels" in model.model.model_config.unet_config:
+        return
+    
     model_channels = model.model.model_config.unet_config["model_channels"]
     scale_dict = {model_channels * 4: (b1, s1), model_channels * 2: (b2, s2)}
     on_cpu_devices = {}

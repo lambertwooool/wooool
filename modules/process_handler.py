@@ -17,7 +17,7 @@ from modules import clip_helper, civitai, core, controlnet_helper, devices, styl
 from modules.model.model_base import BaseModel, SDXL, SDXLRefiner
 from modules.model import model_loader, model_helper, sample, samplers, latent_formats
 from modules.controlnet.processor import Processor as controlnet_processor
-from modules.exists import freelunch, model_advanced
+from modules.extras import differential_diffusion, freelunch, model_advanced, perpneg, sag
 
 def handler(task):
     style = task.get("style", None)
@@ -272,7 +272,7 @@ def progress_scb(model_path, lantent_stage_c, positive_cond, negative_cond, cur_
         c = []
         for t in conditioning:
             d = t[1].copy()
-            d['stable_cascade_prior'] = lantent_stage_c
+            d['stable_cascade_prior'] = stage_c
             n = [t[0], d]
             c.append(n)
         return (c, )
@@ -281,9 +281,9 @@ def progress_scb(model_path, lantent_stage_c, positive_cond, negative_cond, cur_
 
     sampled_latent = sample.sample(
             model=scb_model,
-            positive=cur_positive_cond,
-            negative=cur_negative_cond,
-            latent_image=lantent,
+            positive=positive_cond,
+            negative=negative_cond,
+            latent_image=lantent_stage_c,
             noise=cur_noise,
             steps=steps, start_step=0, last_step=steps,
             cfg=cfg_scale,
@@ -470,6 +470,10 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
 
     # unet_model.model_options["model_function_wrapper"] = model_function_wrapper
     model_advanced.Rescale_cfg(unet_model, cfg_multiplier, cfg_scale_to)
+    freelunch.FreeU_V2S(unet_model, 0.4)
+    # perpneg.apply(unet_model, clip_helper.clip_encode(clip_model, [""], model_type), 1.0)
+    # sag.apply(unet_model, 1.2, 0.3)
+    differential_diffusion.apply(unet_model)
     
     latent_image = latent["samples"]
     latent_mask = latent.get("noise_mask", None)
@@ -533,9 +537,9 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
                     disable_pbar=False
                 )
 
-                if isinstance(scb_model.model.latent_format, latent_formats.SC_Prior):
+                if isinstance(unet_model.model.latent_format, latent_formats.SC_Prior):
                     sampled_latent, vae_model = progress_scb(
-                        model_path, sampled_latent,
+                        base_path, sampled_latent,
                         cur_positive_cond, cur_negative_cond,
                         cur_noise, 10, cur_seed,
                         sampler_name, scheduler_name,
