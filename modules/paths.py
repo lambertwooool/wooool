@@ -31,6 +31,7 @@ clip_vision_models_path = get_path('clip_vision_models_path', '../models/clip_vi
 annotator_models_path = get_path('annotator_models_path', '../models/annotator/')
 face_models_path = get_path('face_models_path', '../models/faces/')
 wd14tagger_path = get_path('wd14tagger_path', '../models/wd14tagger/')
+layerd_path = get_path('layerd_path', '../models/layerd/')
 
 temp_outputs_path = get_path('temp_outputs_path', '../outputs/')
 scripts_path = get_path('scripts_path', '../web/javascript/')

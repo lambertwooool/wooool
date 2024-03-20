@@ -61,8 +61,10 @@ def get_base_model(model_path):
     
     if "patches" in xl_base.unet.model_options["transformer_options"]:
         xl_base.unet.model_options["transformer_options"].pop("patches")
+
+    model = xl_base.clone()
     
-    return xl_base
+    return model
 
 def get_refiner_model(model_path):
     if shared.xl_refiner is not None and shared.xl_refiner[0] == model_path:
@@ -82,7 +84,22 @@ def get_refiner_model(model_path):
         # else:
         #     xl_refiner.clip = None
 
-    return xl_refiner
+    model = xl_refiner.clone()
+
+    return model
+
+def get_scb_model(model):
+    if shared.scb_model is not None and shared.scb_model[0] == model_path:
+        scb_model = shared.scb_model[1]
+        print(f'Cascade stageB model loaded from cache: {model_path}')
+    else:
+        scb_model = load_model(model_path)
+        shared.scb_model = (model_path, scb_model)
+        print(f'Cascade stageB model loaded: {model_path}')
+
+    model = scb_model.clone()
+
+    return model
 
 def get_loras(model, loras):
     xl_base_patched = model
@@ -97,41 +114,6 @@ def get_loras(model, loras):
             print(f'[LoRA Ignore] {name}')
 
     return xl_base_patched
-
-def rescale_cfg(model, cfg_multiplier, cfg_scale_to):
-    sigma_max = model.model.model_sampling.sigma_max
-    cond_alpha = 1.0
-    if isinstance(model.model.latent_format, latent_formats.SDXL_Playground_2_5):
-        cond_alpha = 3.0 / 7.0
-    elif isinstance(model.model.latent_format, latent_formats.SC_Prior):
-        cond_alpha = 1.0 / 7.0
-    cfg_scale_to = round(cfg_scale_to * cond_alpha, 1)
-
-    def patch_cfg(args):
-        cond = args["cond"]
-        uncond = args["uncond"]
-        cond_scale = round(args["cond_scale"] * cond_alpha, 1)
-        sigma = args["sigma"]   
-        sigma = sigma.view(sigma.shape[:1] + (1,) * (cond.ndim - 1))
-        x_orig = args["input"]
-
-        #rescale cfg has to be done on v-pred model output
-        x = x_orig / (sigma * sigma + 1.0)
-        cond = ((x - (x_orig - cond)) * (sigma ** 2 + 1.0) ** 0.5) / (sigma)
-        uncond = ((x - (x_orig - uncond)) * (sigma ** 2 + 1.0) ** 0.5) / (sigma)
-
-        #rescalecfg
-        cond_scale = cfg_scale_to + (cond_scale - cfg_scale_to) * sigma[0] / sigma_max
-        x_cfg = uncond + cond_scale * (cond - uncond)
-        ro_pos = torch.std(cond, dim=(1,2,3), keepdim=True)
-        ro_cfg = torch.std(x_cfg, dim=(1,2,3), keepdim=True)
-
-        x_rescaled = x_cfg * (ro_pos / ro_cfg)
-        x_final = cfg_multiplier * x_rescaled + (1.0 - cfg_multiplier) * x_cfg
-
-        return x_orig - (x - x_final * sigma / (sigma * sigma + 1.0) ** 0.5)
-    
-    model.set_model_sampler_cfg_function(patch_cfg)
 
 @torch.no_grad()
 @torch.inference_mode()
@@ -283,18 +265,3 @@ def calculate_sigmas(sampler, model, scheduler, steps, denoise):
         sigmas = sigmas[-(steps + 1):]
     return sigmas
 
-def set_model_sampling(model, sampling, sigma_min=0.002, sigma_max=120.0, sigma_data=1.0):
-    latent_format = None
-    sigma_data = 1.0
-    if sampling == model_sampling.EDM:
-        sigma_data = 0.5
-        latent_format = latent_formats.SDXL_Playground_2_5()
-    
-    class ModelSamplingAdvanced(model_sampling.ModelSamplingContinuousEDM, sampling):
-        pass
-    
-    sampling_patch = ModelSamplingAdvanced(model.model.model_config)
-    sampling_patch.set_parameters(sigma_min, sigma_max, sigma_data)
-    model.add_object_patch("model_sampling", sampling_patch)
-    if latent_format is not None:
-        model.add_object_patch("latent_format", latent_format)

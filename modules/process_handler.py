@@ -17,6 +17,7 @@ from modules import clip_helper, civitai, core, controlnet_helper, devices, styl
 from modules.model.model_base import BaseModel, SDXL, SDXLRefiner
 from modules.model import model_loader, model_helper, sample, samplers, latent_formats
 from modules.controlnet.processor import Processor as controlnet_processor
+from modules.exists import freelunch, model_advanced
 
 def handler(task):
     style = task.get("style", None)
@@ -260,6 +261,44 @@ def progress_output(task, step_type, params=(), picture=None):
 class UserStopException(Exception):
     pass
 
+def progress_scb(model_path, lantent_stage_c, positive_cond, negative_cond, cur_noise, steps,
+        cfg_scale, seed, sampler_name, scheduler_name, callback):
+    scb_model_path = model_path.replace("stage_c", "stage_c")
+    scb_model = core.get_scb_model(scb_model_path)
+
+    assert isinstance(scb_model.model.latent_format, latent_formats.SC_B)
+
+    def set_prior(conditioning, stage_c):
+        c = []
+        for t in conditioning:
+            d = t[1].copy()
+            d['stable_cascade_prior'] = lantent_stage_c
+            n = [t[0], d]
+            c.append(n)
+        return (c, )
+
+    positive_cond = set_prior(positive_cond, lantent_stage_c)
+
+    sampled_latent = sample.sample(
+            model=scb_model,
+            positive=cur_positive_cond,
+            negative=cur_negative_cond,
+            latent_image=lantent,
+            noise=cur_noise,
+            steps=steps, start_step=0, last_step=steps,
+            cfg=cfg_scale,
+            seed=seed,
+            sampler_name=sampler_name,
+            scheduler=scheduler_name,
+            denoise=1.0, disable_noise=False, force_full_denoise=False,
+            callback=callback,
+            noise_mask=None,
+            sigmas=None,
+            disable_pbar=False
+        )
+
+    return sampled_latent, scb_model.vae
+
 @torch.no_grad()
 @torch.inference_mode()
 def process_diffusion(task, base_path, refiner_path, positive, negative, steps, skip_step, size, seeds, subseeds,
@@ -430,7 +469,7 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
         return func(args.pop("input"), args.pop("timestep"), **args.pop("c"))
 
     # unet_model.model_options["model_function_wrapper"] = model_function_wrapper
-    core.rescale_cfg(unet_model, cfg_multiplier, cfg_scale_to)
+    model_advanced.Rescale_cfg(unet_model, cfg_multiplier, cfg_scale_to)
     
     latent_image = latent["samples"]
     latent_mask = latent.get("noise_mask", None)
@@ -493,6 +532,14 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
                     sigmas=None,
                     disable_pbar=False
                 )
+
+                if isinstance(scb_model.model.latent_format, latent_formats.SC_Prior):
+                    sampled_latent, vae_model = progress_scb(
+                        model_path, sampled_latent,
+                        cur_positive_cond, cur_negative_cond,
+                        cur_noise, 10, cur_seed,
+                        sampler_name, scheduler_name,
+                        callback_base_sample)
             else:
                 sampled_latent = latent_image.clone()
 

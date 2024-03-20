@@ -698,13 +698,9 @@ def copy_to_param(obj, attr, value):
     prev = getattr(obj, attrs[-1])
     prev.data.copy_(value)
 
-@torch.no_grad()
-@torch.inference_mode()
 def pytorch_to_numpy(x):
     return [np.clip(255. * y.cpu().numpy(), 0, 255).astype(np.uint8) for y in x]
 
-@torch.no_grad()
-@torch.inference_mode()
 def numpy_to_pytorch(x):
     if x is None:
         return None

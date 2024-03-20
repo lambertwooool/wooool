@@ -5,4 +5,5 @@ args = None
 clip_cond_cache = {}
 xl_base = None
 xl_refiner = None
+scb_model = None
 outputs = []
