@@ -12,6 +12,7 @@ device_config = {
     "unet": (True, False, torch.float16),
     "upscaler": (True, False),
     "controlnet": (True, False, torch.float16),
+    "ipadapter": (True, False, torch.float16),
     "vae": (True, False),
     "face": (True, False),
 }

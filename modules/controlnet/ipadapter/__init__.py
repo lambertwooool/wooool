@@ -49,8 +49,8 @@ class IPAdapterDetector:
     def load(self, cn_type, model_name):
         ip_adapter_path = os.path.join(modules.paths.controlnet_models_path, model_name)
 
-        self.load_device = model_loader.run_device("controlnet")
-        self.offload_device = model_loader.offload_device("controlnet")
+        self.load_device = model_loader.run_device("ipadapter")
+        self.offload_device = model_loader.offload_device("ipadapter")
         self.dtype = devices.dtype(self.load_device)
 
         ip_state_dict = self.load_state_dict(ip_adapter_path)
