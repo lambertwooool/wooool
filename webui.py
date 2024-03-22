@@ -154,7 +154,7 @@ with gr.Blocks(theme=my_theme, title=app_name).queue() as wooool:
                     with gr.Row(elem_id="panel_pro_advanced") as panel_pro_advanced:
                         with gr.Column(scale=20, min_width=200):
                             opt_dict = opt_dict | ui_compent.MakeOpts(["sampler", "scheduler"])
-                            opt_dict = opt_dict | ui_compent.MakeSlider(["cfg_scale", "cfg_scale_to", "cfg_multiplier", "clip_skip"])
+                            opt_dict = opt_dict | ui_compent.MakeSlider(["cfg_scale", "cfg_scale_to", "cfg_multiplier", "free_u", "clip_skip"])
                             opt_dict = opt_dict | ui_compent.MakeOpts(["file_format"], opt_type="Radio")
                         with gr.Column(scale=20, min_width=200):
                             with gr.Row():
@@ -167,6 +167,7 @@ with gr.Blocks(theme=my_theme, title=app_name).queue() as wooool:
                             btn_refresh_model = gr.Button("🔄 Refresh Models", elem_id="btn_refresh_model")
                             opt_dict = opt_dict | ui_compent.MakeSlider(["denoise"])
                             opt_dict = opt_dict | ui_compent.MakeSlider(["style_aligned"])
+                            opt_dict = opt_dict | ui_compent.MakeOpts(["transparent_bg"], opt_type="Radio")
 
                             btn_refresh_model.click(ui_process.RefreshModels, None, [opt_base_model, opt_vary_model, opt_refiner_model])
                             # opt_dict = opt_dict | ui_compent.MakeOpts(["single_vae"], opt_type="Radio")

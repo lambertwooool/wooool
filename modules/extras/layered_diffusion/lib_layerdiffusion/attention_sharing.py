@@ -254,7 +254,7 @@ class AttentionSharingUnit(torch.nn.Module):
 
             return forward
 
-        from comfy.ldm.modules.attention import BasicTransformerBlock
+        from modules.model.ldm.modules.attention import BasicTransformerBlock
 
         BasicTransformerBlock.forward = register_get_transformer_options(
             BasicTransformerBlock.forward

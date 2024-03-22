@@ -17,7 +17,7 @@ from modules import clip_helper, civitai, core, controlnet_helper, devices, styl
 from modules.model.model_base import BaseModel, SDXL, SDXLRefiner
 from modules.model import model_loader, model_helper, sample, samplers, latent_formats
 from modules.controlnet.processor import Processor as controlnet_processor
-from modules.extras import differential_diffusion, freelunch, model_advanced, perpneg, sag
+from modules.extras import differential_diffusion, freelunch, layered_diffusion, model_advanced, perpneg, sag
 
 def handler(task):
     style = task.get("style", None)
@@ -76,7 +76,8 @@ def handler(task):
     size = task.get("size", util.ratios2size(task.get("aspect_ratios", None), pixels ** 2))
     cfg_scale = task.get("cfg_scale", 7.0)
     cfg_scale_to = task.get("cfg_scale_to", cfg_scale)
-    cfg_multiplier = task.get("cfg_multiplier", 1.0)
+    cfg_multiplier = task.get("cfg_multiplier", 0)
+    free_u = task.get("free_u", 0)
     clip_skip = -1 * abs(int(task.get("clip_skip") or 1))
 
     detail = float(task.get("detail", 0))
@@ -97,7 +98,8 @@ def handler(task):
     style_aligned_scale = round(task.get("style_aligned_scale", 0.0), 2)
     sampler = task.get("sampler", "") or default_sampler
     scheduler = task.get("scheduler", "") or default_scheduler
-    file_format = task.get("file_format", "jpeg").lower()   
+    file_format = task.get("file_format", "jpeg").lower()
+    transparent_bg = task.get("transparent_bg", "")
     image, mask = task.get("image", (None, None))
     if size is None:
         size = util.ratios2size(util.size2ratio(image.shape[1], image.shape[0]) if image is not None else (1, 1), pixels ** 2)
@@ -156,6 +158,8 @@ def handler(task):
             '\n[seeds]:', seeds, \
             '\n[subseeds]:', subseeds, \
             '\n[subseed strength]:', subseed_strength, \
+            '\n[freeU]:', free_u, \
+            '\n[layered diffusion]:', transparent_bg, \
             '\n[file_format]:', file_format, \
             '\n[loras]:', loras, \
             '\n[controlnets]:', [(x[0], x[2], x[3], x[4], x[5]) for x in controlnets], \
@@ -192,6 +196,8 @@ def handler(task):
                 cfg_scale=cfg_scale,
                 cfg_scale_to=cfg_scale_to,
                 cfg_multiplier=cfg_multiplier,
+                free_u=free_u,
+                transparent_bg=transparent_bg,
                 loras=loras,
                 controlnets=controlnets,
                 round_batch_size=round_batch_size,
@@ -303,7 +309,8 @@ def progress_scb(model_path, lantent_stage_c, positive_cond, negative_cond, cur_
 @torch.inference_mode()
 def process_diffusion(task, base_path, refiner_path, positive, negative, steps, skip_step, size, seeds, subseeds,
         callback, sampler_name, scheduler_name,
-        latent=None, image=None, denoise=1.0, noise_scale=1.0, cfg_scale=7.0, cfg_scale_to=7.0, cfg_multiplier=1.0, style_aligned_scale=0.0, batch_size=1, loras=[], controlnets=[],
+        latent=None, image=None, denoise=1.0, noise_scale=1.0, cfg_scale=7.0, cfg_scale_to=7.0, batch_size=1, loras=[], controlnets=[],
+        cfg_multiplier=0, free_u=0, style_aligned_scale=0.0, transparent_bg="",
         tiled=False, round_batch_size=8, subseed_strength=1.0, clip_skip=0):
 
     devices.torch_gc()
@@ -345,8 +352,17 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
     unet_model = xl_base_patched.unet
     refiner_unet_model = xl_refiner.unet if xl_refiner is not None else None
     
-    vae_model = xl_refiner.vae if xl_refiner is not None and xl_refiner.vae is not None else xl_base_patched.vae
-    model_loader.load_model_gpu(vae_model.patcher)
+    if xl_refiner is not None and xl_refiner.vae is not None:
+        vae_model = xl_refiner.vae
+        vae_lantent_format = xl_refiner.unet.model.latent_format
+    else:
+        vae_model = xl_base_patched.vae
+        vae_lantent_format = unet_model.model.latent_format
+    transparent_method = {
+        "ATTN": layered_diffusion.LayerMethod.ATTN,
+        "CONV": layered_diffusion.LayerMethod.CONV,
+    }.get(transparent_bg)
+    layer_vae_model = layered_diffusion.LayeredDiffusionDecodeRGBA(device=vae_model.device) if transparent_method else None
 
     width, height = size
     image_pixel, image_mask = image
@@ -437,7 +453,7 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
         while left_sampled_latents:
             progress_output(task, "vae")
             sampled_latent, cur_batch, cur_seed, cur_subseed, filename = left_sampled_latents.pop(0)
-            core.vae_sampled(sampled_latent, vae_model, tiled, task, cur_batch, cur_seed, cur_subseed, filename, image_pixel, image_mask, image_pixel_orgin, re_zoom_point)
+            core.vae_sampled(sampled_latent, vae_model, tiled, task, cur_batch, cur_seed, cur_subseed, filename, image_pixel, image_mask, image_pixel_orgin, re_zoom_point, vae_lantent_format, layer_vae_model=layer_vae_model)
             print("cuda", len(left_sampled_latents))
 
     def callback_base_sample(step, x0, x, total_steps, is_refiner=False):
@@ -470,7 +486,10 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
 
     # unet_model.model_options["model_function_wrapper"] = model_function_wrapper
     model_advanced.Rescale_cfg(unet_model, cfg_multiplier, cfg_scale_to)
-    freelunch.FreeU_V2S(unet_model, 0.4)
+    freelunch.FreeU_V2S(unet_model, free_u)
+    if transparent_method:
+        layer_diff = layered_diffusion.LayeredDiffusionFG()
+        layer_diff.apply_layered_diffusion(unet_model, unet_model.model.latent_format, transparent_method, 1.0)
     # perpneg.apply(unet_model, clip_helper.clip_encode(clip_model, [""], model_type), 1.0)
     # sag.apply(unet_model, 1.2, 0.3)
     differential_diffusion.apply(unet_model)

@@ -193,6 +193,12 @@ mul["cfg_multiplier"] = 0.01
 title["cfg_multiplier"] = "CFG Multiplier %"
 default["cfg_multiplier"] = 70
 
+# FreeU
+options["free_u"] = (0, 100, 5)
+mul["free_u"] = 0.01
+title["free_u"] = "FreeU %"
+default["free_u"] = 40
+
 # Style Aligned
 options["style_aligned"] = (0, 100, 5)
 mul["style_aligned"] = 0.01
@@ -214,6 +220,15 @@ options["single_vae"] = {
 }
 title["single_vae"] = "VAE Mode"
 default["single_vae"] = "CPU and GPU"
+
+# Transparent Background
+options["transparent_bg"] = {
+	"Attn": "ATTN",
+	"Conv": "CONV",
+	"Disable": "",
+}
+title["transparent_bg"] = "Transparent Background"
+default["transparent_bg"] = "Disable"
 
 # Base Step
 options["step_base"] = (0, 80, 1)

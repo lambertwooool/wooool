@@ -70,6 +70,7 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
         "cfg_scale": gen_opts.pop("cfg_scale"),
         "cfg_scale_to": gen_opts.pop("cfg_scale_to"),
         "cfg_multiplier": gen_opts.pop("cfg_multiplier"),
+        "free_u": gen_opts.pop("free_u"),
         "aspect_ratios": gen_opts.pop("ratios"),
         "batch": gen_opts.pop("pic_num"),
         "style": style_item if not gen_opts.pop("disable_style", False) else None,
@@ -87,6 +88,7 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
         "detail": gen_opts.pop("detail"),
         "denoise": gen_opts.pop("denoise"),
         "file_format": gen_opts.pop("file_format"),
+        "transparent_bg": gen_opts.pop("transparent_bg"),
         "single_vae": gen_opts.pop("single_vae", False),
         "options": {
             k: v if isinstance(v, dict) else { "prompt": v } \

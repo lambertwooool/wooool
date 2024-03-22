@@ -3,6 +3,7 @@
 ## 0.8.8
 - Support sdxl and sd15 lightning generate, 6 step generate an image
 - Support playground V2.5 generate
+- Support layered diffusion
 - add sdxl tile controlnet
 - Optimize the CFG algorithm and add CFG scaling
 - Apply freeU optimize image

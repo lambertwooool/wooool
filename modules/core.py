@@ -10,6 +10,7 @@ from modules.model import sd, latent_formats, model_helper, model_sampling
 from modules.paths import embeddings_path
 from modules import lora, util, shared, vae_helper
 from modules.model.model_base import BaseModel, SDXL, SDXLRefiner
+from modules.extras.layered_diffusion import LayeredDiffusionDecodeRGBA
 
 patches = patch_all()
 
@@ -117,8 +118,13 @@ def get_loras(model, loras):
 
 @torch.no_grad()
 @torch.inference_mode()
-def vae_sampled(sampled_latent, vae_model, tiled, task, cur_batch, cur_seed, cur_subseed, filename, image_pixel, image_mask, image_pixel_orgin, re_zoom_point):
+def vae_sampled(sampled_latent, vae_model, tiled, task, cur_batch, cur_seed, cur_subseed, filename,
+                image_pixel, image_mask, image_pixel_orgin, re_zoom_point,
+                latent_format, layer_vae_model:LayeredDiffusionDecodeRGBA=None):
     decoded_latent = vae_helper.decode_vae(vae=vae_model, latent_image=sampled_latent, tiled=tiled)
+
+    if layer_vae_model is not None:
+        decoded_latent = layer_vae_model.decode(sampled_latent, decoded_latent, latent_format)[0]
     images = util.pytorch_to_numpy(decoded_latent)
 
     prompt, negative_prompt = task["prompt"].pop(0), task["negative"].pop(0)
@@ -145,7 +151,7 @@ def vae_sampled(sampled_latent, vae_model, tiled, task, cur_batch, cur_seed, cur
                 image[min_y:max_y, min_x:max_x, :] = (image[min_y:max_y, min_x:max_x, :] * (1 - image_inpaint_mask)  + image_inpaint * image_inpaint_mask).astype(np.uint8)
             else:
                 image[min_y:max_y, min_x:max_x, :] = image_inpaint
-        
+
         if idx == 0:
             filename_idx = os.path.join(modules.paths.temp_outputs_path, filename)
         else:

@@ -93,7 +93,7 @@ def gaussian_blur_2d(img, kernel_size, sigma):
     img = F.conv2d(img, kernel2d, groups=img.shape[-3])
     return img
 
-def apply(model, scale, blur_sigma):
+def apply(model, scale=0.5, blur_sigma=2.0):
     attn_scores = None
 
     # TODO: make this work properly with chunked batches
