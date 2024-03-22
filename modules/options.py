@@ -82,6 +82,7 @@ default["lora_num"] = "3 LoRA"
 # Quality
 options["quality"] = {
     "Lightning Generate": 5,
+	"TCD Generate": 6,
 	"Ex-Fast Generate": 1,
 	"Fast Generate": 2,
 	"High Quality": 3,
@@ -92,6 +93,7 @@ default["quality"] = "Fast Generate"
 
 options["quality_setting"] = {
     "5": { "sdxl": (1024, 6, 0, "dpmpp_sde_gpu", "sgm_uniform"), "sd15": (768, 6, 0, "dpmpp_sde_gpu", "sgm_uniform") },
+	"6": { "sdxl": (1024, 8, 0, "dpmpp_2m_sde_gpu", "sgm_uniform"), "sd15": (768, 8, 0, "dpmpp_2m_sde_gpu", "sgm_uniform") },
 	"1": { "sdxl": (1184, 16, 0, "dpmpp_2m_sde_gpu", "karras"), "sd15": (768, 16, 0, "dpmpp_2m_sde_gpu", "karras") },
 	"2": { "sdxl": (1184, 25, 0, "dpmpp_2m_sde_gpu", "karras"), "sd15": (768, 25, 0, "dpmpp_2m_sde_gpu", "karras") },
 	"3": { "sdxl": (1184, 25, int(25 / 2.5), "dpmpp_sde_gpu", "karras"), "sd15": (768, 25, int(25 / 2.5), "dpmpp_sde_gpu", "karras") },
@@ -198,6 +200,12 @@ options["free_u"] = (0, 100, 5)
 mul["free_u"] = 0.01
 title["free_u"] = "FreeU %"
 default["free_u"] = 40
+
+# ETA
+options["eta"] = (0, 100, 1)
+mul["eta"] = 0.01
+title["eta"] = "ETA %"
+default["eta"] = 30
 
 # Style Aligned
 options["style_aligned"] = (0, 100, 5)

@@ -633,7 +633,7 @@ def calculate_sigmas_scheduler(model, scheduler_name, steps):
         logging.error("error invalid scheduler {}".format(scheduler_name))
     return sigmas
 
-def sampler_object(name):
+def sampler_object(name, extra_options={}, inpaint_options={}):
     if name == "uni_pc":
         sampler = KSAMPLER(uni_pc.sample_unipc)
     elif name == "uni_pc_bh2":
@@ -641,7 +641,7 @@ def sampler_object(name):
     elif name == "ddim":
         sampler = ksampler("euler", inpaint_options={"random": True})
     else:
-        sampler = ksampler(name)
+        sampler = ksampler(name, extra_options=extra_options, inpaint_options=inpaint_options)
     return sampler
 
 class KSampler:
@@ -685,7 +685,7 @@ class KSampler:
             sigmas = self.calculate_sigmas(new_steps).to(self.device)
             self.sigmas = sigmas[-(steps + 1):]
 
-    def sample(self, noise, positive, negative, cfg, latent_image=None, start_step=None, last_step=None, force_full_denoise=False, denoise_mask=None, sigmas=None, callback=None, disable_pbar=False, seed=None):
+    def sample(self, noise, positive, negative, cfg, latent_image=None, start_step=None, last_step=None, force_full_denoise=False, denoise_mask=None, sigmas=None, callback=None, disable_pbar=False, seed=None, extra_options={}, inpaint_options={}):
         if sigmas is None:
             sigmas = self.sigmas
 
@@ -703,6 +703,6 @@ class KSampler:
                 else:
                     return torch.zeros_like(noise)
 
-        sampler = sampler_object(self.sampler)
+        sampler = sampler_object(self.sampler, extra_options, inpaint_options)
 
         return sample(self.model, noise, positive, negative, cfg, self.device, sampler, sigmas, self.model_options, latent_image=latent_image, denoise_mask=denoise_mask, callback=callback, disable_pbar=disable_pbar, seed=seed)

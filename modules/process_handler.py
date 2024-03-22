@@ -77,6 +77,7 @@ def handler(task):
     cfg_scale = task.get("cfg_scale", 7.0)
     cfg_scale_to = task.get("cfg_scale_to", cfg_scale)
     cfg_multiplier = task.get("cfg_multiplier", 0)
+    eta = task.get("eta", 1.0)
     free_u = task.get("free_u", 0)
     clip_skip = -1 * abs(int(task.get("clip_skip") or 1))
 
@@ -94,6 +95,11 @@ def handler(task):
         cfg_scale_to = round(cfg_scale_to * (1.5 / 7.0), 1)
         lightning_lora = { "sd15": "sd15_lcm_lora_rank1.safetensors", "sdxl": "sdxl_lightning_4step_lora.safetensors" }[sd_type]
         loras.append((lightning_lora, 1.0, ""))
+    if quality_id == 6:
+        cfg_scale = round(cfg_scale * (1.5 / 7.0), 1)
+        cfg_scale_to = round(cfg_scale_to * (1.5 / 7.0), 1)
+        tcd_lora = { "sd15": "tcd_sd15_lora.safetensors", "sdxl": "tcd_sdxl_lora.safetensors" }[sd_type]
+        loras.append((tcd_lora, 1.0, ""))
     denoise = round(task.get("denoise", 1.0), 2)
     style_aligned_scale = round(task.get("style_aligned_scale", 0.0), 2)
     sampler = task.get("sampler", "") or default_sampler
@@ -158,7 +164,7 @@ def handler(task):
             '\n[seeds]:', seeds, \
             '\n[subseeds]:', subseeds, \
             '\n[subseed strength]:', subseed_strength, \
-            '\n[freeU]:', free_u, \
+            '\n[freeU, eta]:', [free_u, eta], \
             '\n[layered diffusion]:', transparent_bg, \
             '\n[file_format]:', file_format, \
             '\n[loras]:', loras, \
@@ -197,6 +203,7 @@ def handler(task):
                 cfg_scale_to=cfg_scale_to,
                 cfg_multiplier=cfg_multiplier,
                 free_u=free_u,
+                eta=eta,
                 transparent_bg=transparent_bg,
                 loras=loras,
                 controlnets=controlnets,
@@ -310,7 +317,7 @@ def progress_scb(model_path, lantent_stage_c, positive_cond, negative_cond, cur_
 def process_diffusion(task, base_path, refiner_path, positive, negative, steps, skip_step, size, seeds, subseeds,
         callback, sampler_name, scheduler_name,
         latent=None, image=None, denoise=1.0, noise_scale=1.0, cfg_scale=7.0, cfg_scale_to=7.0, batch_size=1, loras=[], controlnets=[],
-        cfg_multiplier=0, free_u=0, style_aligned_scale=0.0, transparent_bg="",
+        cfg_multiplier=0, free_u=0, eta=1.0, style_aligned_scale=0.0, transparent_bg="",
         tiled=False, round_batch_size=8, subseed_strength=1.0, clip_skip=0):
 
     devices.torch_gc()
@@ -553,7 +560,8 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
                     callback=callback_base_sample,
                     noise_mask=latent_mask,
                     sigmas=None,
-                    disable_pbar=False
+                    disable_pbar=False,
+                    extra_options={ "eta": eta }
                 )
 
                 if isinstance(unet_model.model.latent_format, latent_formats.SC_Prior):
