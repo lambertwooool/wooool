@@ -158,7 +158,7 @@ def cast_to_device(tensor, device, dtype, copy=False):
         return tensor.to(device, dtype, copy=copy, non_blocking=non_blocking)
 
 # None means no manual cast
-def unet_manual_cast(weight_dtype, inference_device):
+def unet_manual_cast(weight_dtype, inference_device, supported_dtypes=[torch.float16, torch.bfloat16, torch.float32]):
     if weight_dtype == torch.float32:
         return None
 
@@ -166,8 +166,10 @@ def unet_manual_cast(weight_dtype, inference_device):
     if fp16_supported and weight_dtype == torch.float16:
         return None
 
-    if fp16_supported:
+    if fp16_supported and torch.float16 in supported_dtypes:
         return torch.float16
+    elif fp16_supported and torch.bfloat16 in supported_dtypes:
+        return torch.bfloat16
     else:
         return torch.float32
 

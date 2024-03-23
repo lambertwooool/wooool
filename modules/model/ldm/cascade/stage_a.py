@@ -166,7 +166,6 @@ class StageA(nn.Module):
     def __init__(self, levels=2, bottleneck_blocks=12, c_hidden=384, c_latent=4, codebook_size=8192):
         super().__init__()
         self.c_latent = c_latent
-        self.scale_factor = scale_factor
         c_levels = [c_hidden // (2 ** i) for i in reversed(range(levels))]
 
         # Encoder blocks

@@ -365,7 +365,6 @@ def load_clip(ckpt_paths, embedding_directory=None, clip_type=CLIPType.STABLE_DI
 
 def load_checkpoint_guess_config(ckpt_path, output_vae=True, output_clip=True, output_clipvision=False, embedding_directory=None, output_model=True):
     sd = model_helper.load_torch_file(ckpt_path)
-
     sd_keys = sd.keys()
     clip = None
     clipvision = None
@@ -375,14 +374,13 @@ def load_checkpoint_guess_config(ckpt_path, output_vae=True, output_clip=True, o
     clip_target = None
 
     parameters = model_helper.calculate_parameters(sd, "model.diffusion_model.")
-    # unet_dtype = devices.dtype()
     load_device = model_loader.run_device("unet")
     unet_dtype = model_loader.dtype("unet")
-    manual_cast_dtype = devices.unet_manual_cast(unet_dtype, load_device)
 
-    model_config = model_detection.model_config_from_unet(sd, "model.diffusion_model.", unet_dtype)
+    model_config = model_detection.model_config_from_unet(sd, "model.diffusion_model.")
+    manual_cast_dtype = devices.unet_manual_cast(unet_dtype, load_device, model_config.supported_inference_dtypes)
     model_config.set_inference_dtype(unet_dtype, manual_cast_dtype)
-    
+
     if model_config is None:
         raise RuntimeError("ERROR: Could not detect model type of: {}".format(ckpt_path))
 

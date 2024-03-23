@@ -94,11 +94,11 @@ def get_scb_model(model_path):
         scb_model = shared.scb_model[1]
         print(f'Cascade stageB model loaded from cache: {model_path}')
     else:
-        scb_model = load_model(model_path)
+        scb_model = load_model(model_path, output_clip=False)
         shared.scb_model = (model_path, scb_model)
         print(f'Cascade stageB model loaded: {model_path}')
 
-    model = scb_model.clone()
+    model = StableDiffusionModel(scb_model.unet.clone(), scb_model.vae, None, None)
 
     return model
 

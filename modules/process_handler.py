@@ -82,7 +82,6 @@ def handler(task):
     clip_skip = -1 * abs(int(task.get("clip_skip") or 1))
 
     detail = float(task.get("detail", 0))
-    noise_scale = 1 + detail * 0.05
     if detail != 0:
         detail_lora = { "sd15": "add_detail.safetensors", "sdxl": "add-detail-xl.safetensors" }[sd_type]
         loras.append((detail_lora, detail, ""))
@@ -131,7 +130,6 @@ def handler(task):
     task["cfg_scale"] = cfg_scale
     task["cfg_scale_to"] = cfg_scale_to
     task["cfg_multiplier"] = cfg_multiplier
-    task["noise_scale"] = noise_scale
     task["denoise"] = denoise
     task["seed"] = seeds
     task["sampler"] = sampler
@@ -153,7 +151,6 @@ def handler(task):
             '\n[cfg_scale]:', (cfg_scale, cfg_scale_to, cfg_multiplier), \
             '\n[image & mask]:', (True if image is not None else False, True if mask is not None else False), \
             '\n[clip_skip]:', clip_skip, \
-            '\n[noise_scale]:', noise_scale, \
             '\n[denoise]:', denoise, \
             '\n[style_aligned_scale]:', style_aligned_scale, \
             '\n[batch_size]:', batch_size, \
@@ -195,7 +192,6 @@ def handler(task):
                 scheduler_name=scheduler,
                 latent=initial_latent,
                 image=(image, mask),
-                noise_scale=noise_scale,
                 denoise=denoise,
                 style_aligned_scale=style_aligned_scale,
                 tiled=tiled,
@@ -274,29 +270,34 @@ def progress_output(task, step_type, params=(), picture=None):
 class UserStopException(Exception):
     pass
 
-def progress_scb(model_path, lantent_stage_c, positive_cond, negative_cond, cur_noise, steps,
-        cfg_scale, seed, sampler_name, scheduler_name, callback):
-    scb_model_path = model_path.replace("stage_c", "stage_c")
+def progress_scb(model_path, latent_stage_c, latent_stage_b, positive_cond, negative_cond, cur_noise,
+        steps=10, cfg_scale=1.1, seed=0, sampler_name="euler", scheduler_name="simple", callback=None):
+    scb_model_path = model_path.replace("stage_c", "stage_b")
     scb_model = core.get_scb_model(scb_model_path)
 
-    assert isinstance(scb_model.model.latent_format, latent_formats.SC_B)
+    assert isinstance(scb_model.unet.model.latent_format, latent_formats.SC_B)
 
     def set_prior(conditioning, stage_c):
         c = []
         for t in conditioning:
             d = t[1].copy()
             d['stable_cascade_prior'] = stage_c
-            n = [t[0], d]
+            if "pooled_output" in d:
+                d["pooled_output"] = torch.zeros_like(d["pooled_output"])
+            n = [torch.zeros_like(t[0]), d]
             c.append(n)
-        return (c, )
+        return c
 
-    positive_cond = set_prior(positive_cond, lantent_stage_c)
+    positive_cond = set_prior(positive_cond, latent_stage_c)
+
+    def callback_sample(step, x0, x, total_steps):
+        callback(step, x0, x, total_steps, scb_model.unet.model.latent_format)
 
     sampled_latent = sample.sample(
-            model=scb_model,
+            model=scb_model.unet,
             positive=positive_cond,
             negative=negative_cond,
-            latent_image=lantent_stage_c,
+            latent_image=latent_stage_b,
             noise=cur_noise,
             steps=steps, start_step=0, last_step=steps,
             cfg=cfg_scale,
@@ -304,7 +305,7 @@ def progress_scb(model_path, lantent_stage_c, positive_cond, negative_cond, cur_
             sampler_name=sampler_name,
             scheduler=scheduler_name,
             denoise=1.0, disable_noise=False, force_full_denoise=False,
-            callback=callback,
+            callback=callback_sample,
             noise_mask=None,
             sigmas=None,
             disable_pbar=False
@@ -316,7 +317,7 @@ def progress_scb(model_path, lantent_stage_c, positive_cond, negative_cond, cur_
 @torch.inference_mode()
 def process_diffusion(task, base_path, refiner_path, positive, negative, steps, skip_step, size, seeds, subseeds,
         callback, sampler_name, scheduler_name,
-        latent=None, image=None, denoise=1.0, noise_scale=1.0, cfg_scale=7.0, cfg_scale_to=7.0, batch_size=1, loras=[], controlnets=[],
+        latent=None, image=None, denoise=1.0, cfg_scale=7.0, cfg_scale_to=7.0, batch_size=1, loras=[], controlnets=[],
         cfg_multiplier=0, free_u=0, eta=1.0, style_aligned_scale=0.0, transparent_bg="",
         tiled=False, round_batch_size=8, subseed_strength=1.0, clip_skip=0):
 
@@ -434,8 +435,8 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
             if not isinstance(unet_model.model.latent_format, latent_formats.SC_Prior):
                 latent = core.generate_empty_latent(width=width, height=height, batch_size=1, channel=4, compression=8)
             else:
-                latent = core.generate_empty_latent(width=width, height=height, batch_size=1, channel=16, compression=42)
-                latent_scb = core.generate_empty_latent(width=width, height=height, batch_size=1, channel=4, compression=4)
+                latent = core.generate_empty_latent(width=width, height=height, batch_size=1, channel=16, compression=min(width, height) // 24)
+                latent_stage_b = core.generate_empty_latent(width=width, height=height, batch_size=1, channel=4, compression=4)
         else:
             image_pixel_torch = util.numpy_to_pytorch(image_pixel)
             image_mask_torch = util.numpy_to_pytorch(image_mask)
@@ -463,15 +464,15 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
             core.vae_sampled(sampled_latent, vae_model, tiled, task, cur_batch, cur_seed, cur_subseed, filename, image_pixel, image_mask, image_pixel_orgin, re_zoom_point, vae_lantent_format, layer_vae_model=layer_vae_model)
             print("cuda", len(left_sampled_latents))
 
-    def callback_base_sample(step, x0, x, total_steps, is_refiner=False):
+    def callback_base_sample(step, x0, x, total_steps, latent_format=None):
         if task.get("stop", False) or task.get("skip", False):
             task["skip"] = False
             raise UserStopException()
         
         # preview_image = vae_helper.decode_vae_preview(refiner_unet_model if is_refiner else unet_model, x0)
 
-        model = refiner_unet_model if is_refiner else unet_model
-        previewer = vae_helper.get_previewer(model.model.latent_format)
+        latent_format = unet_model.model.latent_format if latent_format is None else latent_format
+        previewer = vae_helper.get_previewer(latent_format)
         preview_image = previewer.decode_latent_to_preview_image(x0)
         
         switch_step = step_base - 1
@@ -485,15 +486,19 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
             util.save_temp_image(preview_image, "generate.png")
     
     def callback_refine_sample(step, x0, x, total_steps):
-        callback_base_sample(step + step_base, x0, x, total_steps, is_refiner=True)
+        callback_base_sample(step + step_base, x0, x, total_steps, refiner_unet_model.model.latent_format)
     
     def model_function_wrapper(func, args):
         cond_or_uncond = args.pop("cond_or_uncond")
         return func(args.pop("input"), args.pop("timestep"), **args.pop("c"))
 
     # unet_model.model_options["model_function_wrapper"] = model_function_wrapper
-    model_advanced.Rescale_cfg(unet_model, cfg_multiplier, cfg_scale_to)
-    freelunch.FreeU_V2S(unet_model, free_u)
+    if not isinstance(unet_model.model.latent_format, latent_formats.SC_Prior):
+        model_advanced.Rescale_cfg(unet_model, cfg_multiplier, cfg_scale_to)
+        freelunch.FreeU_V2S(unet_model, free_u)
+    else:
+        cfg_scale = round(1.0 / 7.0 * cfg_scale, 1)
+
     if transparent_method:
         layer_diff = layered_diffusion.LayeredDiffusionFG()
         layer_diff.apply_layered_diffusion(unet_model, unet_model.model.latent_format, transparent_method, 1.0)
@@ -515,6 +520,10 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
     # latent_convert = None
     # if model_type != refiner_model_type and step_refiner > 0:
     #     latent_convert = latent_interposer.LatentInterposer(model_type, refiner_model_type)
+    
+    extra_options = {}
+    if sampler_name not in ["euler"]:
+        extra_options = { "eta": eta }
 
     for i in range(batch_size):
         task["cur_batch"] = i + 1
@@ -531,7 +540,7 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
         cur_subseed = subseeds.pop(0)
 
         try:
-            cur_noise = sample.prepare_noise(latent_image, cur_seed, None) * noise_scale
+            cur_noise = sample.prepare_noise(latent_image, cur_seed, None)
             start_step = skip_step
 
             if subseed_strength > 0 and subseed_strength < 1:
@@ -561,16 +570,16 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
                     noise_mask=latent_mask,
                     sigmas=None,
                     disable_pbar=False,
-                    extra_options={ "eta": eta }
+                    extra_options=extra_options
                 )
 
                 if isinstance(unet_model.model.latent_format, latent_formats.SC_Prior):
                     sampled_latent, vae_model = progress_scb(
-                        base_path, sampled_latent,
-                        cur_positive_cond, cur_negative_cond,
-                        cur_noise, 10, cur_seed,
-                        sampler_name, scheduler_name,
-                        callback_base_sample)
+                        base_path, sampled_latent, latent_stage_b["samples"],
+                        cur_positive_cond, cur_negative_cond, sample.prepare_noise(latent_stage_b["samples"], cur_seed, None),
+                        steps=step_base, cfg_scale=1.1, seed=cur_seed,
+                        sampler_name=sampler_name, scheduler_name=scheduler_name,
+                        callback=callback_base_sample)
             else:
                 sampled_latent = latent_image.clone()
 

@@ -4,6 +4,7 @@
 - Support sdxl and sd15 lightning generate, 6 step generate an image
 - Support sdxl and sd15 tcd generate and eta weight, 8 step generate an image
 - Support playground V2.5 generate
+- Support cascade generate
 - Support layered diffusion
 - Add sdxl tile controlnet
 - Optimize the CFG algorithm and add CFG scaling
