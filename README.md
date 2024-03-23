@@ -7,6 +7,16 @@ Wooool is an AIGC image generator, Refer to the functions from[Stable Diffusion 
 
 ![](screenshot.png)
 
+## Release
+- [0.8.8] [2024/03/21]🔥🔥🔥 Support playground V2.5, cascade, layered diffusion, lighting, tcd, sdxl tile, freeU and differential diffusion
+- [0.8.7] [2024/02/15]🔥 Support instant id, controlnet use fp8
+- [0.8.6] [2024/02/06]🔥🔥🔥 Support IPAdapters faceid and portrait, style aligned, better integration of multiple IPAdapters
+- [0.8.5] [2024/01/18]🔥 Inpaint adds vary after erase, any combination of sd15 and sdxl, controlnet supports multiple preprocessors
+- [0.8.4] [2024/01/13] New UI, upgrade lora, upscale, vary, endless etc
+- [0.8.3] [2024/01/05]🔥🔥🔥 Support more controlnet, densepose, animal_pose, lineart, lineart_anime, manga_line, mlsd, normalbae, oneformer, sam, tile, depth_zoe, qrcode, brightness, recolor, color, style
+- [0.8.2] [2023/12/30] Optimize extended image, support zoom(custom), resize and refiner(face)
+- [0.8.1] [2023/12/30] Support random style, vary(Custom), configuration auto save, Checkpoints and Loras link to civitai
+
 ## Features
 
 ### Prompt
@@ -22,7 +32,7 @@ shaping the whole view gradually by description with photographic words.
 ### Reference Image (Controlnet + Img2img + Wd14Tagger)
 
 Anything is a reference image
-- IPAdapter，Reference All(IPAdapter) and Face only(IPAdapter Face)
+- IPAdapter，Reference All(IPAdapter), Face only(IPAdapter Face/FaceID/Portrait/InstantID)
 - Controlnet，Layout only(Canny, Lineart, MLSD, Scribble, Softedge)、Depth only(Depth)、Pose only(DWPose, DWPoseFace, AnimalPose), Others(Tile, Seg, Recolor), etc.
 - Wd14Tagger, Content only
 - Base Image, Img2img
@@ -67,15 +77,6 @@ Integrating image browser with generating preview galleries for easier managemen
 - config/sd_styles, SDXL configuration.
 - config/wildcard, Wildcard configuration.
 - config/ui, UI Interface configuration, Perspective, Aspect ratio, negative, sampler etc.
-
-```json
-{
-    "prompt": "",
-    "negative_prompt": "",
-    "loras_sd15": { "lora_name_1": 0.7 },
-    "loras_sdxl": { "lora_name_2": 0.8 },
-}
-```
 
 ### Installation
 

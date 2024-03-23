@@ -106,15 +106,16 @@ def should_use_fp16(device=None):
     
     return torch.cuda.is_bf16_supported()
 
-def dtype(device=None, want_use_dtype=torch.float16):
-    if should_use_fp16(device=device):
-        if want_use_dtype in [torch.float8_e4m3fn, torch.float8_e4m3fnuz, torch.float8_e5m2, torch.float8_e5m2fnuz, torch.float32]:
-            return want_use_dtype
-        if want_use_dtype == torch.bfloat16 and torch.cuda.is_bf16_supported():
-            return torch.bfloat16
-        else:
-            return torch.float16
-    return torch.float32
+def dtype(device=None, want_use_dtype=[torch.float16]):
+    want_use_dtype = want_use_dtype if isinstance(want_use_dtype, list) else [want_use_dtype]
+    for dtype in want_use_dtype:
+        if should_use_fp16(device=device):
+            if dtype in [torch.float8_e4m3fn, torch.float8_e4m3fnuz, torch.float8_e5m2, torch.float8_e5m2fnuz, torch.float32]:
+                return dtype
+            if dtype == torch.bfloat16 and torch.cuda.is_bf16_supported():
+                return torch.bfloat16         
+            
+    return torch.float16 if torch.cuda.is_bf16_supported() else torch.float32
 
 def dtype_size(dtype):
     dtype_size = 4

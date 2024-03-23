@@ -387,9 +387,8 @@ def load_controlnet(ckpt_path, model=None):
         controlnet_config = model_config.unet_config
 
     load_device = model_loader.run_device("controlnet")
-    if supported_inference_dtypes is None:
-        unet_dtype = devices.dtype(load_device)
-    else:
+    unet_dtype = model_loader.dtype("controlnet")
+    if supported_inference_dtypes is not None:
         unet_dtype = devices.dtype(load_device, want_use_dtype=supported_inference_dtypes)
 
     manual_cast_dtype = devices.unet_manual_cast(unet_dtype, load_device)
