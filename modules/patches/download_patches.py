@@ -56,11 +56,12 @@ def model_zoo_get_model(*args, **kwargs):
     return original(__name__, insightface.model_zoo, "get_model")(*args, **kwargs)
 
 def wd14_tag(*args, **kwargs):
-    model_name = kwargs.get("model_name", "wd-v1-4-moat-tagger-v2.onnx")
+    func = original(__name__, modules.wd14tagger, "tag")
+    model_name = kwargs.get("model_name", func.__defaults__[0])
     model_path = os.path.join(modules.paths.wd14tagger_path, model_name)
     csv_name = os.path.splitext(model_name)[0] + ".csv"
     csv_path = os.path.join(modules.paths.wd14tagger_path, csv_name)
     load_or_download_file(model_path)
     load_or_download_file(csv_path)
-    return original(__name__, modules.wd14tagger, "tag")(*args, **kwargs)
+    return func(*args, **kwargs)
 

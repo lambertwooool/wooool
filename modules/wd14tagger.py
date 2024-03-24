@@ -11,14 +11,15 @@ from PIL import Image
 import modules.paths
 from modules import util
 
-all_models = ["wd-v1-4-moat-tagger-v2.onnx", 
+all_models = ["wd-v1-4-moat-tagger-v2.onnx", "wd-swinv2-tagger-v3.onnx",
               "wd-v1-4-convnext-tagger-v2.onnx", "wd-v1-4-convnext-tagger.onnx",
-              "wd-v1-4-convnextv2-tagger-v2.onnx", "wd-v1-4-vit-tagger-v2.onnx"]
+              "wd-v1-4-convnextv2-tagger-v2.onnx", "wd-v1-4-vit-tagger-v2.onnx",
+            ]
 
 default_exclude_tags = [    "greyscale", "monochrome", "realistic", "smile", "solo", "solo_focus", "looking_at_viewer", \
                             "blurry", "blurry_background", "depth_of_field" ]
 
-def tag(image, model_name="wd-v1-4-moat-tagger-v2.onnx", threshold=0.35, character_threshold=0.85, exclude_tags=[], only_text=True):
+def tag(image, model_name="wd-swinv2-tagger-v3.onnx", threshold=0.35, character_threshold=0.85, exclude_tags=[], only_text=True):
     model_path = os.path.join(modules.paths.wd14tagger_path, model_name)
     model = InferenceSession(model_path, providers=ort.get_available_providers())
 
