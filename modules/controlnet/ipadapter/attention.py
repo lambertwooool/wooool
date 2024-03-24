@@ -93,7 +93,8 @@ class CrossAttentionPatch:
             k = []
             v = []
             w = []
-            sigma = extra_options["sigmas"][0].item() if 'sigmas' in extra_options else 999999999.9
+            sigma = extra_options["sigmas"][0] if "sigmas" in extra_options else None
+            sigma = sigma.item() if sigma is not None else 999999999.9
             batch_size, sequence_length, inner_dim = q.shape
             batch_prompt = batch_size // len(cond_or_uncond)
             n_heads = extra_options["n_heads"]

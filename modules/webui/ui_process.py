@@ -515,7 +515,8 @@ def GenerateByData(txt_generate_data, txt_setting):
         params["cfg_scale_to"] = gen_opts.pop("cfg_scale_to")
     
     params["aspect_ratios"] = gen_opts.pop("ratios")
-    params["batch"] = gen_opts.pop("pic_num")
+    # params["batch"] = gen_opts.pop("pic_num")
+    params["batch"] = 1
     gen_opts["steps"] = (gen_opts.pop("step_base"), gen_opts.pop("step_refiner")) if gen_opts.pop("custom_step") else (None, None)
     
     params["base_name"] = gen_opts.pop("base_model")

@@ -155,7 +155,6 @@ with gr.Blocks(theme=my_theme, title=app_name).queue() as wooool:
                         with gr.Column(scale=20, min_width=200):
                             opt_dict = opt_dict | ui_compent.MakeOpts(["sampler", "scheduler"])
                             opt_dict = opt_dict | ui_compent.MakeSlider(["cfg_scale", "cfg_scale_to", "cfg_multiplier", "free_u", "eta", "clip_skip"])
-                            opt_dict = opt_dict | ui_compent.MakeOpts(["file_format"], opt_type="Radio")
                         with gr.Column(scale=20, min_width=200):
                             with gr.Row():
                                 txt_seed = gr.Number(label="Seed", value=0, elem_id="txt_seed", interactive=False, min_width=80, scale=80)
@@ -177,6 +176,7 @@ with gr.Blocks(theme=my_theme, title=app_name).queue() as wooool:
                             ckb_grp_negative = opt_dict["recommend_negative"]
                             txt_sel_negative = gr.Textbox(label="Selected Negative Prompt", lines=5, max_lines=7)
                             opt_dict = opt_dict | ui_compent.MakeSlider(["prompt_negative_weight"])
+                            opt_dict = opt_dict | ui_compent.MakeOpts(["file_format"], opt_type="Radio")
                         with gr.Column(scale=20, min_width=200):
                             ckb_step = gr.Checkbox(label="Custom Steps", elem_id="ckb_step")
                             opt_dict = opt_dict | ui_compent.MakeSlider(["step_base", "step_refiner"], interactive=False)
