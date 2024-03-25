@@ -22,11 +22,11 @@ class DownloadPatches:
 
     def undo(self):
         self.load_torch_file = undo(__name__, modules.model.model_helper, 'load_torch_file')
-        self.torch_load = patch(__name__, torch, 'load')
+        self.torch_load = undo(__name__, torch, 'load')
         self.GFPGan_get_model_path = undo(__name__, modules.gfpgan_model.GFPGan, 'get_model_path')
         self.wd14_tag = undo(__name__, modules.wd14tagger, 'tag')
         self.model_zoo_get_model = undo(__name__, insightface.model_zoo, 'get_model')
-        self.model_zoo_get_model_inner = patch(__name__, insightface.model_zoo.model_zoo, 'get_model')
+        self.model_zoo_get_model_inner = undo(__name__, insightface.model_zoo.model_zoo, 'get_model')
 
 def load_or_download_file(dest):
     filename = os.path.split(dest)[1]
