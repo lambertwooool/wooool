@@ -2,6 +2,7 @@ import sys
 import numpy as np
 import psutil
 import torch
+import torch.nn as nn
 from modules import mac_specific, xpu_specific
 
 XFORMERS_ENABLE = None
@@ -115,7 +116,7 @@ def dtype(device=None, want_use_dtype=[torch.float16]):
             if dtype == torch.bfloat16 and torch.cuda.is_bf16_supported():
                 return torch.bfloat16         
             
-    return torch.float16 if torch.cuda.is_bf16_supported() else torch.float32
+    return torch.float16 if should_use_fp16() else torch.float32
 
 def dtype_size(dtype):
     dtype_size = 4

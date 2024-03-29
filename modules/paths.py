@@ -21,6 +21,7 @@ def get_path(key, default_value):
         return dp
 
 modelfile_path = get_path('modelfile_path', '../models/checkpoints/')
+unet_path = get_path('unet_path', '../models/unet/')
 lorafile_path = get_path('lorafile_path', '../models/loras/')
 embeddings_path = get_path('embeddings_path', '../models/embeddings/')
 vae_approx_path = get_path('vae_approx_path', '../models/vae_approx/')
