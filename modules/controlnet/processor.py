@@ -38,6 +38,7 @@ from .sam import SamDetector
 from .lama_inpaint import LamaInpaintdetector
 from .anime_face_segment import AnimeFaceSegmentor
 from .remove_bg import RemoveBackgroundDetector
+from .bria_rmbg import BriaRemoveBackgroundDetector
 from .teed import TEEDDector
 from .depth_anything import DepthAnythingDetector
 from .kps import KpsDetector
@@ -93,6 +94,7 @@ MODELS = {
     'lama_inpaint': { 'class': LamaInpaintdetector },
     'anime_segmentation': { 'class': AnimeFaceSegmentor },
     'remove_bg': { 'class': RemoveBackgroundDetector },
+    'bria_remove_bg': { 'class': BriaRemoveBackgroundDetector },
     'kps': { 'class': KpsDetector },
 }
 
@@ -133,6 +135,7 @@ MODEL_PARAMS = {
     'lama_inpaint': {},
     'anime_segmentation': {},
     'remove_bg': {},
+    'bria_remove_bg': {},
     'kps': {},
 }
 
@@ -218,7 +221,7 @@ class Processor:
         return processed_image
 
     
-    def load_controlnet(self, filename: str):
+    def load_controlnet(self, filename: str, want_use_dtype=None):
         filename = os.path.join(modules.paths.controlnet_models_path, filename)
         controlnet_model = controlnet.load_controlnet(filename)
         self.controlnet = controlnet_model

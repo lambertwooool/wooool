@@ -9,7 +9,7 @@ from modules.util import HWC3, image_pad
 
 class RemoveBackgroundDetector:
     def __init__(self):
-        filename="isnetis.ckpt"
+        filename = "isnetis.ckpt"
         model_path = os.path.join(modules.paths.annotator_models_path, filename)
 
         model = network(model_path)
