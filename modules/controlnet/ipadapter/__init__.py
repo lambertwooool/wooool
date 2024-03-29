@@ -4,7 +4,7 @@ import contextlib
 import modules.paths
 import modules.model.clip_vision
 from modules import devices
-from modules.model import model_loader, model_helper
+from modules.model import model_loader, model_helper, ops
 from modules.model.clip_vision import clip_preprocess
 from .IPAdapterModel import IPAdapterModel
 from .IPAdapterPlusModel import IPAdapterPlusModel
@@ -31,29 +31,32 @@ class IPAdapterDetector:
         self.cond = None
         self.uncond = None
 
-    def load_state_dict(self, ip_adapter_path):
+    def load_state_dict(self, ip_adapter_path, dtype=torch.float32):
         ip_state_dict = model_helper.load_torch_file(ip_adapter_path)
         tmp_state_dict = { "image_proj": {}, "ip_adapter": {} }
 
         for key in ip_state_dict.keys():
             if key.startswith("image_proj."):
-                tmp_state_dict["image_proj"][key.replace("image_proj.", "")] = ip_state_dict.get_tensor(key)
+                tmp_state_dict["image_proj"][key.replace("image_proj.", "")] = ip_state_dict.get_tensor(key).to(dtype)
             elif key.startswith("ip_adapter."):
-                tmp_state_dict["ip_adapter"][key.replace("ip_adapter.", "")] = ip_state_dict.get_tensor(key)
+                tmp_state_dict["ip_adapter"][key.replace("ip_adapter.", "")] = ip_state_dict.get_tensor(key).to(dtype)
             else:
-                tmp_state_dict[key] = ip_state_dict.get(key)
+                tmp_state_dict[key] = ip_state_dict.get(key).to(dtype)
         ip_state_dict = tmp_state_dict
 
         return ip_state_dict
 
-    def load(self, cn_type, model_name):
+    def load(self, cn_type, model_name, want_use_dtype=None):
         ip_adapter_path = os.path.join(modules.paths.controlnet_models_path, model_name)
 
-        self.load_device = model_loader.run_device("ipadapter")
-        self.offload_device = model_loader.offload_device("ipadapter")
-        self.dtype = devices.dtype(self.load_device)
+        load_device, offload_device, dtype, manual_cast_dtype = model_loader.get_device_and_dtype("ipadapter", want_use_dtype=want_use_dtype)
+        self.load_device = load_device
+        self.offload_device = offload_device
+        self.dtype = dtype
+        self.manual_cast_dtype = manual_cast_dtype
+        self.ops = ops.disable_weight_init if manual_cast_dtype is None else ops.manual_cast
 
-        ip_state_dict = self.load_state_dict(ip_adapter_path)
+        ip_state_dict = self.load_state_dict(ip_adapter_path, dtype)
 
         is_plus = (
             "proj.3.weight" in ip_state_dict['image_proj'] or
@@ -71,7 +74,7 @@ class IPAdapterDetector:
         else:
             model = IPAdapterModel
         
-        self.ip_adapter = model(ip_state_dict, model_name, self.load_device, self.offload_device)
+        self.ip_adapter = model(ip_state_dict, model_name, self.load_device, self.offload_device, self.ops)
         
     
     @torch.no_grad()
@@ -112,7 +115,7 @@ class IPAdapterDetector:
 
     @torch.no_grad()
     @torch.inference_mode()
-    def patch_model(self, model, image_emb, uncond_image_emb, weight, start_at=0.0, end_at=1.0):
+    def patch_model(self, model, image_emb, uncond_image_emb, weight, attn_mask=None, start_at=0.0, end_at=1.0):
         sigma_start = model.model.model_sampling.percent_to_sigma(start_at)
         sigma_end = model.model.model_sampling.percent_to_sigma(end_at)
 
@@ -126,6 +129,7 @@ class IPAdapterDetector:
             "dtype": self.dtype,
             "cond": image_emb,
             "uncond": uncond_image_emb,
+            "attn_mask": attn_mask,
             "sigma_start": sigma_start,
             "sigma_end": sigma_end,
             "sdxl": self.ip_adapter.sdxl,

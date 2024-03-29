@@ -45,6 +45,19 @@ def set_model_patch_replace(model, patch_kwargs, key):
     else:
         to["patches_replace"]["attn2"][key].set_new_condition(**patch_kwargs)
 
+def tensor_to_size(source, dest_size):
+    if isinstance(dest_size, torch.Tensor):
+        dest_size = dest_size.shape[0]
+    source_size = source.shape[0]
+
+    if source_size < dest_size:
+        shape = [dest_size - source_size] + [1]*(source.dim()-1)
+        source = torch.cat((source, source[-1:].repeat(shape)), dim=0)
+    elif source_size > dest_size:
+        source = source[:dest_size]
+
+    return source
+
 def attention_ipadapter(q, k, v, extra_options):
     if not hasattr(F, "multi_head_attention_forward"):
         q, k, v = map(lambda t: rearrange(t, 'b n (h d) -> (b h) n d', h=extra_options["n_heads"]), (q, k, v))
@@ -67,19 +80,21 @@ def sdp(q, k, v, extra_options):
 
 class CrossAttentionPatch:
     # forward for patching
-    def __init__(self, weight, dtype, number, cond, uncond, sigma_start=0.0, sigma_end=1.0):
+    def __init__(self, weight, dtype, number, cond, uncond, attn_mask=None, sigma_start=0.0, sigma_end=1.0):
         self.weights = [weight]
         self.conds = [cond]
         self.unconds = [uncond]
         self.dtype = dtype
         self.number = number
+        self.attn_masks = [attn_mask]
         self.sigma_start = [sigma_start]
         self.sigma_end = [sigma_end]
     
-    def set_new_condition(self, weight, cond, uncond, dtype, number, sigma_start=0.0, sigma_end=1.0):
+    def set_new_condition(self, weight, cond, uncond, dtype, number, attn_mask=None, sigma_start=0.0, sigma_end=1.0):
         self.weights.append(weight)
         self.conds.append(cond)
         self.unconds.append(uncond)
+        self.attn_masks.append(attn_mask)
         self.sigma_start.append(sigma_start)
         self.sigma_end.append(sigma_end)
 
@@ -93,14 +108,16 @@ class CrossAttentionPatch:
             k = []
             v = []
             w = []
+            m = []
             sigma = extra_options["sigmas"][0] if "sigmas" in extra_options else None
             sigma = sigma.item() if sigma is not None else 999999999.9
-            batch_size, sequence_length, inner_dim = q.shape
+            batch_size, seq_len, inner_dim = q.shape
             batch_prompt = batch_size // len(cond_or_uncond)
             n_heads = extra_options["n_heads"]
             dim_head = extra_options["dim_head"]
+            _, _, oh, ow = extra_options["original_shape"]
 
-            for weight, cond, uncond, sigma_start, sigma_end in zip(self.weights, self.conds, self.unconds, self.sigma_start, self.sigma_end):
+            for weight, cond, uncond, mask, sigma_start, sigma_end in zip(self.weights, self.conds, self.unconds, self.attn_masks, self.sigma_start, self.sigma_end):
                 if sigma > sigma_start or sigma < sigma_end:
                     continue
 
@@ -119,17 +136,44 @@ class CrossAttentionPatch:
                 k.append(ip_k * weight)
                 v.append(ip_v * weight)
                 w.append(weight)
+
+                if mask is not None:
+                    mask_h = oh / math.sqrt(oh * ow / seq_len)
+                    mask_h = int(mask_h) + int((seq_len % int(mask_h)) != 0)
+                    mask_w = seq_len // mask_h
+
+                    mask = F.interpolate(mask.unsqueeze(1), size=(mask_h, mask_w), mode="bilinear").squeeze(1)
+                    mask = tensor_to_size(mask, batch_prompt)
+
+                    mask = mask.repeat(len(cond_or_uncond), 1, 1)
+                    mask = mask.view(mask.shape[0], -1, 1).repeat(1, 1, out.shape[2])
+
+                    # covers cases where extreme aspect ratios can cause the mask to have a wrong size
+                    mask_len = mask_h * mask_w
+                    if mask_len < seq_len:
+                        pad_len = seq_len - mask_len
+                        pad1 = pad_len // 2
+                        pad2 = pad_len - pad1
+                        mask = F.pad(mask, (0, 0, pad1, pad2), value=0.0)
+                    elif mask_len > seq_len:
+                        crop_start = (mask_len - seq_len) // 2
+                        mask = mask[:, crop_start:crop_start+seq_len, :]
+
+                    m.append(mask)
+                else:
+                    m.append(tensor.ones_like(batch_prompt))
             
             out = attention_ipadapter(q, context_attn2, value_attn2, extra_options)
             if len(k) > 0:
                 ip_k_all = torch.cat(k, dim=1)
                 ip_v_all = torch.cat(v, dim=1)
+                ip_mask_all = torch.cat(m, dim=1)
                 ip_weight = sum(w) / len(w)
 
                 ip_v_mean = torch.mean(ip_v_all, dim=1, keepdim=True)
                 ip_v_offset = ip_v_all - ip_v_mean
                 ip_v_all = (ip_v_offset + ip_v_mean)
 
-                out = out * (1 - ip_weight) + attention_ipadapter(q, ip_k_all, ip_v_all, extra_options)
+                out = out * (1 - ip_weight) + attention_ipadapter(q, ip_k_all, ip_v_all, extra_options) * ip_mask_all
 
         return out.to(dtype=org_dtype)

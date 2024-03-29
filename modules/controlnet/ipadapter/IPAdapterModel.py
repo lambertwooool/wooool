@@ -1,9 +1,9 @@
 import torch
 from .network import ImageProjModel, To_KV
-from modules.model import model_patcher
+from modules.model import model_patcher, ops
 
 class IPAdapterModel(torch.nn.Module):
-    def __init__(self, state_dict, model_name, load_device=None, offload_device=None):
+    def __init__(self, state_dict, model_name, load_device=None, offload_device=None, ops=ops.disable_weight_init):
         super().__init__()
 
         self.model_name = model_name
@@ -42,7 +42,8 @@ class IPAdapterModel(torch.nn.Module):
         image_proj_model = ImageProjModel(
             cross_attention_dim=cross_attention_dim,
             clip_embeddings_dim=clip_embeddings_dim,
-            clip_extra_context_tokens=clip_extra_context_tokens
+            clip_extra_context_tokens=clip_extra_context_tokens,
+            ops=ops
         )
 
         image_proj_model.load_state_dict(state_dict["image_proj"])

@@ -1,16 +1,17 @@
 import math
 import torch
 import torch.nn as nn
+from modules.model import ops
 
 class MLPProjModel(torch.nn.Module):
-    def __init__(self, cross_attention_dim=1024, clip_embeddings_dim=1024):
+    def __init__(self, cross_attention_dim=1024, clip_embeddings_dim=1024, ops=ops.disable_weight_init):
         super().__init__()
 
         self.proj = torch.nn.Sequential(
-            torch.nn.Linear(clip_embeddings_dim, clip_embeddings_dim),
+            ops.Linear(clip_embeddings_dim, clip_embeddings_dim),
             torch.nn.GELU(),
-            torch.nn.Linear(clip_embeddings_dim, cross_attention_dim),
-            torch.nn.LayerNorm(cross_attention_dim)
+            ops.Linear(clip_embeddings_dim, cross_attention_dim),
+            ops.LayerNorm(cross_attention_dim)
         )
 
     def forward(self, image_embeds):
@@ -18,13 +19,13 @@ class MLPProjModel(torch.nn.Module):
         return clip_extra_context_tokens
 
 class ImageProjModel(torch.nn.Module):
-    def __init__(self, cross_attention_dim=1024, clip_embeddings_dim=1024, clip_extra_context_tokens=4):
+    def __init__(self, cross_attention_dim=1024, clip_embeddings_dim=1024, clip_extra_context_tokens=4, ops=ops.disable_weight_init):
         super().__init__()
 
         self.cross_attention_dim = cross_attention_dim
         self.clip_extra_context_tokens = clip_extra_context_tokens
-        self.proj = torch.nn.Linear(clip_embeddings_dim, self.clip_extra_context_tokens * cross_attention_dim)
-        self.norm = torch.nn.LayerNorm(cross_attention_dim)
+        self.proj = ops.Linear(clip_embeddings_dim, self.clip_extra_context_tokens * cross_attention_dim)
+        self.norm = ops.LayerNorm(cross_attention_dim)
 
     def forward(self, image_embeds):
         embeds = image_embeds
@@ -35,7 +36,7 @@ class ImageProjModel(torch.nn.Module):
 
 # Cross Attention to_k, to_v for IPAdapter
 class To_KV(torch.nn.Module):
-    def __init__(self, state_dict):
+    def __init__(self, state_dict, ops=ops.disable_weight_init):
         super().__init__()
 
         layers = []
@@ -44,7 +45,7 @@ class To_KV(torch.nn.Module):
                 key = f'{i}.to_{k}_ip.weight'
                 if key in state_dict:
                     value = state_dict[key]
-                    layer = torch.nn.Linear(value.shape[1], value.shape[0], bias=False)
+                    layer = ops.Linear(value.shape[1], value.shape[0], bias=False)
                     layer.weight = torch.nn.Parameter(value, requires_grad=False)
                     layers.append(layer)
 
@@ -52,13 +53,13 @@ class To_KV(torch.nn.Module):
 
 
 # modified from https://github.com/mlfoundations/open_flamingo/blob/main/open_flamingo/src/helpers.py
-def FeedForward(dim, mult=4):
+def FeedForward(dim, mult=4, ops=ops.disable_weight_init):
     inner_dim = int(dim * mult)
     return nn.Sequential(
-        nn.LayerNorm(dim),
-        nn.Linear(dim, inner_dim, bias=False),
+        ops.LayerNorm(dim),
+        ops.Linear(dim, inner_dim, bias=False),
         nn.GELU(),
-        nn.Linear(inner_dim, dim, bias=False),
+        ops.Linear(inner_dim, dim, bias=False),
     )
 
 
@@ -73,19 +74,19 @@ def reshape_tensor(x, heads):
     return x
 
 class PerceiverAttention(nn.Module):
-    def __init__(self, *, dim, dim_head=64, heads=8):
+    def __init__(self, *, dim, dim_head=64, heads=8, ops=ops.disable_weight_init):
         super().__init__()
         self.scale = dim_head**-0.5
         self.dim_head = dim_head
         self.heads = heads
         inner_dim = dim_head * heads
 
-        self.norm1 = nn.LayerNorm(dim)
-        self.norm2 = nn.LayerNorm(dim)
+        self.norm1 = ops.LayerNorm(dim)
+        self.norm2 = ops.LayerNorm(dim)
 
-        self.to_q = nn.Linear(dim, inner_dim, bias=False)
-        self.to_kv = nn.Linear(dim, inner_dim * 2, bias=False)
-        self.to_out = nn.Linear(inner_dim, dim, bias=False)
+        self.to_q = ops.Linear(dim, inner_dim, bias=False)
+        self.to_kv = ops.Linear(dim, inner_dim * 2, bias=False)
+        self.to_out = ops.Linear(inner_dim, dim, bias=False)
 
 
     def forward(self, x, latents):
@@ -131,23 +132,24 @@ class Resampler(nn.Module):
         embedding_dim=768,
         output_dim=1024,
         ff_mult=4,
+        ops=ops.disable_weight_init,
     ):
         super().__init__()
 
         self.latents = nn.Parameter(torch.randn(1, num_queries, dim) / dim**0.5)
 
-        self.proj_in = nn.Linear(embedding_dim, dim)
+        self.proj_in = ops.Linear(embedding_dim, dim)
 
-        self.proj_out = nn.Linear(dim, output_dim)
-        self.norm_out = nn.LayerNorm(output_dim)
+        self.proj_out = ops.Linear(dim, output_dim)
+        self.norm_out = ops.LayerNorm(output_dim)
 
         self.layers = nn.ModuleList([])
         for _ in range(depth):
             self.layers.append(
                 nn.ModuleList(
                     [
-                        PerceiverAttention(dim=dim, dim_head=dim_head, heads=heads),
-                        FeedForward(dim=dim, mult=ff_mult),
+                        PerceiverAttention(dim=dim, dim_head=dim_head, heads=heads, ops=ops),
+                        FeedForward(dim=dim, mult=ff_mult, ops=ops),
                     ]
                 )
             )
@@ -177,19 +179,20 @@ class FacePerceiverResampler(torch.nn.Module):
         embedding_dim=1280,
         output_dim=768,
         ff_mult=4,
+        ops=ops.disable_weight_init,
     ):
         super().__init__()
 
-        self.proj_in = torch.nn.Linear(embedding_dim, dim)
-        self.proj_out = torch.nn.Linear(dim, output_dim)
-        self.norm_out = torch.nn.LayerNorm(output_dim)
+        self.proj_in = ops.Linear(embedding_dim, dim)
+        self.proj_out = ops.Linear(dim, output_dim)
+        self.norm_out = ops.LayerNorm(output_dim)
         self.layers = torch.nn.ModuleList([])
         for _ in range(depth):
             self.layers.append(
                 torch.nn.ModuleList(
                     [
-                        PerceiverAttention(dim=dim, dim_head=dim_head, heads=heads),
-                        FeedForward(dim=dim, mult=ff_mult),
+                        PerceiverAttention(dim=dim, dim_head=dim_head, heads=heads, ops=ops),
+                        FeedForward(dim=dim, mult=ff_mult, ops=ops),
                     ]
                 )
             )
@@ -207,18 +210,18 @@ class MLPProjModelFaceId(torch.nn.Module):
     """ MLPProjModel used for FaceId.
     Source: https://github.com/tencent-ailab/IP-Adapter/blob/main/ip_adapter/ip_adapter_faceid.py
     """
-    def __init__(self, cross_attention_dim=768, id_embeddings_dim=512, num_tokens=4):
+    def __init__(self, cross_attention_dim=768, id_embeddings_dim=512, num_tokens=4, ops=ops.disable_weight_init):
         super().__init__()
 
         self.cross_attention_dim = cross_attention_dim
         self.num_tokens = num_tokens
 
         self.proj = torch.nn.Sequential(
-            torch.nn.Linear(id_embeddings_dim, id_embeddings_dim*2),
+            ops.Linear(id_embeddings_dim, id_embeddings_dim*2),
             torch.nn.GELU(),
-            torch.nn.Linear(id_embeddings_dim*2, cross_attention_dim*num_tokens),
+            ops.Linear(id_embeddings_dim*2, cross_attention_dim*num_tokens),
         )
-        self.norm = torch.nn.LayerNorm(cross_attention_dim)
+        self.norm = ops.LayerNorm(cross_attention_dim)
 
     def forward(self, id_embeds):
         x = self.proj(id_embeds)
@@ -228,18 +231,18 @@ class MLPProjModelFaceId(torch.nn.Module):
 
 class ProjModelFaceIdPlus(torch.nn.Module):
     """ Source: https://github.com/tencent-ailab/IP-Adapter/blob/main/ip_adapter/ip_adapter_faceid.py """
-    def __init__(self, cross_attention_dim=768, id_embeddings_dim=512, clip_embeddings_dim=1280, num_tokens=4):
+    def __init__(self, cross_attention_dim=768, id_embeddings_dim=512, clip_embeddings_dim=1280, num_tokens=4, ops=ops.disable_weight_init):
         super().__init__()
 
         self.cross_attention_dim = cross_attention_dim
         self.num_tokens = num_tokens
 
         self.proj = torch.nn.Sequential(
-            torch.nn.Linear(id_embeddings_dim, id_embeddings_dim*2),
+            ops.Linear(id_embeddings_dim, id_embeddings_dim*2),
             torch.nn.GELU(),
-            torch.nn.Linear(id_embeddings_dim*2, cross_attention_dim*num_tokens),
+            ops.Linear(id_embeddings_dim*2, cross_attention_dim*num_tokens),
         )
-        self.norm = torch.nn.LayerNorm(cross_attention_dim)
+        self.norm = ops.LayerNorm(cross_attention_dim)
 
         self.perceiver_resampler = FacePerceiverResampler(
             dim=cross_attention_dim,
@@ -249,6 +252,7 @@ class ProjModelFaceIdPlus(torch.nn.Module):
             embedding_dim=clip_embeddings_dim,
             output_dim=cross_attention_dim,
             ff_mult=4,
+            ops=ops,
         )
 
     def forward(self, clip_embeds, face_embeds=None, scale=1.0, shortcut=False):
