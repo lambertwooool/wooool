@@ -1,4 +1,6 @@
+import contextlib
 import torch
+import torch.nn as nn
 from modules import devices
 
 def cast_bias_weight(s, input):
@@ -143,3 +145,28 @@ class manual_cast(disable_weight_init):
 
     class ConvTranspose2d(disable_weight_init.ConvTranspose2d):
         comfy_cast_weights = True
+
+
+def set_weight_bias_function(model, weight_function=None, bias_function=None):
+    for n, m in model.named_modules():
+        if hasattr(m, "comfy_cast_weights"):
+            if weight_function is not None:
+                m.weight_function = weight_function
+            if bias_function is not None:
+                m.bias_function = bias_function
+
+@contextlib.contextmanager
+def auto_cast(ops=manual_cast):
+    patch_module_list = [x for x in ops.__dict__ if not x.startswith("__")]
+    origin = {}
+
+    for module_type in patch_module_list:
+        module_name = str(module_type)
+        if hasattr(nn, module_name):
+            origin[module_name] = getattr(nn, module_name)
+            setattr(nn, module_name, module_type)
+    try:
+        yield None
+    finally:
+        for module_name, module_type in origin.items():
+            setattr(nn, module_name, module_type)
