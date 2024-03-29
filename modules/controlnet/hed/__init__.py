@@ -14,17 +14,17 @@ import torch
 from einops import rearrange
 
 import modules.paths
-from modules.model import model_helper, model_loader, model_patcher
+from modules.model import model_helper, model_loader, model_patcher, ops
 from modules.util import nms, safe_step
 
 class DoubleConvBlock(torch.nn.Module):
-    def __init__(self, input_channel, output_channel, layer_number):
+    def __init__(self, input_channel, output_channel, layer_number, ops):
         super().__init__()
         self.convs = torch.nn.Sequential()
-        self.convs.append(torch.nn.Conv2d(in_channels=input_channel, out_channels=output_channel, kernel_size=(3, 3), stride=(1, 1), padding=1))
+        self.convs.append(ops.Conv2d(in_channels=input_channel, out_channels=output_channel, kernel_size=(3, 3), stride=(1, 1), padding=1))
         for i in range(1, layer_number):
-            self.convs.append(torch.nn.Conv2d(in_channels=output_channel, out_channels=output_channel, kernel_size=(3, 3), stride=(1, 1), padding=1))
-        self.projection = torch.nn.Conv2d(in_channels=output_channel, out_channels=1, kernel_size=(1, 1), stride=(1, 1), padding=0)
+            self.convs.append(ops.Conv2d(in_channels=output_channel, out_channels=output_channel, kernel_size=(3, 3), stride=(1, 1), padding=1))
+        self.projection = ops.Conv2d(in_channels=output_channel, out_channels=1, kernel_size=(1, 1), stride=(1, 1), padding=0)
 
     def __call__(self, x, down_sampling=False):
         h = x
@@ -37,14 +37,14 @@ class DoubleConvBlock(torch.nn.Module):
 
 
 class ControlNetHED_Apache2(torch.nn.Module):
-    def __init__(self):
+    def __init__(self, ops=ops.disable_weight_init):
         super().__init__()
         self.norm = torch.nn.Parameter(torch.zeros(size=(1, 3, 1, 1)))
-        self.block1 = DoubleConvBlock(input_channel=3, output_channel=64, layer_number=2)
-        self.block2 = DoubleConvBlock(input_channel=64, output_channel=128, layer_number=2)
-        self.block3 = DoubleConvBlock(input_channel=128, output_channel=256, layer_number=3)
-        self.block4 = DoubleConvBlock(input_channel=256, output_channel=512, layer_number=3)
-        self.block5 = DoubleConvBlock(input_channel=512, output_channel=512, layer_number=3)
+        self.block1 = DoubleConvBlock(input_channel=3, output_channel=64, layer_number=2, ops=ops)
+        self.block2 = DoubleConvBlock(input_channel=64, output_channel=128, layer_number=2, ops=ops)
+        self.block3 = DoubleConvBlock(input_channel=128, output_channel=256, layer_number=3, ops=ops)
+        self.block4 = DoubleConvBlock(input_channel=256, output_channel=512, layer_number=3, ops=ops)
+        self.block5 = DoubleConvBlock(input_channel=512, output_channel=512, layer_number=3, ops=ops)
 
     def __call__(self, x):
         h = x - self.norm
@@ -59,30 +59,25 @@ class HEDdetector:
     def __init__(self):
         filename = "ControlNetHED.pth"
         model_path = os.path.join(modules.paths.annotator_models_path, filename)
-        model = model_helper.load_torch_file(model_path)
-        netNetwork = ControlNetHED_Apache2()
-        netNetwork.load_state_dict(model)
+        state_dict = model_helper.load_torch_file(model_path)
 
-        load_device = model_loader.run_device("annotator")
-        offload_device = model_loader.offload_device("annotator")
+        load_device, offload_device, dtype, manual_cast_dtype = model_loader.get_device_and_dtype("annotator")
+        self.dtype = dtype
+        self.manual_cast_dtype = manual_cast_dtype
+
+        if self.manual_cast_dtype is None:
+            operations = ops.disable_weight_init
+        else:
+            operations = ops.manual_cast
+        
+        for k in state_dict:
+            state_dict[k].to(dtype)
+
+        netNetwork = ControlNetHED_Apache2(ops.manual_cast)
+        netNetwork.load_state_dict(state_dict)
+
         self.netNetwork = model_patcher.ModelPatcher(netNetwork, load_device, offload_device)
 
-        # self.netNetwork = netNetwork
-
-    # @classmethod
-    # def from_pretrained(cls, pretrained_model_or_path, filename=None, cache_dir=None):
-    #     filename = filename or "ControlNetHED.pth"
-    #     model_path = os.path.join(pretrained_model_or_path, filename)
-
-    #     netNetwork = ControlNetHED_Apache2()
-    #     netNetwork.load_state_dict(torch.load(model_path, map_location='cpu'))
-    #     netNetwork.float().eval()
-
-    #     return cls(netNetwork)
-    
-    def to(self, device):
-        self.netNetwork.to(device)
-        return self
 
     @torch.no_grad()
     @torch.inference_mode()

@@ -32,7 +32,7 @@ class DepthAnythingDetector:
     """https://github.com/LiheYoung/Depth-Anything"""
 
     def __init__(self):
-        filename="depth_anything_vitl14.pth"
+        filename = "depth_anything_vitl14.pth"
         model_path = os.path.join(modules.paths.annotator_models_path, filename)
         state_dict = model_helper.load_torch_file(model_path)
 
