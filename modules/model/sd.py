@@ -69,7 +69,7 @@ def load_lora_for_models(model, clip, lora_model, strength_model, strength_clip)
 
 
 class CLIP:
-    def __init__(self, target=None, embedding_directory=None, no_init=False):
+    def __init__(self, target=None, embedding_directory=None, no_init=False, dtype=None):
         if no_init:
             return
         params = target.params.copy()
@@ -79,7 +79,7 @@ class CLIP:
         load_device = model_loader.run_device("clip")
         offload_device = model_loader.offload_device("clip")
         params['device'] = offload_device
-        params['dtype'] = devices.dtype(load_device)
+        params['dtype'] = model_loader.dtype("clip", want_use_dtype=dtype)
 
         self.cond_stage_model = clip(**(params))
 
@@ -216,11 +216,9 @@ class VAE:
             device = model_loader.run_device("vae")
         self.device = device
         offload_device = model_loader.offload_device("vae")
-        if dtype is None:
-            want_use_dtype = torch.bfloat16
-        self.vae_dtype = devices.dtype(device, want_use_dtype=want_use_dtype)
+        self.vae_dtype = model_loader.dtype("vae", dtype or torch.bfloat16)
         self.first_stage_model.to(self.vae_dtype)
-        self.output_device = torch.device("cpu")
+        self.output_device = devices.intermediate_device()
 
         self.patcher = model_patcher.ModelPatcher(self.first_stage_model, load_device=self.device, offload_device=offload_device)
 
@@ -363,7 +361,7 @@ def load_clip(ckpt_paths, embedding_directory=None, clip_type=CLIPType.STABLE_DI
     return clip
 
 
-def load_checkpoint_guess_config(ckpt_path, output_vae=True, output_clip=True, output_clipvision=False, embedding_directory=None, output_model=True):
+def load_checkpoint_guess_config(ckpt_path, output_vae=True, output_clip=True, output_clipvision=False, embedding_directory=None, output_model=True, dtype_model=None, dtype_vae=None, dtype_clip=None):
     sd = model_helper.load_torch_file(ckpt_path)
     sd_keys = sd.keys()
     clip = None
@@ -375,7 +373,7 @@ def load_checkpoint_guess_config(ckpt_path, output_vae=True, output_clip=True, o
 
     parameters = model_helper.calculate_parameters(sd, "model.diffusion_model.")
     load_device = model_loader.run_device("unet")
-    unet_dtype = model_loader.dtype("unet")
+    unet_dtype = model_loader.dtype("unet", want_use_dtype=dtype_model)
 
     model_config = model_detection.model_config_from_unet(sd, "model.diffusion_model.")
     manual_cast_dtype = devices.unet_manual_cast(unet_dtype, load_device, model_config.supported_inference_dtypes)
@@ -398,14 +396,14 @@ def load_checkpoint_guess_config(ckpt_path, output_vae=True, output_clip=True, o
     if output_vae:
         vae_sd = model_helper.state_dict_prefix_replace(sd, {k: "" for k in model_config.vae_key_prefix}, filter_keys=True)
         vae_sd = model_config.process_vae_state_dict(vae_sd)
-        vae = VAE(sd=vae_sd)
+        vae = VAE(sd=vae_sd, dtype=dtype_vae)
 
     if output_clip:
         clip_target = model_config.clip_target()
         if clip_target is not None:
             clip_sd = model_config.process_clip_state_dict(sd)
             if len(clip_sd) > 0:
-                clip = CLIP(clip_target, embedding_directory=embedding_directory)
+                clip = CLIP(clip_target, embedding_directory=embedding_directory, dtype=dtype_clip)
                 m, u = clip.load_sd(clip_sd, full_model=True)
                 if len(m) > 0:
                     logging.warning("clip missing: {}".format(m))

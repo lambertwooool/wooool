@@ -23,8 +23,11 @@ class StableDiffusionModel:
 
 @torch.no_grad()
 @torch.inference_mode()
-def load_model(ckpt_filename, output_clip=True, output_vae=True):
-    unet, clip, vae, clip_vision = sd.load_checkpoint_guess_config(ckpt_filename, embedding_directory=embeddings_path, output_clip=output_clip, output_vae=output_vae)
+def load_model(ckpt_filename, output_model=True, output_clip=True, output_vae=True, dtype_model=None, dtype_clip=None, dtype_vae=None):
+    unet, clip, vae, clip_vision = sd.load_checkpoint_guess_config(ckpt_filename, embedding_directory=embeddings_path,
+            output_model=output_model, output_clip=output_clip, output_vae=output_vae,
+            dtype_model=dtype_model, dtype_clip=dtype_clip, dtype_vae=dtype_vae
+        )
     return StableDiffusionModel(unet=unet, clip=clip, vae=vae, clip_vision=clip_vision)
 
 @torch.no_grad()
@@ -38,12 +41,12 @@ def load_sd_lora(model, lora_filename, strength_model=1.0, strength_clip=1.0):
 
     return StableDiffusionModel(unet=new_unet, clip=new_clip, vae=model.vae, clip_vision=model.clip_vision)
 
-def get_sd_model(base_path, refiner_path, steps, loras):
-    xl_base = get_base_model(base_path)
+def get_sd_model(base_path, refiner_path, steps, loras, dtype_model=None, dtype_clip=None, dtype_vae=None):
+    xl_base = get_base_model(base_path, dtype_model=dtype_model, dtype_clip=dtype_clip, dtype_vae=dtype_vae)
     xl_base_patched = get_loras(xl_base, loras)
 
     if steps[1] > 0:
-        xl_refiner = get_refiner_model(refiner_path)
+        xl_refiner = get_refiner_model(refiner_path, dtype_model=dtype_model, dtype_clip=dtype_clip, dtype_vae=dtype_vae)
         # xl_refiner.clip = xl_base.clip
         # xl_refiner = get_loras(xl_refiner, loras)
     else:
@@ -51,12 +54,12 @@ def get_sd_model(base_path, refiner_path, steps, loras):
     
     return xl_base, xl_base_patched, xl_refiner
 
-def get_base_model(model_path):
+def get_base_model(model_path, dtype_model=None, dtype_clip=None, dtype_vae=None):
     if shared.xl_base is not None and shared.xl_base[0] == model_path:
         xl_base = shared.xl_base[1]
         print(f'Base model loaded from cache: {model_path}')
     else:
-        xl_base = load_model(model_path)
+        xl_base = load_model(model_path, dtype_model=dtype_model, dtype_clip=dtype_clip, dtype_vae=dtype_vae)
         shared.xl_base = (model_path, xl_base)
         print(f'Base model loaded: {model_path}')
     
@@ -67,12 +70,12 @@ def get_base_model(model_path):
     
     return model
 
-def get_refiner_model(model_path):
+def get_refiner_model(model_path, dtype_model=None, dtype_clip=None, dtype_vae=None):
     if shared.xl_refiner is not None and shared.xl_refiner[0] == model_path:
         xl_refiner = shared.xl_refiner[1]
         print(f'Refiner model loaded from cache: {model_path}')
     else:
-        xl_refiner = load_model(model_path)
+        xl_refiner = load_model(model_path, dtype_model=dtype_model, dtype_clip=dtype_clip, dtype_vae=dtype_vae)
         shared.xl_refiner = (model_path, xl_refiner)
         print(f'Refiner model loaded: {model_path}')
 

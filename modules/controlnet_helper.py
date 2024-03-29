@@ -18,8 +18,8 @@ def get_controlnets():
 
     return controlnet_files
 
-def processor(controlnets, unet_model, width, height, image_mask):
-    ctrl_procs = load_controlnets_by_task(controlnets)
+def processor(controlnets, unet_model, width, height, image_mask, dtype_ctrl=None, dtype_ipa=None):
+    ctrl_procs = load_controlnets_by_task(controlnets, dtype_ctrl=dtype_ctrl, dtype_ipa=dtype_ipa)
     ctrls = []
     ip_procs = []
 
@@ -28,7 +28,7 @@ def processor(controlnets, unet_model, width, height, image_mask):
     ip_proc = None
 
     for cn in controlnets:
-        cn_type, cn_img, cn_weight, cn_model_name, start_percent, end_percent = cn
+        cn_type, cn_img, cn_weight, cn_model_name, cn_mask, start_percent, end_percent = cn
         cn_items = cn_type.split(",")
         cn_model = None
         cn_img = cv2.cvtColor(cn_img, cv2.COLOR_BGR2RGB)
@@ -37,9 +37,9 @@ def processor(controlnets, unet_model, width, height, image_mask):
             # if cn_item in ctrl_procs.keys():
             if cn_model_name in ctrl_procs.keys():
                 if cn_item in ["lama_inpaint"]:
-                    cn_mask = image_mask.copy()
-                    cn_mask = cn_mask[..., np.newaxis]
-                    cn_img = np.concatenate([cn_img[:cn_mask.shape[0], :cn_mask.shape[1], :], cn_mask], axis=-1)
+                    lama_mask = image_mask.copy()
+                    lama_mask = lama_mask[..., np.newaxis]
+                    cn_img = np.concatenate([cn_img[:lama_mask.shape[0], :lama_mask.shape[1], :], lama_mask], axis=-1)
 
                 # ctrl_proc = ctrl_procs[cn_item]
                 ctrl_proc = ctrl_procs[cn_model_name]
@@ -49,13 +49,13 @@ def processor(controlnets, unet_model, width, height, image_mask):
                     ip_proc = ctrl_proc.processor
                     image_emb, uncond_image_emb = ip_proc.preprocess(cn_img, clip_vision_model)
                     # ip_adapters.append((ip_proc.preprocess(ip_img, clip_vision_model), 1, cn_weight))
-                    unet_model = ip_proc.patch_model(unet_model, image_emb, uncond_image_emb, cn_weight, start_percent, end_percent)
+                    unet_model = ip_proc.patch_model(unet_model, image_emb, uncond_image_emb, cn_weight, cn_mask, start_percent, end_percent)
                     ip_procs.append(ip_proc)
                 else:
                     cn_img = util.resize_image(cn_img, width=width, height=height)
                     cn_img = util.HWC3(ctrl_proc(cn_img))
                     if cn_model is None:
-                        cn_model = ctrl_proc.load_controlnet(cn_model_name)
+                        cn_model = ctrl_proc.load_controlnet(cn_model_name, want_use_dtype=dtype_ctrl)
 
                 util.save_temp_image(cn_img, f"{cn_item}.png")
             else:
@@ -65,14 +65,14 @@ def processor(controlnets, unet_model, width, height, image_mask):
         if cn_model is not None:
             if "recolor" in cn_model_name:
                 end_percent = 1.0
-            ctrls.append((cn_type, cn_img, cn_weight, cn_model, start_percent, end_percent))
+            ctrls.append((cn_type, cn_img, cn_weight, cn_model, cn_mask, start_percent, end_percent))
     
     return ctrls, ip_procs, unet_model
 
-def load_controlnets_by_task(cn_types):
+def load_controlnets_by_task(cn_types, dtype_ctrl=None, dtype_ipa=None):
     ctrls = {}
 
-    for cn_type, cn_image, cn_weight, cn_model_name, start_percent, end_percent in cn_types:
+    for cn_type, cn_image, cn_weight, cn_model_name, cn_mask, start_percent, end_percent in cn_types:
         cn_items = cn_type.split(",")
         for cn_item in cn_items:
             # if cn_item not in ctrls:
@@ -81,7 +81,7 @@ def load_controlnets_by_task(cn_types):
                     if cn_item in ["ip_adapter", "ip_adapter_face"]:
                         proc = controlnet_processor(cn_item)
                         proc.load_processor()
-                        proc.processor.load(cn_item, cn_model_name)
+                        proc.processor.load(cn_item, cn_model_name, want_use_dtype=dtype_ipa)
                     else:
                         proc = controlnet_processor(cn_item)
                     
@@ -93,18 +93,20 @@ def load_controlnets_by_task(cn_types):
 @torch.inference_mode()
 def apply_controlnets(positive_cond, negative_cond, ctrls):
     for cn in ctrls:
-        cn_type, cn_img, cn_weight, cn_model, start_percent, end_percent = cn
+        cn_type, cn_img, cn_weight, cn_model, cn_mask, start_percent, end_percent = cn
 
         if cn_model is not None :
             positive_cond, negative_cond = apply_controlnet(
                 positive_cond, negative_cond,
-                cn_model, util.numpy_to_pytorch(cn_img), cn_weight, start_percent, end_percent)
+                cn_model, util.numpy_to_pytorch(cn_img),
+                util.numpy_to_pytorch(cn_mask) if cn_mask is not None else None,
+                cn_weight, start_percent, end_percent)
     
     return positive_cond, negative_cond
 
 @torch.no_grad()
 @torch.inference_mode()
-def apply_controlnet(positive, negative, control_net, image, strength, start_percent, end_percent):
+def apply_controlnet(positive, negative, control_net, image, mask, strength, start_percent, end_percent):
     if strength == 0:
         return (positive, negative)
 

@@ -247,6 +247,10 @@ def RefBlock(opt_base_model, opt_dict, refCount=5, showCount=3):
             with gr.Row() as panel_step_range:
                 sl_start_percent = gr.Slider(minimum=0, maximum=100, value=0, step=5, min_width=120, label="Start At %", visible=False, elem_id=f"refer_start_{i}", elem_classes="refer_start_at")
                 sl_end_percent = gr.Slider(minimum=0, maximum=100, value=80, step=5, min_width=120, label="End At %", visible=False, elem_id=f"refer_end_{i}", elem_classes="refer_end_at")
+                with gr.Column(visible=False) as panel_mask:
+                    ckb_mask = gr.Checkbox(label="apply mask", value=False, min_width=40, elem_id=f"refer_apply_mask_{i}")
+                    image_attn_mask = gr.Image(label="mask", height=280, visible=False, elem_id=f"refer_mask_{i}")
+
             ckb_words = gr.CheckboxGroup(show_label=False, visible=False, elem_id=f"refer_wd14_{i}", elem_classes="refer_words")
             
             opt_ctrl_model = gr.Dropdown(choices=ctrl_models, value=default_model, visible=(len(ctrl_models) > 1),  container=False, filterable=False, min_width=80, elem_id=f"ref_ctrl_model_{i}", elem_classes="gr_dropdown")
@@ -265,14 +269,16 @@ def RefBlock(opt_base_model, opt_dict, refCount=5, showCount=3):
             .then(get_models, [opt_type, opt_base_model, opt_ctrl_model], opt_ctrl_model, queue=False)
         opt_ctrl_model.change(get_annotators, [opt_type, opt_ctrl_model, opt_annotator], [opt_annotator, panel_annotator], queue=False)
 
-        image_refer.change(lambda x: (gr.Slider(visible=x is not None), gr.Slider(visible=x is not None), gr.Slider(visible=x is not None)), image_refer, [sl_rate, sl_start_percent, sl_end_percent], queue=False) \
+        image_refer.change(lambda x: (gr.Slider(visible=x is not None), gr.Slider(visible=x is not None), gr.Slider(visible=x is not None), gr.Column(visible=x is not None)), image_refer, [sl_rate, sl_start_percent, sl_end_percent, panel_mask], queue=False) \
             .then(get_tags, [opt_type, image_refer], [ckb_words], queue=False)
 
         ckb_enable.change(lambda x: gr.Dropdown(interactive=x), ckb_enable, opt_type, queue=False)
         ckb_annotator.change(lambda x: gr.Dropdown(interactive=x), ckb_annotator, opt_annotator, queue=False)
 
+        ckb_mask.change(lambda x: gr.Image(visible=x), ckb_mask, image_attn_mask, queue=False)
+
         blocks.append(block)
-        ctrls += [opt_type, ckb_enable, image_refer, sl_rate, ckb_words, opt_ctrl_model, ckb_annotator, opt_annotator, sl_start_percent, sl_end_percent]
+        ctrls += [opt_type, ckb_enable, image_refer, sl_rate, ckb_words, opt_ctrl_model, ckb_annotator, opt_annotator, ckb_mask, image_attn_mask, sl_start_percent, sl_end_percent]
     
     return blocks, ctrls
 

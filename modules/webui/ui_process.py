@@ -8,6 +8,7 @@ import numpy as np
 import shutil
 import time
 import random
+import torch
 import traceback
 from PIL import Image
 
@@ -95,9 +96,20 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
             k: v if isinstance(v, dict) else { "prompt": v } \
                 for k, v in gen_opts.items() if k in ["view", "emo", "location", "weather", "hue"]
         },
+        "dtype": {},
         "controlnet": [],
         "lora": loras,
     }
+
+    dtypes = {
+        "fp32": torch.float32,
+        "fp16": torch.float16,
+        "bf16": torch.bfloat16,
+        "fp8_e4m3": torch.float8_e4m3fn,
+        "fp8_e5m2": torch.float8_e5m2,
+    }
+    for x in ["model", "clip", "vae", "controlnet", "ipadapter"]:
+        params["dtype"][x] = dtypes.get(gen_opts.pop(f"{x}_dtype"))
 
     if gen_opts.pop("custom_size", False):
         params["size"] = (int(gen_opts.pop("image_width")), int(gen_opts.pop("image_height")))
@@ -124,12 +136,12 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
             ref_mode, _ = opts.options["ref_mode"]["Ref All"]
             params["controlnet"].append(["Ref All", ref_mode, img_refer, 0.5])
     else:
-        len_ref_ctrl = 10
+        len_ref_ctrl = 12
         ref_image_args = args[: ref_image_count[0] * len_ref_ctrl]
         ref_num = int(gen_opts.get("ref_num", ref_image_count[1]))
         args = args[ref_image_count[0] * len_ref_ctrl :]
         for i in range(ref_image_count[0]):
-            opt_type, ckb_enable, image_refer, sl_rate, ckb_words, opt_model, ckb_annotator, opt_annotator, sl_start_percent, sl_end_percent = ref_image_args[i * len_ref_ctrl : (i + 1) * len_ref_ctrl]
+            opt_type, ckb_enable, image_refer, sl_rate, ckb_words, opt_model, ckb_annotator, opt_annotator, ckb_mask, image_attn_mask, sl_start_percent, sl_end_percent = ref_image_args[i * len_ref_ctrl : (i + 1) * len_ref_ctrl]
             if not ckb_enable or i >= ref_num:
                 continue
 
@@ -144,7 +156,8 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
             else:
                 if image_refer is not None or params.get("image"):
                     opt_annotator = opt_annotator or ref_mode if ckb_annotator or opt_annotator in ["ip_adapter", "ip_adapter_face"] else "default"
-                    params["controlnet"].append([opt_type, opt_annotator, image_refer, sl_rate / 100.0, opt_model, sl_start_percent / 100.0, sl_end_percent / 100.0])
+                    image_attn_mask = image_attn_mask if ckb_mask else None
+                    params["controlnet"].append([opt_type, opt_annotator, image_refer, sl_rate / 100.0, opt_model, image_attn_mask, sl_start_percent / 100.0, sl_end_percent / 100.0])
         
         if params.get("base_image"):
             params["image"] = params.pop("base_image")

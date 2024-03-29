@@ -305,6 +305,13 @@ for x in ["mc", "style", "view", "emo", "location", "weather", "hue"]:
 	default[k] = 100
 default["style_weight"] = 110
 
+# Dtype
+for x in ["Model", "Clip", "VAE", "Controlnet", "IPAdapter"]:
+	dtype_name = f"{x.lower()}_dtype"
+	options[dtype_name] = load_ui_config("dtype")
+	title[dtype_name] = f"{x} Dtype"
+	default[dtype_name] = "Default"
+
 # Detail
 options["detail"] = (0, 120, 5)
 mul["detail"] = 0.01

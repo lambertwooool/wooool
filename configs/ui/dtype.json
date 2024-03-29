@@ -1,0 +1,8 @@
+{
+	"Default": "",
+	"Float32": "fp32",
+	"Float16": "fp16",
+	"BFloat16": "bf16",
+	"Float8 e4m3": "fp8_e4m3",
+	"Float8 e5m2": "fp8_e5m2"
+}

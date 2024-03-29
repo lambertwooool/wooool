@@ -110,10 +110,11 @@ def handler(task):
         size = util.ratios2size(util.size2ratio(image.shape[1], image.shape[0]) if image is not None else (1, 1), pixels ** 2)
     width, height = size
     size = (width // 8 * 8, height // 8 * 8)
+    dtypes = task.get("dtype", {})
     controlnets = [[    ref_mode, image_refer, sl_rate,
                         controlnet_helper.controlnet_files.get(opt_model) or opts.options["ref_mode"][opt_type][1][sd_type],
-                        start_percent, end_percent ]
-                    for opt_type, ref_mode, image_refer, sl_rate, opt_model, start_percent, end_percent in task.get("controlnet", []) \
+                        attn_mask, start_percent, end_percent ]
+                    for opt_type, ref_mode, image_refer, sl_rate, opt_model, attn_mask, start_percent, end_percent in task.get("controlnet", []) \
                         if opt_model or opts.options["ref_mode"][opt_type][1][sd_type] is not None]
 
     tiled = False
@@ -164,8 +165,9 @@ def handler(task):
             '\n[freeU, eta]:', [free_u, eta], \
             '\n[layered diffusion]:', transparent_bg, \
             '\n[file_format]:', file_format, \
+            '\n[dtypes]:', dtypes, \
             '\n[loras]:', loras, \
-            '\n[controlnets]:', [(x[0], x[2], x[3], x[4], x[5]) for x in controlnets], \
+            '\n[controlnets]:', [(x[0], x[1].shape[:2], x[2], x[3], x[4] is not None, x[5], x[6]) for x in controlnets], \
             '\n-------------------------------'
         )
 
@@ -206,6 +208,7 @@ def handler(task):
                 round_batch_size=round_batch_size,
                 subseed_strength=subseed_strength,
                 clip_skip=clip_skip,
+                model_dtypes=dtypes,
             )
     
     # model_loader.free_memory(1024 ** 4, torch.device(torch.cuda.current_device()))
@@ -319,14 +322,14 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
         callback, sampler_name, scheduler_name,
         latent=None, image=None, denoise=1.0, cfg_scale=7.0, cfg_scale_to=7.0, batch_size=1, loras=[], controlnets=[],
         cfg_multiplier=0, free_u=0, eta=1.0, style_aligned_scale=0.0, transparent_bg="",
-        tiled=False, round_batch_size=8, subseed_strength=1.0, clip_skip=0):
+        tiled=False, round_batch_size=8, subseed_strength=1.0, clip_skip=0, model_dtypes={}):
 
     devices.torch_gc()
     progress_output(task, "load_model")
     
-    xl_base, xl_base_patched, xl_refiner = core.get_sd_model(base_path, refiner_path, steps, loras)
+    xl_base, xl_base_patched, xl_refiner = core.get_sd_model(base_path, refiner_path, steps, loras,
+        dtype_model=model_dtypes.get("model"), dtype_clip=model_dtypes.get("clip"), dtype_vae=model_dtypes.get("vae"))
     model_type, refiner_model_type = core.assert_model_integrity(xl_base, xl_refiner)
-
     progress_output(task, "clip")
 
     clip_model = xl_base_patched.clip
@@ -444,7 +447,9 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
 
     if controlnets:
         progress_output(task, "controlnet")
-        ctrls, ip_procs, unet_model = controlnet_helper.processor(controlnets, unet_model, width, height, image_mask)
+        ctrls, ip_procs, unet_model = controlnet_helper.processor(
+            controlnets, unet_model, width, height, image_mask,
+            dtype_ctrl=model_dtypes.get("controlnet"), dtype_ipa=model_dtypes.get("ipadapter"))
     else:
         ctrls = []
         ip_procs = []

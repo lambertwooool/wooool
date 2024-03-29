@@ -314,7 +314,7 @@ class ControlLora(ControlNet):
     def inference_memory_requirements(self, dtype):
         return model_helper.calculate_parameters(self.control_weights) * devices.dtype_size(dtype) + ControlBase.inference_memory_requirements(self, dtype)
 
-def load_controlnet(ckpt_path, model=None):
+def load_controlnet(ckpt_path, model=None, want_use_dtype=None):
     controlnet_data = model_helper.load_torch_file(ckpt_path, safe_load=True)
     if "lora_controlnet" in controlnet_data:
         return ControlLora(controlnet_data)
@@ -387,8 +387,8 @@ def load_controlnet(ckpt_path, model=None):
         controlnet_config = model_config.unet_config
 
     load_device = model_loader.run_device("controlnet")
-    unet_dtype = model_loader.dtype("controlnet")
-    if supported_inference_dtypes is not None:
+    unet_dtype = model_loader.dtype("controlnet", want_use_dtype=want_use_dtype)
+    if supported_inference_dtypes is not None and unet_dtype not in supported_inference_dtypes:
         unet_dtype = devices.dtype(load_device, want_use_dtype=supported_inference_dtypes)
 
     manual_cast_dtype = devices.unet_manual_cast(unet_dtype, load_device)
