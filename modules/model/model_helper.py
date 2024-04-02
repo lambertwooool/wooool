@@ -18,7 +18,7 @@ base_files = []
 default_base_name = ""
 default_refiner_name = ""
 
-def load_torch_file(ckpt, safe_load=False, device=None):
+def load_torch_file(ckpt, safe_load=False, device=None, dtype=None):
     if not os.path.exists(ckpt):      
         print(f"[Load File Error] {ckpt} not exist.")
         return None
@@ -46,6 +46,11 @@ def load_torch_file(ckpt, safe_load=False, device=None):
             sd = pl_sd["state_dict"]
         else:
             sd = pl_sd
+
+    if dtype is not None:
+        for k in sd:
+            sd[k].to(dtype)
+
     print(f"[Load File][{time.perf_counter() - start_time:.2f}s] {ckpt}")
     return sd
 

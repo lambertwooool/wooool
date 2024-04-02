@@ -18,13 +18,13 @@ from modules.model import model_helper, model_loader, model_patcher, ops
 from modules.util import nms, safe_step
 
 class DoubleConvBlock(torch.nn.Module):
-    def __init__(self, input_channel, output_channel, layer_number, ops):
+    def __init__(self, input_channel, output_channel, layer_number):
         super().__init__()
         self.convs = torch.nn.Sequential()
-        self.convs.append(ops.Conv2d(in_channels=input_channel, out_channels=output_channel, kernel_size=(3, 3), stride=(1, 1), padding=1))
+        self.convs.append(torch.nn.Conv2d(in_channels=input_channel, out_channels=output_channel, kernel_size=(3, 3), stride=(1, 1), padding=1))
         for i in range(1, layer_number):
-            self.convs.append(ops.Conv2d(in_channels=output_channel, out_channels=output_channel, kernel_size=(3, 3), stride=(1, 1), padding=1))
-        self.projection = ops.Conv2d(in_channels=output_channel, out_channels=1, kernel_size=(1, 1), stride=(1, 1), padding=0)
+            self.convs.append(torch.nn.Conv2d(in_channels=output_channel, out_channels=output_channel, kernel_size=(3, 3), stride=(1, 1), padding=1))
+        self.projection = torch.nn.Conv2d(in_channels=output_channel, out_channels=1, kernel_size=(1, 1), stride=(1, 1), padding=0)
 
     def __call__(self, x, down_sampling=False):
         h = x
@@ -37,14 +37,14 @@ class DoubleConvBlock(torch.nn.Module):
 
 
 class ControlNetHED_Apache2(torch.nn.Module):
-    def __init__(self, ops=ops.disable_weight_init):
+    def __init__(self):
         super().__init__()
         self.norm = torch.nn.Parameter(torch.zeros(size=(1, 3, 1, 1)))
-        self.block1 = DoubleConvBlock(input_channel=3, output_channel=64, layer_number=2, ops=ops)
-        self.block2 = DoubleConvBlock(input_channel=64, output_channel=128, layer_number=2, ops=ops)
-        self.block3 = DoubleConvBlock(input_channel=128, output_channel=256, layer_number=3, ops=ops)
-        self.block4 = DoubleConvBlock(input_channel=256, output_channel=512, layer_number=3, ops=ops)
-        self.block5 = DoubleConvBlock(input_channel=512, output_channel=512, layer_number=3, ops=ops)
+        self.block1 = DoubleConvBlock(input_channel=3, output_channel=64, layer_number=2)
+        self.block2 = DoubleConvBlock(input_channel=64, output_channel=128, layer_number=2)
+        self.block3 = DoubleConvBlock(input_channel=128, output_channel=256, layer_number=3)
+        self.block4 = DoubleConvBlock(input_channel=256, output_channel=512, layer_number=3)
+        self.block5 = DoubleConvBlock(input_channel=512, output_channel=512, layer_number=3)
 
     def __call__(self, x):
         h = x - self.norm
@@ -57,26 +57,17 @@ class ControlNetHED_Apache2(torch.nn.Module):
 
 class HEDdetector:
     def __init__(self):
+        load_device, offload_device, dtype, manual_cast_dtype = model_loader.get_device_and_dtype("annotator")
+        print(load_device, offload_device, dtype, manual_cast_dtype)
         filename = "ControlNetHED.pth"
         model_path = os.path.join(modules.paths.annotator_models_path, filename)
-        state_dict = model_helper.load_torch_file(model_path)
+        state_dict = model_helper.load_torch_file(model_path, dtype=dtype)
 
-        load_device, offload_device, dtype, manual_cast_dtype = model_loader.get_device_and_dtype("annotator")
-        self.dtype = dtype
-        self.manual_cast_dtype = manual_cast_dtype
-
-        if self.manual_cast_dtype is None:
-            operations = ops.disable_weight_init
-        else:
-            operations = ops.manual_cast
-        
-        for k in state_dict:
-            state_dict[k].to(dtype)
-
-        netNetwork = ControlNetHED_Apache2(ops.manual_cast)
+        with ops.auto_ops():
+            netNetwork = ControlNetHED_Apache2()
         netNetwork.load_state_dict(state_dict)
 
-        self.netNetwork = model_patcher.ModelPatcher(netNetwork, load_device, offload_device)
+        self.netNetwork = model_patcher.ModelPatcher(netNetwork, load_device, offload_device, manual_cast_dtype=manual_cast_dtype)
 
 
     @torch.no_grad()
@@ -85,15 +76,12 @@ class HEDdetector:
         assert input_image.ndim == 3
         H, W, C = input_image.shape
 
-        model_loader.load_model_gpu(self.netNetwork)
-
         with torch.no_grad():
             # device = next(iter(self.netNetwork.parameters())).device
             device = self.netNetwork.load_device
             image_hed = torch.from_numpy(input_image).float().to(device)
             image_hed = rearrange(image_hed, 'h w c -> 1 c h w')
-            # edges = self.netNetwork(image_hed)
-            edges = self.netNetwork.model(image_hed)
+            edges = self.netNetwork(image_hed)
             edges = [e.detach().cpu().numpy().astype(np.float32)[0, 0] for e in edges]
             edges = [cv2.resize(e, (W, H), interpolation=cv2.INTER_LINEAR) for e in edges]
             edges = np.stack(edges, axis=2)

@@ -2,7 +2,7 @@ import torch
 import copy
 import inspect
 from modules import devices, util
-from modules.model import model_helper, model_loader
+from modules.model import model_helper, model_loader, ops
 import logging
 
 def apply_weight_decompose(dora_scale, weight):
@@ -18,7 +18,7 @@ def apply_weight_decompose(dora_scale, weight):
 
 
 class ModelPatcher:
-    def __init__(self, model, load_device, offload_device, size=0, current_device=None, weight_inplace_update=False):
+    def __init__(self, model, load_device, offload_device, size=0, current_device=None, weight_inplace_update=False, manual_cast_dtype=None):
         self.size = size
         self.model = model
         self.patches = {}
@@ -35,6 +35,15 @@ class ModelPatcher:
             self.current_device = current_device
 
         self.weight_inplace_update = weight_inplace_update
+        self.manual_cast_dtype = manual_cast_dtype
+
+    def __call__(self, *args, **kwargs):
+        model_loader.load_model_gpu(self)
+        for n, m in self.model.named_modules():
+            if hasattr(m, "comfy_cast_weights"):
+                m.comfy_cast_weights = self.manual_cast_dtype is not None
+        x = self.model(*args, **kwargs)
+        return x
 
     def model_size(self):
         if self.size > 0:

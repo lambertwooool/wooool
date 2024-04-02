@@ -4,6 +4,7 @@ import torch.nn as nn
 from modules import devices
 
 def cast_bias_weight(s, input):
+    print("cast bias weight")
     bias = None
     non_blocking = devices.device_supports_non_blocking(input.device)
     if s.bias is not None:
@@ -156,7 +157,8 @@ def set_weight_bias_function(model, weight_function=None, bias_function=None):
                 m.bias_function = bias_function
 
 @contextlib.contextmanager
-def auto_cast(ops=manual_cast):
+def auto_ops(manual_cast_dtype=None):
+    ops = disable_weight_init if manual_cast_dtype is None else manual_cast
     patch_module_list = [x for x in ops.__dict__ if not x.startswith("__")]
     origin = {}
 
@@ -164,7 +166,7 @@ def auto_cast(ops=manual_cast):
         module_name = str(module_type)
         if hasattr(nn, module_name):
             origin[module_name] = getattr(nn, module_name)
-            setattr(nn, module_name, module_type)
+            setattr(nn, module_name, getattr(ops, module_name))
     try:
         yield None
     finally:

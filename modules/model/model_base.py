@@ -63,7 +63,8 @@ class BaseModel(torch.nn.Module):
         self.adm_channels = unet_config.get("adm_in_channels", None)
         if self.adm_channels is None:
             self.adm_channels = 0
-        self.inpaint_model = False
+
+        self.concat_keys = ()
         logging.info("model_type {}".format(model_type.name))
         logging.debug("adm {}".format(self.adm_channels))
 
@@ -104,7 +105,7 @@ class BaseModel(torch.nn.Module):
 
     def extra_conds(self, **kwargs):
         out = {}
-        if self.inpaint_model:
+        if len(self.concat_keys) > 0:
             concat_keys = ("mask", "masked_image")
             cond_concat = []
             denoise_mask = kwargs.get("concat_mask", kwargs.get("denoise_mask", None))
