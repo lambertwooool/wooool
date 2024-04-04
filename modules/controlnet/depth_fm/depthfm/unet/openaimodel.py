@@ -78,6 +78,8 @@ class TimestepEmbedSequential(nn.Sequential, TimestepBlock):
     """
 
     def forward(self, x, emb, context=None):
+        x = x.to(emb)
+        context = context.to(emb)
         for layer in self:
             if isinstance(layer, TimestepBlock):
                 x = layer(x, emb)
@@ -823,7 +825,7 @@ class UNetModel(nn.Module):
             self.num_classes is not None
         ), "must specify y if and only if the model is class-conditional"
         hs = []
-        t_emb = timestep_embedding(t, self.model_channels, repeat_only=False)
+        t_emb = timestep_embedding(t, self.model_channels, repeat_only=False).to(x)
         emb = self.time_embed(t_emb)
 
         if self.num_classes is not None:

@@ -1,5 +1,10 @@
 # Change Logs
 
+## 0.8.9
+- Adjust the model data type at anytime, using FP32, FP16, FP8, etc, support unet, clip, vae, controlnet and IPAdapter
+- Support IPAdapter mask
+- Support new controlnet "bria remove background", and use it replace "remove background"
+
 ## 0.8.8
 - Support sdxl and sd15 lightning generate, 6 step generate an image
 - Support sdxl and sd15 tcd generate and eta weight, 8 step generate an image

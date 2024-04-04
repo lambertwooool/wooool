@@ -146,7 +146,7 @@ options["ref_mode"] = {
 	"Ref Segment": (	"oneformer",
 			  		{ 	"sdxl": None, "sd15": "control_v11p_sd15_seg.pth",
 						"keyword": [r"\bseg\b"],
-						"annotator": [["oneformer", "segment_anything", "bria_remove_bg,anime_segmentation"]]
+						"annotator": [["oneformer", "segment_anything", "bria_remove_bg,anime_segmentation", "remove_bg,anime_segmentation"]]
 					}),
 	"Ref Normalbae": (	"normal_bae",
 			  		{ 	"sdxl": None, "sd15": "control_v11p_sd15_normalbae.pth",

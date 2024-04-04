@@ -41,6 +41,7 @@ from .remove_bg import RemoveBackgroundDetector
 from .bria_rmbg import BriaRemoveBackgroundDetector
 from .teed import TEEDDector
 from .depth_anything import DepthAnythingDetector
+# from .depth_fm import DepthFMDetector
 from .kps import KpsDetector
 
 import modules.paths
@@ -80,6 +81,7 @@ MODELS = {
     'depth_leres': { 'class': LeresDetector }, 
     'depth_leres++': { 'class': LeresDetector },
     'depth_anything': { 'class': DepthAnythingDetector },
+    # 'depth_fm': { 'class': DepthFMDetector },
     'mlsd': {'class': MLSDdetector },
     'dwpose': { 'class': DwposeDetector },
     'dwpose_face': { 'class': DwposeDetector },
@@ -121,6 +123,7 @@ MODEL_PARAMS = {
     'depth_leres': { 'boost': False },
     'depth_leres++': { 'boost': True },
     'depth_anything': { 'colored': False },
+    # 'depth_fm': {},
     'mlsd': {},
     'dwpose': { 'include_body': True, 'include_hand': True, 'include_face': True },
     'dwpose_face': { 'include_body': False, 'include_hand': False, 'include_face': True },

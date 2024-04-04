@@ -60,7 +60,7 @@ class IPAdapterModel(torch.nn.Module):
         return ip_layers
     
     def get_image_emb(self, image, clip_image, clip_vision):
-        clip_image_embeds = clip_vision.model(pixel_values=clip_image)[0]
+        clip_image_embeds = clip_vision.model(pixel_values=clip_image)[0 if self.sdxl else 2]
         uncond_clip_image_embeds = torch.zeros_like(clip_image_embeds)
 
         return clip_image_embeds, uncond_clip_image_embeds
