@@ -32,6 +32,10 @@ def processor(controlnets, unet_model, width, height, image_mask, dtype_ctrl=Non
         cn_items = cn_type.split(",")
         cn_model = None
         cn_img = cv2.cvtColor(cn_img, cv2.COLOR_BGR2RGB)
+        
+        if cn_mask is not None:
+            cn_mask = util.resize_image(cn_mask, width, height)[:, :, 0]
+            cn_mask = util.numpy_to_pytorch(cn_mask)
 
         for cn_item in cn_items:
             # if cn_item in ctrl_procs.keys():
