@@ -63,6 +63,7 @@
     "7_model.pth": "https://huggingface.co/bdsqlsz/qinglong_controlnet-lllite/resolve/main/Annotators/7_model.pth",
     "depth_anything_vitl14.pth": "https://huggingface.co/spaces/LiheYoung/Depth-Anything/resolve/main/checkpoints/depth_anything_vitl14.pth",
     "depthfm-v1.ckpt": "https://ommer-lab.com/files/depthfm/depthfm-v1.ckpt",
+    "rmbg14.safetensors": "https://huggingface.co/briaai/RMBG-1.4/resolve/main/model.safetensors",
 
     "add_detail.safetensors": "https://civitai.com/api/download/models/62833",
     "add-detail-xl.safetensors": "https://civitai.com/api/download/models/135867",
