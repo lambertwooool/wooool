@@ -48,8 +48,7 @@ def load_torch_file(ckpt, safe_load=False, device=None, dtype=None):
             sd = pl_sd
 
     if dtype is not None:
-        for k in sd:
-            sd[k].to(dtype)
+        convert_sd_dtype(sd, dtype)
 
     print(f"[Load File][{time.perf_counter() - start_time:.2f}s] {ckpt}")
     return sd
@@ -59,6 +58,13 @@ def save_torch_file(sd, ckpt, metadata=None):
         safetensors.torch.save_file(sd, ckpt, metadata=metadata)
     else:
         safetensors.torch.save_file(sd, ckpt)
+
+def convert_sd_dtype(sd, dtype):
+    def convert(sd, dtype):
+        for k in sd:
+            sd[k] = sd[k].to(dtype) if hasattr(sd[k], "to") else convert(sd[k], dtype)
+        return sd
+    convert(sd, dtype)
 
 def get_model_type_by_size(model_path):
     filesize = os.path.getsize(model_path)

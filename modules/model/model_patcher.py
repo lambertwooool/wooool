@@ -69,6 +69,19 @@ class ModelPatcher:
             return True
         return False
 
+    def clone_has_same_weights(self, clone):
+        if not self.is_clone(clone):
+            return False
+
+        if len(self.patches) == 0 and len(clone.patches) == 0:
+            return True
+
+        if self.patches_uuid == clone.patches_uuid:
+            if len(self.patches) != len(clone.patches):
+                logging.warning("WARNING: something went wrong, same patch uuid but different length of patches.")
+            else:
+                return True
+
     def memory_required(self, input_shape):
         return self.model.memory_required(input_shape=input_shape)
 
@@ -197,6 +210,27 @@ class ModelPatcher:
                 if not k.startswith(filter_prefix):
                     sd.pop(k)
         return sd
+
+    def patch_weight_to_device(self, key, device_to=None):
+        if key not in self.patches:
+            return
+
+        weight = model_helper.get_attr(self.model, key)
+
+        inplace_update = self.weight_inplace_update
+
+        if key not in self.backup:
+            self.backup[key] = weight.to(device=self.offload_device, copy=inplace_update)
+
+        if device_to is not None:
+            temp_weight = devices.cast_to_device(weight, device_to, torch.float32, copy=True)
+        else:
+            temp_weight = weight.to(torch.float32, copy=True)
+        out_weight = self.calculate_weight(self.patches[key], temp_weight, key).to(weight.dtype)
+        if inplace_update:
+            model_helper.copy_to_param(self.model, key, out_weight)
+        else:
+            model_helper.set_attr_param(self.model, key, out_weight)
 
     def patch_model(self, device_to=None, patch_weights=True):
         for k in self.object_patches:
@@ -414,21 +448,22 @@ class ModelPatcher:
 
         return weight
 
-    def unpatch_model(self, device_to=None):
-        keys = list(self.backup.keys())
+    def unpatch_model(self, device_to=None, unpatch_weights=True):
+        if unpatch_weights:
+            keys = list(self.backup.keys())
 
-        if self.weight_inplace_update:
-            for k in keys:
-                model_helper.copy_to_param(self.model, k, self.backup[k])
-        else:
-            for k in keys:
-                model_helper.set_attr_param(self.model, k, self.backup[k])
+            if self.weight_inplace_update:
+                for k in keys:
+                    model_helper.copy_to_param(self.model, k, self.backup[k])
+            else:
+                for k in keys:
+                    model_helper.set_attr_param(self.model, k, self.backup[k])
 
-        self.backup = {}
+            self.backup.clear()
 
-        if device_to is not None:
-            self.model.to(device_to)
-            self.current_device = device_to
+            if device_to is not None:
+                self.model.to(device_to)
+                self.current_device = device_to
 
         keys = list(self.object_patches_backup.keys())
         for k in keys:

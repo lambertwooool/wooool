@@ -3,7 +3,7 @@ import torch
 import contextlib
 import modules.paths
 import modules.model.clip_vision
-from modules import devices
+from modules import devices, util
 from modules.model import model_loader, model_helper, ops
 from modules.model.clip_vision import clip_preprocess
 from .IPAdapterModel import IPAdapterModel
@@ -31,17 +31,17 @@ class IPAdapterDetector:
         self.cond = None
         self.uncond = None
 
-    def load_state_dict(self, ip_adapter_path, dtype=torch.float32):
-        ip_state_dict = model_helper.load_torch_file(ip_adapter_path)
+    def load_state_dict(self, ip_adapter_path, dtype):
+        ip_state_dict = model_helper.load_torch_file(ip_adapter_path, dtype=dtype)
         tmp_state_dict = { "image_proj": {}, "ip_adapter": {} }
 
         for key in ip_state_dict.keys():
             if key.startswith("image_proj."):
-                tmp_state_dict["image_proj"][key.replace("image_proj.", "")] = ip_state_dict.get_tensor(key).to(dtype)
+                tmp_state_dict["image_proj"][key.replace("image_proj.", "")] = ip_state_dict.get_tensor(key)
             elif key.startswith("ip_adapter."):
-                tmp_state_dict["ip_adapter"][key.replace("ip_adapter.", "")] = ip_state_dict.get_tensor(key).to(dtype)
+                tmp_state_dict["ip_adapter"][key.replace("ip_adapter.", "")] = ip_state_dict.get_tensor(key)
             else:
-                tmp_state_dict[key] = ip_state_dict.get(key).to(dtype)
+                tmp_state_dict[key] = ip_state_dict.get(key)
         ip_state_dict = tmp_state_dict
 
         return ip_state_dict
@@ -56,7 +56,7 @@ class IPAdapterDetector:
         self.manual_cast_dtype = manual_cast_dtype
         self.ops = ops.disable_weight_init if manual_cast_dtype is None else ops.manual_cast
 
-        ip_state_dict = self.load_state_dict(ip_adapter_path, dtype)
+        ip_state_dict = self.load_state_dict(ip_adapter_path, self.dtype)
 
         is_plus = (
             "proj.3.weight" in ip_state_dict['image_proj'] or
@@ -74,7 +74,7 @@ class IPAdapterDetector:
         else:
             model = IPAdapterModel
         
-        self.ip_adapter = model(ip_state_dict, model_name, self.load_device, self.offload_device, self.ops)
+        self.ip_adapter = model(ip_state_dict, model_name, dtype, self.load_device, self.offload_device, self.ops)
         
     
     @torch.no_grad()
@@ -84,6 +84,8 @@ class IPAdapterDetector:
         clip_image = clip_preprocess(NPToTensor(image_pixel).unsqueeze(0)).float().to(clip_vision.load_device)
         cond_params = {}
         uncond_params = {}
+        
+        device, dtype = self.load_device, self.manual_cast_dtype or self.dtype
 
         if clip_vision.dtype != torch.float32:
             precision_scope = torch.autocast
@@ -99,17 +101,21 @@ class IPAdapterDetector:
             else:
                 clip_image_embeds, uncond_clip_image_embeds, cond_params, uncond_params = embeds
 
-        with precision_scope(devices.get_autocast_device(self.load_device), self.dtype):
-            model_loader.load_model_gpu(self.ip_adapter.image_proj_model)
-            cond = self.ip_adapter.image_proj_model.model(clip_image_embeds, **cond_params).to(device=self.load_device, dtype=self.dtype)
-            uncond = self.ip_adapter.image_proj_model.model(uncond_clip_image_embeds, **uncond_params).to(cond)
-            self.cond = cond
-            self.uncond = uncond
+        clip_image_embeds = clip_image_embeds.to(device=device, dtype=dtype)
+        uncond_clip_image_embeds = uncond_clip_image_embeds.to(device=device, dtype=dtype)
+        cond_params = { k: v.to(device=device, dtype=dtype) if hasattr(v, "to") else v for k, v in cond_params.items() }
+        uncond_params = { k: v.to(device=device, dtype=dtype) if hasattr(v, "to") else v for k, v in uncond_params.items() }
+        # with precision_scope(devices.get_autocast_device(self.load_device), self.dtype):
+        model_loader.load_model_gpu(self.ip_adapter.image_proj_model)
+        cond = self.ip_adapter.image_proj_model.model(clip_image_embeds, **cond_params)
+        uncond = self.ip_adapter.image_proj_model.model(uncond_clip_image_embeds, **uncond_params)
+        self.cond = cond
+        self.uncond = uncond
 
-            model_loader.load_model_gpu(self.ip_adapter.ip_layers)
+        model_loader.load_model_gpu(self.ip_adapter.ip_layers)
 
-            image_emb = [m(cond).cpu() for m in self.ip_adapter.ip_layers.model.to_kvs]
-            uncond_image_emb = [m(uncond).cpu() for m in self.ip_adapter.ip_layers.model.to_kvs]
+        image_emb = [m(cond).cpu() for m in self.ip_adapter.ip_layers.model.to_kvs]
+        uncond_image_emb = [m(uncond).cpu() for m in self.ip_adapter.ip_layers.model.to_kvs]
 
         return image_emb, uncond_image_emb
 

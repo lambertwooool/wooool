@@ -1,11 +1,12 @@
 import torch
 from modules import insightface_model, devices
+from modules.model import ops
 from .IPAdapterModel import IPAdapterModel
 from .network import Resampler
 
 class IPAdapterInstantidModel(IPAdapterModel):
-    def __init__(self, state_dict, model_name, load_device=None, offload_device=None):
-        super().__init__(state_dict, model_name, load_device, offload_device)
+    def __init__(self, state_dict, model_name, dtype, load_device=None, offload_device=None, ops=ops.disable_weight_init):
+        super().__init__(state_dict, model_name, dtype, load_device, offload_device, ops)
 
         self.is_instantid = True
 
@@ -21,7 +22,8 @@ class IPAdapterInstantidModel(IPAdapterModel):
             num_queries=clip_extra_context_tokens,
             embedding_dim=clip_embeddings_dim,
             output_dim=cross_attention_dim,
-            ff_mult=4
+            ff_mult=4,
+            ops=self.ops,
         )
 
         image_proj_model.load_state_dict(state_dict["image_proj"])

@@ -27,7 +27,8 @@ class IPAdapterPlusModel(IPAdapterModel):
                 num_queries=clip_extra_context_tokens,
                 embedding_dim=clip_embeddings_dim,
                 output_dim=cross_attention_dim,
-                ff_mult=4
+                ff_mult=4,
+                ops=self.ops
             )
 
         image_proj_model.load_state_dict(state_dict["image_proj"])

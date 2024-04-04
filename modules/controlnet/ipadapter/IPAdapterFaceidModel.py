@@ -1,12 +1,13 @@
 import torch
 from modules import insightface_model
+from modules.model import ops
 from modules.model.clip_vision import clip_preprocess
 from .IPAdapterModel import IPAdapterModel
 from .network import ProjModelFaceIdPlus, MLPProjModelFaceId
 
 class IPAdapterFaceidModel(IPAdapterModel):
-    def __init__(self, state_dict, model_name, load_device=None, offload_device=None):
-        super().__init__(state_dict, model_name, load_device, offload_device)
+    def __init__(self, state_dict, model_name, dtype, load_device=None, offload_device=None, ops=ops.disable_weight_init):
+        super().__init__(state_dict, model_name, dtype, load_device, offload_device, ops)
 
         self.is_faceid = True
         self.is_faceid_v2 = "v2" in model_name
@@ -19,12 +20,14 @@ class IPAdapterFaceidModel(IPAdapterModel):
                 id_embeddings_dim=512,
                 clip_embeddings_dim=clip_embeddings_dim,
                 num_tokens=4,
+                ops=self.ops,
             )
         else:
             image_proj_model = MLPProjModelFaceId(
                 cross_attention_dim=cross_attention_dim,
                 id_embeddings_dim=512,
                 num_tokens=16,
+                ops=self.ops,
             )
 
         image_proj_model.load_state_dict(state_dict["image_proj"])

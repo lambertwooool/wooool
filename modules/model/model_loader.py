@@ -1,3 +1,4 @@
+import logging
 import sys
 import torch
 from modules import devices
@@ -6,10 +7,10 @@ current_loaded_models = []
 
 # True use GPU, value is (run, offload, dtype)
 device_config = {
-    "clip": (False, False),
+    "clip": (True, False),
     "clip_vision": (True, False),
     "annotator": (True, False),
-    "unet": (True, False, torch.float8_e4m3fn),
+    "unet": (True, False, torch.float16),
     "upscaler": (True, False),
     "controlnet": (True, False, torch.float8_e4m3fn),
     "ipadapter": (True, False, torch.float16),

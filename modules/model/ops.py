@@ -4,7 +4,6 @@ import torch.nn as nn
 from modules import devices
 
 def cast_bias_weight(s, input):
-    print("cast bias weight")
     bias = None
     non_blocking = devices.device_supports_non_blocking(input.device)
     if s.bias is not None:

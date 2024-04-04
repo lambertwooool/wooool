@@ -55,38 +55,28 @@ def get_sd_model(base_path, refiner_path, steps, loras, dtype_model=None, dtype_
     return xl_base, xl_base_patched, xl_refiner
 
 def get_base_model(model_path, dtype_model=None, dtype_clip=None, dtype_vae=None):
-    if shared.xl_base is not None and shared.xl_base[0] == model_path:
+    model_key = util.gen_byte_sha256(str.encode(f"{model_path}_{dtype_model}_{dtype_clip}_{dtype_vae}"))
+    if shared.xl_base is not None and shared.xl_base[0] == model_key:
         xl_base = shared.xl_base[1]
         print(f'Base model loaded from cache: {model_path}')
     else:
         xl_base = load_model(model_path, dtype_model=dtype_model, dtype_clip=dtype_clip, dtype_vae=dtype_vae)
-        shared.xl_base = (model_path, xl_base)
+        shared.xl_base = (model_key, xl_base)
         print(f'Base model loaded: {model_path}')
-    
-    if "patches" in xl_base.unet.model_options["transformer_options"]:
-        xl_base.unet.model_options["transformer_options"].pop("patches")
 
     model = StableDiffusionModel(xl_base.unet.clone(), xl_base.vae, xl_base.clip.clone(), xl_base.clip_vision)
     
     return model
 
 def get_refiner_model(model_path, dtype_model=None, dtype_clip=None, dtype_vae=None):
-    if shared.xl_refiner is not None and shared.xl_refiner[0] == model_path:
+    model_key = util.gen_byte_sha256(str.encode(f"{model_path}_{dtype_model}_{dtype_clip}_{dtype_vae}"))
+    if shared.xl_refiner is not None and shared.xl_refiner[0] == model_key:
         xl_refiner = shared.xl_refiner[1]
         print(f'Refiner model loaded from cache: {model_path}')
     else:
         xl_refiner = load_model(model_path, dtype_model=dtype_model, dtype_clip=dtype_clip, dtype_vae=dtype_vae)
-        shared.xl_refiner = (model_path, xl_refiner)
+        shared.xl_refiner = (model_key, xl_refiner)
         print(f'Refiner model loaded: {model_path}')
-
-        # if isinstance(xl_refiner.unet.model, SDXL):
-        #     xl_refiner.clip = None
-        #     # xl_refiner.vae = None
-        # elif isinstance(xl_refiner.unet.model, SDXLRefiner):
-        #     xl_refiner.clip = None
-        #     # xl_refiner.vae = None
-        # else:
-        #     xl_refiner.clip = None
 
     model = StableDiffusionModel(xl_refiner.unet.clone(), xl_refiner.vae, xl_refiner.clip.clone(), xl_refiner.clip_vision)
     

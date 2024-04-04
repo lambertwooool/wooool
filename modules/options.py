@@ -311,6 +311,9 @@ for x in ["Model", "Clip", "VAE", "Controlnet", "IPAdapter"]:
 	options[dtype_name] = load_ui_config("dtype")
 	title[dtype_name] = f"{x} Dtype"
 	default[dtype_name] = "Default"
+ 
+for remove_key in ["Float8 e4m3", "Float8 e5m2"]:
+	options["vae_dtype"].pop(remove_key)
 
 # Detail
 options["detail"] = (0, 120, 5)
