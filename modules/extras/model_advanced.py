@@ -4,14 +4,14 @@ from modules.model import latent_formats, model_sampling
 def Rescale_cfg(model, cfg_multiplier, cfg_scale_to):
     sigma_max = model.model.model_sampling.sigma_max
     latent_format_alpha = {
-        latent_formats.SDXL_Playground_2_5: 3.0,
-        latent_formats.SC_Prior: 1.0,
+        latent_formats.SDXL_Playground_2_5: (3.0, 1.0),
+        latent_formats.SC_Prior: (1.0, 1.0),
     }
-    cond_alpha = 1.0
+    cond_alpha, cond_alpha_to = 1.0, 1.0
     for latent_format, alpha in latent_format_alpha.items():
         if isinstance(model.model.latent_format, latent_format):
-            cond_alpha = alpha / 7.0
-    cfg_scale_to = round(cfg_scale_to * cond_alpha, 1)
+            cond_alpha, cond_alpha_to = [x / 7.0 for x in alpha]
+    cfg_scale_to = round(cfg_scale_to * cond_alpha_to, 1)
 
     def patch_cfg(args):
         cond = args["cond"]
