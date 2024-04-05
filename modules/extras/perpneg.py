@@ -14,7 +14,7 @@ def apply(model, empty_conditioning, neg_scale=1.0):
         model_options = args["model_options"]
         nocond_processed = samplers.encode_model_conds(model.extra_conds, nocond, x, x.device, "negative")
 
-        (noise_pred_nocond, _) = samplers.calc_cond_uncond_batch(model, nocond_processed, None, x, sigma, model_options)
+        (noise_pred_nocond, _) = samplers.calc_cond_batch(model, [nocond_processed], x, sigma, model_options)
 
         pos = noise_pred_pos - noise_pred_nocond
         neg = noise_pred_neg - noise_pred_nocond

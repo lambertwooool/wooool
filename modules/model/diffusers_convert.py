@@ -207,6 +207,21 @@ textenc_pattern = re.compile("|".join(protected.keys()))
 # Ordering is from https://github.com/pytorch/pytorch/blob/master/test/cpp/api/modules.cpp
 code2idx = {"q": 0, "k": 1, "v": 2}
 
+# This function exists because at the time of writing torch.cat can't do fp8 with cuda
+def cat_tensors(tensors):
+    x = 0
+    for t in tensors:
+        x += t.shape[0]
+
+    shape = [x] + list(tensors[0].shape)[1:]
+    out = torch.empty(shape, device=tensors[0].device, dtype=tensors[0].dtype)
+
+    x = 0
+    for t in tensors:
+        out[x:x + t.shape[0]] = t
+        x += t.shape[0]
+
+    return out
 
 def convert_text_enc_state_dict_v20(text_enc_dict, prefix=""):
     new_state_dict = {}

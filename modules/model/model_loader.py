@@ -167,7 +167,7 @@ def unload_model_clones(model, unload_weights_only=True, force_unload=True):
             to_unload = [i] + to_unload
 
     if len(to_unload) == 0:
-        return None
+        return True
 
     same_weights = 0
     for i in to_unload:
@@ -189,11 +189,15 @@ def unload_model_clones(model, unload_weights_only=True, force_unload=True):
 
     return unload_weight
 
-def cleanup_models():
+def cleanup_models(keep_clone_weights_loaded=False):
     to_delete = []
     for i in range(len(current_loaded_models)):
         if sys.getrefcount(current_loaded_models[i].model) <= 2:
-            to_delete = [i] + to_delete
+            if not keep_clone_weights_loaded:
+                to_delete = [i] + to_delete
+            #TODO: find a less fragile way to do this.
+            elif sys.getrefcount(current_loaded_models[i].real_model) <= 3: #references from .real_model + the .model
+                to_delete = [i] + to_delete
 
     for i in to_delete:
         x = current_loaded_models.pop(i)

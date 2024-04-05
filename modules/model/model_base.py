@@ -106,7 +106,6 @@ class BaseModel(torch.nn.Module):
     def extra_conds(self, **kwargs):
         out = {}
         if len(self.concat_keys) > 0:
-            concat_keys = ("mask", "masked_image")
             cond_concat = []
             denoise_mask = kwargs.get("concat_mask", kwargs.get("denoise_mask", None))
             concat_latent_image = kwargs.get("concat_latent_image", None)
@@ -123,24 +122,16 @@ class BaseModel(torch.nn.Module):
 
             concat_latent_image = model_helper.resize_to_batch_size(concat_latent_image, noise.shape[0])
 
-            if len(denoise_mask.shape) == len(noise.shape):
-                denoise_mask = denoise_mask[:,:1]
+            if denoise_mask is not None:
+                if len(denoise_mask.shape) == len(noise.shape):
+                    denoise_mask = denoise_mask[:,:1]
 
-            denoise_mask = denoise_mask.reshape((-1, 1, denoise_mask.shape[-2], denoise_mask.shape[-1]))
-            if denoise_mask.shape[-2:] != noise.shape[-2:]:
-                denoise_mask = model_helper.common_upscale(denoise_mask, noise.shape[-1], noise.shape[-2], "bilinear", "center")
-            denoise_mask = model_helper.resize_to_batch_size(denoise_mask.round(), noise.shape[0])
+                denoise_mask = denoise_mask.reshape((-1, 1, denoise_mask.shape[-2], denoise_mask.shape[-1]))
+                if denoise_mask.shape[-2:] != noise.shape[-2:]:
+                    denoise_mask = model_helper.common_upscale(denoise_mask, noise.shape[-1], noise.shape[-2], "bilinear", "center")
+                denoise_mask = model_helper.resize_to_batch_size(denoise_mask.round(), noise.shape[0])
 
-            def blank_inpaint_image_like(latent_image):
-                blank_image = torch.ones_like(latent_image)
-                # these are the values for "zero" in pixel space translated to latent space
-                blank_image[:,0] *= 0.8223
-                blank_image[:,1] *= -0.6876
-                blank_image[:,2] *= 0.6364
-                blank_image[:,3] *= 0.1380
-                return blank_image
-
-            for ck in concat_keys:
+            for ck in self.concat_keys:
                 if denoise_mask is not None:
                     if ck == "mask":
                         cond_concat.append(denoise_mask.to(device))
@@ -150,7 +141,7 @@ class BaseModel(torch.nn.Module):
                     if ck == "mask":
                         cond_concat.append(torch.ones_like(noise)[:,:1])
                     elif ck == "masked_image":
-                        cond_concat.append(blank_inpaint_image_like(noise))
+                        cond_concat.append(self.blank_inpaint_image_like(noise))
             data = torch.cat(cond_concat, dim=1)
             out['c_concat'] = conds.CONDNoiseShape(data)
 
@@ -219,7 +210,16 @@ class BaseModel(torch.nn.Module):
         return unet_state_dict
 
     def set_inpaint(self):
-        self.inpaint_model = True
+        self.concat_keys = ("mask", "masked_image")
+        def blank_inpaint_image_like(latent_image):
+            blank_image = torch.ones_like(latent_image)
+            # these are the values for "zero" in pixel space translated to latent space
+            blank_image[:,0] *= 0.8223
+            blank_image[:,1] *= -0.6876
+            blank_image[:,2] *= 0.6364
+            blank_image[:,3] *= 0.1380
+            return blank_image
+        self.blank_inpaint_image_like = blank_inpaint_image_like
 
     def memory_required(self, input_shape):
         if devices.is_xformers_enable() or devices.is_pytorch_attention_enable():
@@ -439,6 +439,40 @@ class SD_X4Upscaler(BaseModel):
         out['c_concat'] = conds.CONDNoiseShape(image)
         out['y'] = conds.CONDRegular(noise_level)
         return out
+
+class IP2P:
+    def extra_conds(self, **kwargs):
+        out = {}
+
+        image = kwargs.get("concat_latent_image", None)
+        noise = kwargs.get("noise", None)
+        device = kwargs["device"]
+
+        if image is None:
+            image = torch.zeros_like(noise)
+
+        if image.shape[1:] != noise.shape[1:]:
+            image = model_helper.common_upscale(image.to(device), noise.shape[-1], noise.shape[-2], "bilinear", "center")
+
+        image = model_helper.resize_to_batch_size(image, noise.shape[0])
+
+        out['c_concat'] = conds.CONDNoiseShape(self.process_ip2p_image_in(image))
+        adm = self.encode_adm(**kwargs)
+        if adm is not None:
+            out['y'] = conds.CONDRegular(adm)
+        return out
+
+class SD15_instructpix2pix(IP2P, BaseModel):
+    def __init__(self, model_config, model_type=ModelType.EPS, device=None):
+        super().__init__(model_config, model_type, device=device)
+        self.process_ip2p_image_in = lambda image: image
+
+class SDXL_instructpix2pix(IP2P, SDXL):
+    def __init__(self, model_config, model_type=ModelType.EPS, device=None):
+        super().__init__(model_config, model_type, device=device)
+        # self.process_ip2p_image_in = lambda image: comfy.latent_formats.SDXL().process_in(image)
+        self.process_ip2p_image_in = lambda image: image
+
 
 class StableCascade_C(BaseModel):
     def __init__(self, model_config, model_type=ModelType.STABLE_CASCADE, device=None):
