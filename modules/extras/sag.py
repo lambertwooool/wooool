@@ -136,7 +136,7 @@ def apply(model, scale=0.5, blur_sigma=2.0):
         degraded = create_blur_map(uncond_pred, uncond_attn, sag_sigma, sag_threshold)
         degraded_noised = degraded + x - uncond_pred
         # call into the UNet
-        (sag, _) = samplers.calc_cond_uncond_batch(model, uncond, None, degraded_noised, sigma, model_options)
+        (sag, _) = samplers.calc_cond_batch(model, [uncond], degraded_noised, sigma, model_options)
         return cfg_result + (degraded - sag) * sag_scale
 
     model.set_model_sampler_post_cfg_function(post_cfg_function, disable_cfg1_optimization=True)
