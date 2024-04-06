@@ -1,8 +1,8 @@
 import torch
-from modules.model import sample, samplers
+from modules.model import sampler_helpers, samplers
 
 def apply(model, empty_conditioning, neg_scale=1.0):
-    nocond = sample.convert_cond(empty_conditioning)
+    nocond = sampler_helpers.convert_cond(empty_conditioning)
 
     def cfg_function(args):
         model = args["model"]

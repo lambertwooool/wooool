@@ -6,7 +6,7 @@ from .ldm.modules.diffusionmodules.openaimodel import UNetModel, Timestep
 from .ldm.modules.encoders.noise_aug_modules import CLIPEmbeddingNoiseAugmentation
 from .ldm.modules.diffusionmodules.upscaling import ImageConcatWithNoiseAugmentation
 from enum import Enum
-from modules.model import model_helper, conds, ops
+from modules.model import model_helper, conds, ops, latent_formats
 from modules import util, devices
 
 class ModelType(Enum):
@@ -470,8 +470,10 @@ class SD15_instructpix2pix(IP2P, BaseModel):
 class SDXL_instructpix2pix(IP2P, SDXL):
     def __init__(self, model_config, model_type=ModelType.EPS, device=None):
         super().__init__(model_config, model_type, device=device)
-        # self.process_ip2p_image_in = lambda image: comfy.latent_formats.SDXL().process_in(image)
-        self.process_ip2p_image_in = lambda image: image
+        if model_type == ModelType.V_PREDICTION_EDM:
+            self.process_ip2p_image_in = lambda image: latent_formats.SDXL().process_in(image) #cosxl ip2p
+        else:
+            self.process_ip2p_image_in = lambda image: image #diffusers ip2p
 
 
 class StableCascade_C(BaseModel):
