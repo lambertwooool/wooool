@@ -97,6 +97,7 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
                 for k, v in gen_opts.items() if k in ["view", "emo", "location", "weather", "hue"]
         },
         "dtype": {},
+        "lowvram_dtype": {},
         "controlnet": [],
         "lora": loras,
     }
@@ -109,7 +110,8 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
         "fp8_e5m2": torch.float8_e5m2,
     }
     for x in ["model", "clip", "vae", "controlnet", "ipadapter"]:
-        params["dtype"][x] = dtypes.get(gen_opts.pop(f"{x}_dtype"))
+        params["dtype"][x] = dtypes.get(gen_opts.pop(f"{x}_dtype", None))
+        params["lowvram_dtype"][x] = dtypes.get(gen_opts.pop(f"{x}_lowvram_dtype", None))
 
     if gen_opts.pop("custom_size", False):
         params["size"] = (int(gen_opts.pop("image_width")), int(gen_opts.pop("image_height")))

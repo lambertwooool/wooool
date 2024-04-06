@@ -1,12 +1,15 @@
 import sys
 import numpy as np
 import psutil
+import pynvml
 import torch
 import torch.nn as nn
 from modules import mac_specific, xpu_specific
 
 XFORMERS_ENABLE = None
 PYTORCH_ATTENTION_ENABLE = None
+
+pynvml.nvmlInit()
 
 def has_mps() -> bool:
     if sys.platform != "darwin":
@@ -197,7 +200,10 @@ def get_memory(device=None, get_all=False):
     else:
         # stats = torch.cuda.memory_stats(device)
         # mem_total_torch = stats['reserved_bytes.all.current']
-        mem_free_torch, mem_total_torch = torch.cuda.mem_get_info(device)
+        # mem_free_torch, mem_total_torch = torch.cuda.mem_get_info(device)
+        deviceHandle = pynvml.nvmlDeviceGetHandleByIndex(device.index)
+        meminfo = pynvml.nvmlDeviceGetMemoryInfo(deviceHandle)
+        mem_free_torch, mem_total_torch = meminfo.free, meminfo.total
         mem_total_device = mem_total_torch
          # stats = torch.cuda.memory_stats(device)
         # mem_active = stats['active_bytes.all.current']

@@ -1,5 +1,9 @@
 # Change Logs
 
+## 0.9.0
+- When inference with low VRAM, you can set parts of VRAM to be converted to FP8 for faster inference
+- When low VRAM, split the model to load some parts into the VRAM and the rest into RAM, allowing the model to perform inference normally
+
 ## 0.8.9
 - Adjust the model data type at anytime, using FP32, FP16, FP8, etc, support unet, clip, vae, controlnet and IPAdapter
 - Support IPAdapter mask

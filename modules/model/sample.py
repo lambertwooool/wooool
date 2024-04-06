@@ -83,6 +83,12 @@ def prepare_sampling(model, noise_shape, positive, negative, noise_mask):
     models, inference_memory = get_additional_models(positive, negative, model.model_dtype())
     model_loader.load_models_gpu([model] + models, model.memory_required([noise_shape[0] * 2] + list(noise_shape[1:])) + inference_memory)
     real_model = model.model
+    # model_loader.free_memory(1024 ** 4, device=device)
+    layers = [(n, m) for n, m in real_model.named_modules() if hasattr(m, "comfy_cast_weights")]
+    for i in range(len(layers) - 2):
+        name, layer = layers[i]
+        layer.layer_name = name
+        # layer.next_layers = [layers[i+1][1], layers[i+2][1]]
 
     return real_model, positive, negative, noise_mask, models
 
