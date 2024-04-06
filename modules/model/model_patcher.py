@@ -18,7 +18,7 @@ def apply_weight_decompose(dora_scale, weight):
 
 
 class ModelPatcher:
-    def __init__(self, model, load_device, offload_device, size=0, current_device=None, weight_inplace_update=False, manual_cast_dtype=None):
+    def __init__(self, model, load_device, offload_device, size=0, current_device=None, weight_inplace_update=False, manual_cast_dtype=None, lowvram_dtype=None):
         self.size = size
         self.model = model
         self.patches = {}
@@ -36,6 +36,7 @@ class ModelPatcher:
 
         self.weight_inplace_update = weight_inplace_update
         self.manual_cast_dtype = manual_cast_dtype
+        self.lowvram_dtype = lowvram_dtype
 
     def __call__(self, *args, **kwargs):
         model_loader.load_model_gpu(self)
@@ -269,22 +270,25 @@ class ModelPatcher:
 
         return self.model
 
-    def patch_model_lowvram(self, device_to=None, lowvram_model_memory=0):
+    def patch_model_lowvram(self, device_to:torch.device=None, lowvram_model_memory=0):
         self.patch_model(device_to, patch_weights=False)
 
         logging.info("loading in lowvram mode {}".format(lowvram_model_memory/(1024 * 1024)))
         class LowVramPatch:
-            def __init__(self, key, model_patcher):
+            def __init__(self, key, model_patcher:ModelPatcher):
                 self.key = key
                 self.model_patcher = model_patcher
             def __call__(self, weight):
                 return self.model_patcher.calculate_weight(self.model_patcher.patches[self.key], weight, self.key)
 
         mem_counter = 0
-        for n, m in self.model.named_modules():
+        modules = [(n, m, model_loader.module_size(m)) for n, m in self.model.named_modules()]
+        modules.sort(key=lambda x: x[2])
+        # for n, m in self.model.named_modules():
+        for n, m, module_mem in modules:
             lowvram_weight = False
             if hasattr(m, "comfy_cast_weights"):
-                module_mem = model_loader.module_size(m)
+                # module_mem = model_loader.module_size(m)
                 if mem_counter + module_mem >= lowvram_model_memory:
                     lowvram_weight = True
 
@@ -303,11 +307,15 @@ class ModelPatcher:
                 if hasattr(m, "weight"):
                     self.patch_weight_to_device(weight_key, device_to)
                     self.patch_weight_to_device(bias_key, device_to)
+                    if self.lowvram_dtype is not None:
+                        m.to(self.lowvram_dtype)
+                        m.comfy_cast_weights = True
                     m.to(device_to)
                     mem_counter += model_loader.module_size(m)
                     logging.debug("lowvram: loaded module regularly {}".format(m))
 
         self.model_lowvram = True
+        print(f"lowvram: loaded model use {mem_counter / 1024 ** 3:.2f}GB VRAM, {(self.model_size() - mem_counter) / 1024 ** 3:.2f}GB RAM")
         return self.model
 
     def calculate_weight(self, patches, weight, key):

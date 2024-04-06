@@ -10,7 +10,8 @@ def cast_bias_weight(s, input):
         bias = s.bias.to(device=input.device, dtype=input.dtype, non_blocking=non_blocking)
         if s.bias_function is not None:
             bias = s.bias_function(bias)
-    weight = s.weight.to(device=input.device, dtype=input.dtype, non_blocking=non_blocking)
+    weight = s.weight
+    weight = weight.to(device=input.device, dtype=input.dtype, non_blocking=non_blocking)
     if s.weight_function is not None:
         weight = s.weight_function(weight)
     return weight, bias
@@ -19,6 +20,7 @@ class CastWeightBiasOp:
     comfy_cast_weights = False
     weight_function = None
     bias_function = None
+    layer_name = None
 
 class disable_weight_init:
     class Linear(torch.nn.Linear, CastWeightBiasOp):

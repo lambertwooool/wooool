@@ -111,6 +111,7 @@ def handler(task):
     width, height = size
     size = (width // 8 * 8, height // 8 * 8)
     dtypes = task.get("dtype", {})
+    lowvram_dtypes = task.get("lowvram_dtype", {})
     controlnets = [[    ref_mode, image_refer, sl_rate,
                         controlnet_helper.controlnet_files.get(opt_model) or opts.options["ref_mode"][opt_type][1][sd_type],
                         attn_mask, start_percent, end_percent ]
@@ -166,6 +167,7 @@ def handler(task):
             '\n[layered diffusion]:', transparent_bg, \
             '\n[file_format]:', file_format, \
             '\n[dtypes]:', dtypes, \
+            '\n[lowvram dtypes]:', lowvram_dtypes, \
             '\n[loras]:', loras, \
             '\n[controlnets]:', [(x[0], x[1].shape[:2], x[2], x[3], x[4] is not None, x[5], x[6]) for x in controlnets], \
             '\n-------------------------------'
@@ -209,6 +211,7 @@ def handler(task):
                 subseed_strength=subseed_strength,
                 clip_skip=clip_skip,
                 model_dtypes=dtypes,
+                lowvram_dtypes=lowvram_dtypes,
             )
     
     # model_loader.free_memory(1024 ** 4, torch.device(torch.cuda.current_device()))
@@ -322,7 +325,7 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
         callback, sampler_name, scheduler_name,
         latent=None, image=None, denoise=1.0, cfg_scale=7.0, cfg_scale_to=7.0, batch_size=1, loras=[], controlnets=[],
         cfg_multiplier=0, free_u=0, eta=1.0, style_aligned_scale=0.0, transparent_bg="",
-        tiled=False, round_batch_size=8, subseed_strength=1.0, clip_skip=0, model_dtypes={}):
+        tiled=False, round_batch_size=8, subseed_strength=1.0, clip_skip=0, model_dtypes={}, lowvram_dtypes={}):
 
     devices.torch_gc()
     progress_output(task, "load_model")
@@ -362,6 +365,10 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
 
     unet_model = xl_base_patched.unet
     refiner_unet_model = xl_refiner.unet if xl_refiner is not None else None
+    
+    unet_model.lowvram_dtype = lowvram_dtypes.get("model")
+    if refiner_unet_model is not None:
+        refiner_unet_model.lowvram_dtype = lowvram_dtypes.get("model")
     
     if xl_refiner is not None and xl_refiner.vae is not None:
         vae_model = xl_refiner.vae

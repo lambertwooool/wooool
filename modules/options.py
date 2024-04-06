@@ -315,6 +315,11 @@ for x in ["Model", "Clip", "VAE", "Controlnet", "IPAdapter"]:
 for remove_key in ["Float8 e4m3", "Float8 e5m2"]:
 	options["vae_dtype"].pop(remove_key)
 
+# Lowvram dtype
+options["model_lowvram_dtype"] = load_ui_config("lowvram_dtype")
+title["model_lowvram_dtype"] = f"Model LowVRAM Mode"
+default["model_lowvram_dtype"] = "Delay speed"
+
 # Detail
 options["detail"] = (0, 120, 5)
 mul["detail"] = 0.01

@@ -8,6 +8,8 @@ Wooool is an AIGC image generator, Refer to the functions from[Stable Diffusion 
 ![](screenshot.png)
 
 ## Release
+- [0.9.0] [2024/04/06]🔥🔥🔥 When lowvram split model to inference, only 2G VRAM required to perfectly run the SDXL model 
+- [0.8.9] [2024/04/04]🔥🔥 Adjust the model to fp8 at anytime, support IPAdapter mask and bria remove background controlnet
 - [0.8.8] [2024/03/21]🔥🔥🔥 Support playground V2.5, cascade, layered diffusion, lighting, tcd, sdxl tile, freeU and differential diffusion
 - [0.8.7] [2024/02/15]🔥 Support instant id, controlnet use fp8
 - [0.8.6] [2024/02/06]🔥🔥🔥 Support IPAdapters faceid and portrait, style aligned, better integration of multiple IPAdapters

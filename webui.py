@@ -203,7 +203,9 @@ with gr.Blocks(theme=my_theme, title=app_name).queue() as wooool:
                         txt_setting = gr.Textbox(show_label=False, lines=7, elem_id="txt_setting", visible=False)
 
                         with gr.Column(scale=20, min_width=200):
-                            opt_dict = opt_dict | ui_compent.MakeOpts(["model_dtype", "clip_dtype", "vae_dtype", "controlnet_dtype", "ipadapter_dtype"])
+                            opt_dict = opt_dict | ui_compent.MakeOpts(["model_dtype"])
+                            opt_dict = opt_dict | ui_compent.MakeOpts(["model_lowvram_dtype"], opt_type="Radio")
+                            opt_dict = opt_dict | ui_compent.MakeOpts(["clip_dtype", "vae_dtype", "controlnet_dtype", "ipadapter_dtype"])
                         with gr.Column(scale=20, min_width=200) as panel_setting_btns:
                             btn_download_setting = gr.Button("Download Setting", elem_id="btn_download_setting")
                             btn_load_setting = gr.UploadButton("Load Setting", file_types=[".json"])

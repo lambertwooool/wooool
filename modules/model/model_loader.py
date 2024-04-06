@@ -19,6 +19,8 @@ device_config = {
 }
 
 def module_size(module):
+    if module is None:
+        return 0
     module_mem = 0
     sd = module.state_dict()
     for k in sd:
@@ -58,11 +60,11 @@ class LoadedModel:
                 self.real_model = self.model.patch_model_lowvram(device_to=patch_model_to, lowvram_model_memory=lowvram_model_memory)
             else:
                 self.real_model = self.model.patch_model(device_to=patch_model_to, patch_weights=load_weights)
+            # self.real_model = self.model.patch_model_lowvram(device_to=patch_model_to, lowvram_model_memory=lowvram_model_memory)
         except Exception as e:
             self.model.unpatch_model(self.model.offload_device)
             self.model_unload()
             raise e
-        # self.real_model = self.model.patch_model_lowvram(device_to=patch_model_to, lowvram_model_memory=lowvram_model_memory)
 
         self.weights_loaded = True
         return self.real_model
@@ -86,7 +88,7 @@ def load_models_gpu(models, memory_required=0):
     global current_loaded_models
 
     # extra_mem = max(minimum_inference_memory(), memory_required)
-    extra_mem = 0
+    extra_mem = memory_required
 
     device_cpu = torch.device("cpu")
     models_already_loaded = []
@@ -108,8 +110,8 @@ def load_models_gpu(models, memory_required=0):
         # Prioritize switch model over load model
         all_load_models = models_to_load[device]
 
-        memory_required = sum([x[1] for x in all_load_models])
-        free_memory(memory_required * 1.3 + extra_mem, device, models_already_loaded)
+        memory_all_load_modles = sum([x[1] for x in all_load_models])
+        free_memory(memory_all_load_modles * 1.3 + extra_mem, device, models_already_loaded)
 
         for loaded_model, use_memory in all_load_models:
             is_loaded = loaded_model in current_loaded_models
@@ -121,9 +123,9 @@ def load_models_gpu(models, memory_required=0):
             # when not enough vram to load model, try free ram to load
             keep_loaded = [x for x in models_already_loaded] + [x[0] for x in all_load_models]
             if use_memory > (free_mem - extra_mem) and not free_memory(use_memory + extra_mem, device, keep_loaded):
-                # lowvram_model_memory = int(max(256 * (1024 ** 2), (current_free_mem - 1024 ** 3) / 1.3 ))
-                print("memory lower ...", [(x.real_model.__class__.__name__, sys.getrefcount(x)) for x in current_loaded_models])
-                lowvram_model_memory = int(max(64 * (1024 * 1024), (free_mem - 1024 * (1024 * 1024)) / 1.3 ))
+                # print("memory lower ...", [(x.real_model.__class__.__name__, sys.getrefcount(x)) for x in current_loaded_models])
+                lowvram_model_memory = int(max(64 * (1024 * 1024), (free_mem - 1024 ** 3)))
+                # lowvram_model_memory = int(max(64 * (1024 * 1024), free_mem ))
 
             cur_loaded_model = loaded_model.model_load(device_to=device, lowvram_model_memory=lowvram_model_memory)
 
@@ -229,8 +231,6 @@ def get_device_and_dtype(type_name, want_use_dtype=None):
     t_load_device = run_device(type_name)
     t_offload_device = offload_device(type_name)
     t_dtype = dtype(type_name, want_use_dtype=want_use_dtype)
-    t_manual_cast_dtype = devices.unet_manual_cast(t_dtype, t_load_device)
+    t_manual_cast_dtype = devices.unet_manual_cast(t_dtype, t_load_device) or t_dtype
 
     return t_load_device, t_offload_device, t_dtype, t_manual_cast_dtype
-
-
