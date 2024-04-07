@@ -5,9 +5,10 @@ import torch
 from PIL import Image
 
 import modules.paths
-from modules.model import controlnet, clip_vision, model_loader
+from modules.model import controlnet, clip_vision, model_loader, latent_formats
 from modules import devices, util
 from modules.controlnet.processor import Processor as controlnet_processor
+from modules.controlnet.ipadapter import IPAdapterDetector
 
 controlnet_files = {}
 
@@ -30,7 +31,7 @@ def processor(controlnets, unet_model, width, height, image_mask, dtype_ctrl=Non
     for cn in controlnets:
         cn_type, cn_img, cn_weight, cn_model_name, cn_mask, start_percent, end_percent = cn
         cn_items = cn_type.split(",")
-        cn_model = None
+        cn_model_proc = None
         cn_img = cv2.cvtColor(cn_img, cv2.COLOR_BGR2RGB)
         
         if cn_mask is not None:
@@ -39,34 +40,44 @@ def processor(controlnets, unet_model, width, height, image_mask, dtype_ctrl=Non
 
         for cn_item in cn_items:
             # if cn_item in ctrl_procs.keys():
-            if cn_model_name in ctrl_procs.keys():
+            if f"{cn_item}_{cn_model_name}" in ctrl_procs.keys():
                 if cn_item in ["lama_inpaint"]:
                     lama_mask = image_mask.copy()
                     lama_mask = lama_mask[..., np.newaxis]
                     cn_img = np.concatenate([cn_img[:lama_mask.shape[0], :lama_mask.shape[1], :], lama_mask], axis=-1)
 
                 # ctrl_proc = ctrl_procs[cn_item]
-                ctrl_proc = ctrl_procs[cn_model_name]
+                ctrl_proc = ctrl_procs[f"{cn_item}_{cn_model_name}"]
 
-                if cn_item in ["ip_adapter", "ip_adapter_face"]:
+                if cn_item.startswith("ip_adapter"):
                     clip_vision_model = clip_vision_model or clip_vision.load(clip_vision_path)
-                    ip_proc = ctrl_proc.processor
+                    ip_proc: IPAdapterDetector = ctrl_proc.processor
                     image_emb, uncond_image_emb = ip_proc.preprocess(cn_img, clip_vision_model)
                     # ip_adapters.append((ip_proc.preprocess(ip_img, clip_vision_model), 1, cn_weight))
-                    unet_model = ip_proc.patch_model(unet_model, image_emb, uncond_image_emb, cn_weight, cn_mask, start_percent, end_percent)
+                    target_blocks = None
+                    if cn_item == "ip_adapter_style":
+                        style_target_blocks = {
+                            latent_formats.SDXL: [("output", 1)],
+                            latent_formats.SD15: [("output", 4), ("output", 5)],
+                        }
+                        for latent_format, blocks in style_target_blocks.items():
+                            if isinstance(unet_model.model.latent_format, latent_format):
+                                target_blocks = blocks
+                    unet_model = ip_proc.patch_model(unet_model, image_emb, uncond_image_emb, cn_weight, cn_mask, start_percent, end_percent, target_blocks)
                     ip_procs.append(ip_proc)
+                    cn_model_proc = None
                 else:
                     cn_img = util.resize_image(cn_img, width=width, height=height)
                     cn_img = util.HWC3(ctrl_proc(cn_img))
-                    if cn_model is None:
-                        cn_model = ctrl_proc.load_controlnet(cn_model_name, want_use_dtype=dtype_ctrl)
+                    cn_model_proc = ctrl_proc
 
                 util.save_temp_image(cn_img, f"{cn_item}.png")
             else:
                 print(f"unknow controlnet {cn_item}")
         
+        if cn_model_proc is not None:
+            cn_model = cn_model_proc.load_controlnet(cn_model_name, want_use_dtype=dtype_ctrl)
         
-        if cn_model is not None:
             if "recolor" in cn_model_name:
                 end_percent = 1.0
             ctrls.append((cn_type, cn_img, cn_weight, cn_model, cn_mask, start_percent, end_percent))
@@ -80,16 +91,16 @@ def load_controlnets_by_task(cn_types, dtype_ctrl=None, dtype_ipa=None):
         cn_items = cn_type.split(",")
         for cn_item in cn_items:
             # if cn_item not in ctrls:
-            if cn_model_name not in ctrls:
+            if f"{cn_item}_{cn_model_name}" not in ctrls:
                 if cn_item in controlnet_processor.model_keys() and cn_model_name is not None and end_percent > start_percent:
-                    if cn_item in ["ip_adapter", "ip_adapter_face"]:
+                    if cn_item.startswith("ip_adapter"):
                         proc = controlnet_processor(cn_item)
                         proc.load_processor()
                         proc.processor.load(cn_item, cn_model_name, want_use_dtype=dtype_ipa)
                     else:
                         proc = controlnet_processor(cn_item)
                     
-                    ctrls[cn_model_name] = proc
+                    ctrls[f"{cn_item}_{cn_model_name}"] = proc
 
     return ctrls
 

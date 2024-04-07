@@ -133,10 +133,10 @@ options["ref_mode"] = {
 						"keyword": [r"shuffle", r"\bcolor\b"],
 						"annotator": ["shuffle", "color"]
 					}),
-	"Ref Color": (	"shuffle",
-			  		{ 	"sdxl": None, "sd15": "control_v11e_sd15_shuffle.pth",
-						"keyword": [r"shuffle", r"\bcolor\b"],
-						"annotator": ["shuffle", "color"]
+	"Ref Style": (	"style",
+			  		{ 	"sdxl": "ip-adapter-plus_sdxl_vit-h.bin", "sd15": "ip-adapter_sd15_plus.pth",
+						"keyword": [r"ip adapter(?!.*(face|instant id))"],
+						"annotator": [["ip_adapter_style", "shuffle,ip_adapter_style"]]
 					}),
 	"Ref Brightness": (	"brightness",
 			  		{ 	"sdxl": None, "sd15": "control_v1p_sd15_brightness.safetensors",

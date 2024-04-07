@@ -1,36 +1,28 @@
 import math
+import re
 import torch
 from einops import rearrange
 import torch.nn.functional as F
 import modules.model.ldm.modules.attention as attention
+from modules.model import model_patcher
 
-def patch_unet_model(model, patch_kwargs):
+re_blocks = [ re.compile(f"\.({x})_block[s]?\.(\d+).*?\.transformer_blocks\.(\d+)\.attn2\.to_q")
+                for x in ["input", "output", "middle"] ]
+
+def patch_unet_model(model: model_patcher.ModelPatcher, patch_kwargs) -> model_patcher.ModelPatcher:
     new_model = model.clone()
     is_sdxl = patch_kwargs.pop("sdxl")
-
-    # From https://github.com/laksjdjf/IPAdapter-ComfyUI
-    if not is_sdxl:
-        for id in [1,2,4,5,7,8]: # id of input_blocks that have cross attention
-            set_model_patch_replace(new_model, patch_kwargs, ("input", id))
-            patch_kwargs["number"] += 1
-        for id in [3,4,5,6,7,8,9,10,11]: # id of output_blocks that have cross attention
-            set_model_patch_replace(new_model, patch_kwargs, ("output", id))
-            patch_kwargs["number"] += 1
-        set_model_patch_replace(new_model, patch_kwargs, ("middle", 0))
-    else:
-        for id in [4,5,7,8]: # id of input_blocks that have cross attention
-            block_indices = range(2) if id in [4, 5] else range(10) # transformer_depth
-            for index in block_indices:
-                set_model_patch_replace(new_model, patch_kwargs, ("input", id, index))
+    
+    for re_block in re_blocks:
+        for name, module in new_model.model.named_modules():
+            block = re.search(re_block, name)
+            if block is not None:
+                block_name, number, transformer_index = block.groups()
+                number, transformer_index = int(number), int(transformer_index)
+                number = 0 if block_name == "middle" else number
+                key = (block_name, number, transformer_index) if is_sdxl else (block_name, number)
+                set_model_patch_replace(new_model, patch_kwargs, key)
                 patch_kwargs["number"] += 1
-        for id in range(6): # id of output_blocks that have cross attention
-            block_indices = range(2) if id in [3, 4, 5] else range(10) # transformer_depth
-            for index in block_indices:
-                set_model_patch_replace(new_model, patch_kwargs, ("output", id, index))
-                patch_kwargs["number"] += 1
-        for index in range(10):
-            set_model_patch_replace(new_model, patch_kwargs, ("middle", 0, index))
-            patch_kwargs["number"] += 1
     
     return new_model
 
@@ -81,7 +73,7 @@ def sdp(q, k, v, extra_options):
 
 class CrossAttentionPatch:
     # forward for patching
-    def __init__(self, weight, dtype, number, cond, uncond, attn_mask=None, sigma_start=0.0, sigma_end=1.0):
+    def __init__(self, weight, dtype, number, cond, uncond, attn_mask=None, sigma_start=0.0, sigma_end=1.0, target_blocks=None):
         self.weights = [weight]
         self.conds = [cond]
         self.unconds = [uncond]
@@ -90,14 +82,16 @@ class CrossAttentionPatch:
         self.attn_masks = [attn_mask]
         self.sigma_start = [sigma_start]
         self.sigma_end = [sigma_end]
+        self.target_blocks = [target_blocks]
     
-    def set_new_condition(self, weight, cond, uncond, dtype, number, attn_mask=None, sigma_start=0.0, sigma_end=1.0):
+    def set_new_condition(self, weight, cond, uncond, dtype, number, attn_mask=None, sigma_start=0.0, sigma_end=1.0, target_blocks=None):
         self.weights.append(weight)
         self.conds.append(cond)
         self.unconds.append(uncond)
         self.attn_masks.append(attn_mask)
         self.sigma_start.append(sigma_start)
         self.sigma_end.append(sigma_end)
+        self.target_blocks.append(target_blocks)
 
 
     def __call__(self, n, context_attn2, value_attn2, extra_options):
@@ -116,6 +110,8 @@ class CrossAttentionPatch:
         n_heads = extra_options["n_heads"]
         dim_head = extra_options["dim_head"]
         _, _, oh, ow = extra_options["original_shape"]
+        block = extra_options["block"]
+        tid = extra_options["transformer_index"]
         
         out = attention_ipadapter(q, context_attn2, value_attn2, extra_options)
         
@@ -124,8 +120,11 @@ class CrossAttentionPatch:
         mask_w = seq_len // mask_h
         has_mask = False
 
-        for weight, cond, uncond, mask, sigma_start, sigma_end in zip(self.weights, self.conds, self.unconds, self.attn_masks, self.sigma_start, self.sigma_end):
-            if sigma > sigma_start or sigma < sigma_end:
+        for weight, cond, uncond, mask, sigma_start, sigma_end, target_blocks in zip(
+                self.weights, self.conds, self.unconds, self.attn_masks, self.sigma_start, self.sigma_end, self.target_blocks):
+            
+            if sigma > sigma_start or sigma < sigma_end or \
+                    (target_blocks is not None and block not in target_blocks):
                 continue
 
             ip_k_c = cond[self.number * 2].repeat(batch_prompt, 1, 1).to(q)

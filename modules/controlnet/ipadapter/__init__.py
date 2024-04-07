@@ -121,7 +121,7 @@ class IPAdapterDetector:
 
     @torch.no_grad()
     @torch.inference_mode()
-    def patch_model(self, model, image_emb, uncond_image_emb, weight, attn_mask=None, start_at=0.0, end_at=1.0):
+    def patch_model(self, model, image_emb, uncond_image_emb, weight, attn_mask=None, start_at=0.0, end_at=1.0, target_blocks=None):
         sigma_start = model.model.model_sampling.percent_to_sigma(start_at)
         sigma_end = model.model.model_sampling.percent_to_sigma(end_at)
 
@@ -138,6 +138,7 @@ class IPAdapterDetector:
             "attn_mask": attn_mask,
             "sigma_start": sigma_start,
             "sigma_end": sigma_end,
+            "target_blocks": target_blocks,
             "sdxl": self.ip_adapter.sdxl,
         }
 
