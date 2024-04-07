@@ -122,8 +122,8 @@ class IPAdapterDetector:
     @torch.no_grad()
     @torch.inference_mode()
     def patch_model(self, model, image_emb, uncond_image_emb, weight, attn_mask=None, start_at=0.0, end_at=1.0, target_blocks=None):
-        sigma_start = model.model.model_sampling.percent_to_sigma(start_at)
-        sigma_end = model.model.model_sampling.percent_to_sigma(end_at)
+        sigma_start = model.get_model_object("model_sampling").percent_to_sigma(start_at)
+        sigma_end = model.get_model_object("model_sampling").percent_to_sigma(end_at)
 
         # '''
         # patch_name of sdv1-2: ("input" or "output" or "middle", block_id)
