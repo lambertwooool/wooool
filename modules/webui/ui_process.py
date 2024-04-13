@@ -138,12 +138,12 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
             ref_mode, _ = opts.options["ref_mode"]["Ref All"]
             params["controlnet"].append(["Ref All", ref_mode, img_refer, 0.5])
     else:
-        len_ref_ctrl = 12
+        len_ref_ctrl = 13
         ref_image_args = args[: ref_image_count[0] * len_ref_ctrl]
         ref_num = int(gen_opts.get("ref_num", ref_image_count[1]))
         args = args[ref_image_count[0] * len_ref_ctrl :]
         for i in range(ref_image_count[0]):
-            opt_type, ckb_enable, image_refer, sl_rate, ckb_words, opt_model, ckb_annotator, opt_annotator, ckb_mask, image_attn_mask, sl_start_percent, sl_end_percent = ref_image_args[i * len_ref_ctrl : (i + 1) * len_ref_ctrl]
+            opt_type, ckb_enable, image_refer, sl_rate, ckb_words, txt_words, opt_model, ckb_annotator, opt_annotator, ckb_mask, image_attn_mask, sl_start_percent, sl_end_percent = ref_image_args[i * len_ref_ctrl : (i + 1) * len_ref_ctrl]
             if not ckb_enable or i >= ref_num:
                 continue
 
@@ -154,7 +154,7 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
                     skip_rate = sl_rate / 100.0
                     params["skip_step"] = skip_rate if skip_rate < 1 else 0.99
             elif ref_mode == "content":
-                params["prompt_main"] += f",({','.join(ckb_words)}:{sl_rate / 100.0 / 0.8:.2f})"
+                params["prompt_main"] += f",({','.join(ckb_words)},{txt_words}:{sl_rate / 100.0 / 0.8:.2f})"
             else:
                 if image_refer is not None or params.get("image"):
                     opt_annotator = opt_annotator or ref_mode if ckb_annotator or opt_annotator in ["ip_adapter", "ip_adapter_face"] else "default"

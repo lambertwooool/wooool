@@ -290,7 +290,7 @@ class ModelPatcher:
             def __call__(self, weight):
                 return self.model_patcher.calculate_weight(self.model_patcher.patches[self.key], weight, self.key)
 
-        mem_counter = 0
+        mem_counter, unmem_counter = 0, 0
         modules = [(n, m, model_loader.module_size(m)) for n, m in self.model.named_modules()]
         modules.sort(key=lambda x: x[2])
         # for n, m in self.model.named_modules():
@@ -312,6 +312,7 @@ class ModelPatcher:
 
                 m.prev_comfy_cast_weights = m.comfy_cast_weights
                 m.comfy_cast_weights = True
+                unmem_counter += module_mem
             else:
                 if hasattr(m, "weight"):
                     self.patch_weight_to_device(weight_key, device_to)
@@ -324,7 +325,7 @@ class ModelPatcher:
                     logging.debug("lowvram: loaded module regularly {}".format(m))
 
         self.model_lowvram = True
-        print(f"lowvram: loaded model use {mem_counter / 1024 ** 3:.2f}GB VRAM, {(self.model_size() - mem_counter) / 1024 ** 3:.2f}GB RAM")
+        print(f"lowvram: loaded model use {mem_counter / 1024 ** 3:.2f}GB VRAM, {unmem_counter / 1024 ** 3:.2f}GB RAM")
         return self.model
 
     def calculate_weight(self, patches, weight, key):

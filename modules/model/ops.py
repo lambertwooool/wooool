@@ -2,16 +2,18 @@ import contextlib
 import torch
 import torch.nn as nn
 from modules import devices
+from transformers.modeling_utils import PreTrainedModel
 
-def cast_bias_weight(s, input):
+def cast_bias_weight(s, input, cast_device=True, cast_dtype=True):
+    device = input.device if cast_device else None
+    dtype = input.dtype if cast_dtype else None
     bias = None
     non_blocking = devices.device_supports_non_blocking(input.device)
-    if s.bias is not None:
-        bias = s.bias.to(device=input.device, dtype=input.dtype, non_blocking=non_blocking)
+    if hasattr(s, 'bias') and s.bias is not None:
+        bias = s.bias.to(device=device, dtype=dtype, non_blocking=non_blocking)
         if s.bias_function is not None:
             bias = s.bias_function(bias)
-    weight = s.weight
-    weight = weight.to(device=input.device, dtype=input.dtype, non_blocking=non_blocking)
+    weight = s.weight.to(device=device, dtype=dtype, non_blocking=non_blocking)
     if s.weight_function is not None:
         weight = s.weight_function(weight)
     return weight, bias
@@ -119,6 +121,22 @@ class disable_weight_init:
             else:
                 return super().forward(*args, **kwargs)
 
+    class Embedding(torch.nn.Embedding, CastWeightBiasOp):
+        def reset_parameters(self):
+            return None
+
+        def forward_comfy_cast_weights(self, input):
+            weight, bias = cast_bias_weight(self, input, cast_dtype=False)
+            return torch.nn.functional.embedding(
+                input, weight, self.padding_idx, self.max_norm,
+                self.norm_type, self.scale_grad_by_freq, self.sparse)
+
+        def forward(self, *args, **kwargs):
+            if self.comfy_cast_weights:
+                return self.forward_comfy_cast_weights(*args, **kwargs)
+            else:
+                return super().forward(*args, **kwargs)
+
     @classmethod
     def conv_nd(s, dims, *args, **kwargs):
         if dims == 2:
@@ -148,6 +166,8 @@ class manual_cast(disable_weight_init):
     class ConvTranspose2d(disable_weight_init.ConvTranspose2d):
         comfy_cast_weights = True
 
+    class Embedding(disable_weight_init.Embedding):
+        comfy_cast_weights = True
 
 def set_weight_bias_function(model, weight_function=None, bias_function=None):
     for n, m in model.named_modules():
@@ -159,17 +179,27 @@ def set_weight_bias_function(model, weight_function=None, bias_function=None):
 
 @contextlib.contextmanager
 def auto_ops(manual_cast_dtype=None):
+    class disable_PreTrainedModel_weight_init:
+        def _initialize_weights(self, *args, **kwargs):
+            pass
+    
+    def patch_module(module_class, patch_module, origin):
+        patch_module_list = [x for x in patch_module.__dict__ if not x.startswith("__")]
+        for module_type in patch_module_list:
+            module_name = str(module_type)
+            if hasattr(module_class, module_name):
+                origin[(module_class, module_name)] = getattr(module_class, module_name)
+                setattr(module_class, module_name, getattr(patch_module, module_name))
+    
     ops = disable_weight_init if manual_cast_dtype is None else manual_cast
-    patch_module_list = [x for x in ops.__dict__ if not x.startswith("__")]
     origin = {}
-
-    for module_type in patch_module_list:
-        module_name = str(module_type)
-        if hasattr(nn, module_name):
-            origin[module_name] = getattr(nn, module_name)
-            setattr(nn, module_name, getattr(ops, module_name))
+    
+    patch_module(torch.nn, ops, origin)
+    patch_module(PreTrainedModel, disable_PreTrainedModel_weight_init, origin)
+    
     try:
         yield None
     finally:
-        for module_name, module_type in origin.items():
-            setattr(nn, module_name, module_type)
+        for module, module_type in origin.items():
+            module_class, module_name = module
+            setattr(module_class, module_name, module_type)

@@ -150,7 +150,7 @@ def cached_filepath(processor_id, image, mask, params):
     input_hash = f"{image_hash}_{mask_hash}_{str(params)}"
     input_hash = util.gen_byte_sha256(bytes(input_hash, encoding="utf-8"))[:10]
     filename = f"annotator/{processor_id}_{input_hash}.png"
-    filepath = os.path.join(modules.paths.temp_outputs_path, filename)
+    filepath = os.path.join(modules.paths.caches_path, filename)
 
     return filepath
 
@@ -218,7 +218,7 @@ class Processor:
                 self.load_processor()
 
             processed_image = self.processor(image, **self.params) if mask is None else self.processor(image, mask, **self.params)
-            annotator_path = os.path.join(modules.paths.temp_outputs_path, "annotator")
+            annotator_path = os.path.join(modules.paths.caches_path, "annotator")
             if not os.path.exists(annotator_path):
                 os.mkdir(annotator_path)
             Image.fromarray(processed_image).save(filepath)

@@ -1,0 +1,28 @@
+{
+    "_name_or_path": "../weights/vlm-qwen-big-uform",
+    "architectures": [
+      "VLMForCausalLM"
+    ],
+    "auto_map": {
+      "AutoConfig": "configuration_uform_gen.VLMConfig",
+      "AutoModel": "modeling_uform_gen.VLMForCausalLM",
+      "AutoProcessor": "processing_uform_gen.VLMProcessor"
+    },
+    "image_encoder_hidden_size": 1280,
+    "image_encoder_name_or_path": "unum-cloud/uform-vl-english-big",
+    "image_encoder_num_heads": 16,
+    "image_encoder_num_layers": 32,
+    "image_encoder_patch_size": 14,
+    "image_encoder_pooling": "cls",
+    "image_pooler_intermediate_size": 3200,
+    "image_pooler_num_attn_heads": 16,
+    "image_size": 336,
+    "image_token_id": 151646,
+    "initializer_range": 0.02,
+    "model_type": "vlm",
+    "num_image_latents": 256,
+    "text_decoder_name_or_path": "Qwen/Qwen1.5-0.5B-Chat",
+    "torch_dtype": "float32",
+    "transformers_version": "4.37.2",
+    "use_cache": true
+  }

@@ -119,7 +119,7 @@ class CrossAttentionPatch:
         mask_h = int(mask_h) + int((seq_len % int(mask_h)) != 0)
         mask_w = seq_len // mask_h
         has_mask = False
-
+ 
         for weight, cond, uncond, mask, sigma_start, sigma_end, target_blocks in zip(
                 self.weights, self.conds, self.unconds, self.attn_masks, self.sigma_start, self.sigma_end, self.target_blocks):
             

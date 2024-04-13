@@ -7,13 +7,14 @@ current_loaded_models = []
 
 # True use GPU, value is (run, offload, dtype)
 device_config = {
-    "clip": (True, False),
+    "clip": (False, False),
     "clip_vision": (True, False),
     "annotator": (True, False),
     "unet": (True, False, torch.float16),
     "upscaler": (True, False),
     "controlnet": (True, False, torch.float8_e4m3fn),
     "ipadapter": (True, False, torch.float16),
+    "image2text": (True, False, torch.float16),
     "vae": (True, False, torch.bfloat16),
     "face": (True, False),
 }
@@ -205,6 +206,9 @@ def cleanup_models(keep_clone_weights_loaded=False):
         x = current_loaded_models.pop(i)
         x.model_unload()
         del x
+
+def unload_all_models():
+    free_memory(1e30, devices.get_torch_device())
 
 def init_device(type_name):
     return torch.device("cpu")

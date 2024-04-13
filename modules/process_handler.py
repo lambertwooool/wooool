@@ -534,7 +534,7 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
     #     latent_convert = latent_interposer.LatentInterposer(model_type, refiner_model_type)
     
     extra_options = {}
-    if sampler_name not in ["euler"]:
+    if sampler_name in ["dpmpp_2m_sde", "dpmpp_2m_sde_gpu", "dpmpp_3m_sde", "dpmpp_3m_sde_gpu"]:
         extra_options = { "eta": eta }
 
     for i in range(batch_size):
@@ -650,7 +650,7 @@ def process_diffusion(task, base_path, refiner_path, positive, negative, steps, 
             pool_low_limit = 4
             if batch_size > round_batch_size and len(positive_cond) < pool_low_limit:
                 positive_new, negative_new = prompt_helper.re_generate(positive_template, negative_template, round_batch_size - pool_low_limit)
-                threading.Thread(target=clip_worker, args=(positive_new, negative_new)).start()
+                thread_clip = threading.Thread(target=clip_worker, args=(positive_new, negative_new)).start()
                 positive += positive_new
                 negative += negative_new
                 seeds += [seeds[-1] + (0 if subseed_strength < 1 else i + 1) for i in range(round_batch_size - pool_low_limit)]

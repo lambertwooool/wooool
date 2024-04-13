@@ -1,8 +1,10 @@
 import random
 import re
+import time
 import gradio as gr
 import modules.options as opts
 from modules import lora, wd14tagger
+from modules.image2text import Image2TextProcessor
 from modules.webui import ui_process
 
 mc_show_count = 7
@@ -166,17 +168,37 @@ def LoraBlock(opt_dict, loraCount=6, showCount=3):
 def RefBlock(opt_base_model, opt_dict, refCount=5, showCount=3):
     blocks = []
     ctrls = []
-
-    def opt_type_change(opt_type, image_refer):
-        range_visible = str(opt_type) not in ["Ref Content", "Base Image"]
-        return gr.CheckboxGroup(visible=opt_type == "Ref Content" and image_refer is not None), gr.Row(visible=range_visible)
     
-    def get_tags(opt_type, img_refer):
-        words = []
+    def image_refer_change(image_refer):            
+        return  (   gr.Slider(visible=image_refer is not None), # sl_rate
+                    gr.Slider(visible=image_refer is not None), # sl_start_percent
+                    gr.Slider(visible=image_refer is not None), # sl_end_percent
+                    gr.Column(visible=image_refer is not None)) # panel_mask
+
+    def opt_type_change(opt_type, opt_image2text, image_refer):
+        image2text_visible = str(opt_type) in ["Ref Content"] and image_refer is not None
+        range_visible = str(opt_type) not in ["Ref Content", "Base Image"]
+        wd14_visible = image2text_visible and "wd14" in opt_image2text
+        return gr.Column(visible=image2text_visible), gr.Row(visible=range_visible), gr.CheckboxGroup(visible=wd14_visible)
+    
+    def get_tags(opt_type, opt_image2text, img_refer):
+        words, text = [], ""
+
         if img_refer is not None and opt_type == "Ref Content":
-            words = wd14tagger.tag(img_refer)[:12]
+            if "wd14" in opt_image2text.lower():
+                words = wd14tagger.tag(img_refer)[:15]
+                text = ""
+            else:
+                process_name = image2texts.get(opt_image2text)
+                process = Image2TextProcessor(process_name)
+                words = []
+                text = process(img_refer, max_new_tokens=256)
+        
+        panel_visible = True if str(opt_type) in ["Ref Content"] else False
+        words_visible = True if words else False
+        text_visible = True if text else False
             
-        return gr.CheckboxGroup(choices=words, value=words)
+        return gr.Column(visible=panel_visible), gr.CheckboxGroup(choices=words, value=words, visible=words_visible), gr.Textbox(text, visible=text_visible)
 
     def get_ref_types_inner(opt_base_model):
         # opt_type_list = list(opts.options['ref_mode'].keys())
@@ -232,6 +254,12 @@ def RefBlock(opt_base_model, opt_dict, refCount=5, showCount=3):
     default_ref_mode = opts.default["ref_mode"]
     ctrl_models, default_model = ui_process.GetControlnets(default_ref_mode, "sdxl")
     ctrl_annotators, default_annotator = get_annotators_inner(default_ref_mode, default_model)
+    image2texts, default_image2text = {
+            "Wd14 Tagger": "wd14",
+            "Moondream v1": "moondream_v1",
+            "Moondream v2": "moondream_v2",
+            "QianWen": "qwen",
+        }, "Wd14 Tagger"
 
     for i in range(refCount):
         with gr.Column(min_width=100, visible=i < showCount, elem_classes="panel_ref_block") as block:
@@ -251,26 +279,32 @@ def RefBlock(opt_base_model, opt_dict, refCount=5, showCount=3):
                     ckb_mask = gr.Checkbox(label="apply mask", value=False, min_width=40, elem_id=f"refer_apply_mask_{i}")
                     image_attn_mask = gr.Image(label="mask", height=280, visible=False, elem_id=f"refer_mask_{i}")
 
-            ckb_words = gr.CheckboxGroup(show_label=False, visible=False, elem_id=f"refer_wd14_{i}", elem_classes="refer_words")
-            
+            with gr.Column(visible=False) as panel_image2text:
+                opt_image2text = gr.Dropdown(choices=image2texts.keys(), value=default_image2text, container=False, filterable=False, min_width=80, elem_id=f"ref_image2text_{i}", elem_classes="gr_dropdown")
+                ckb_words = gr.CheckboxGroup(show_label=False, label="", visible=True, elem_id=f"refer_wd14_{i}", elem_classes="refer_words")
+                txt_words = gr.Textbox(show_label=False, visible=False, elem_id=f"refer_img2text_{i}")
+                
             opt_ctrl_model = gr.Dropdown(choices=ctrl_models, value=default_model, visible=(len(ctrl_models) > 1),  container=False, filterable=False, min_width=80, elem_id=f"ref_ctrl_model_{i}", elem_classes="gr_dropdown")
             with gr.Row(visible=(len(ctrl_annotators) > 1)) as panel_annotator:
-                ckb_annotator = gr.Checkbox(label="", value=True, min_width=40, elem_id=f"refer_use_annotator_{i}", scale=1)
-                opt_annotator = gr.Dropdown(choices=ctrl_annotators, value=default_annotator,  container=False, filterable=False, min_width=80, elem_id=f"ref_annotator_{i}", elem_classes="gr_dropdown", scale=9)
+                opt_annotator = gr.Dropdown(choices=ctrl_annotators, value=default_annotator, container=False, filterable=False, min_width=80, elem_id=f"ref_annotator_{i}", elem_classes="gr_dropdown", scale=9)
+                ckb_annotator = gr.Checkbox(show_label=False, label="", value=True, min_width=40, elem_id=f"refer_use_annotator_{i}", scale=1)
 
         opt_dict[f"refer_type_{i}"] = opt_type
 
-        opt_type.change(get_tags, [opt_type, image_refer], [ckb_words], queue=False) \
-            .then(opt_type_change, [opt_type, image_refer], [ckb_words, panel_step_range], queue=False) \
+        opt_type.change(opt_type_change, [opt_type, opt_image2text, image_refer], [panel_image2text, panel_step_range, ckb_words], queue=False) \
             .then(get_models, [opt_type, opt_base_model, opt_ctrl_model], [opt_ctrl_model], queue=False) \
-            .then(get_annotators, [opt_type, opt_ctrl_model, opt_annotator], [opt_annotator, panel_annotator], queue=False)
+            .then(get_annotators, [opt_type, opt_ctrl_model, opt_annotator], [opt_annotator, panel_annotator], queue=False) \
+            .then(get_tags, [opt_type, opt_image2text, image_refer], [panel_image2text, ckb_words, txt_words], queue=False) \
+
+        opt_image2text.change(get_tags, [opt_type, opt_image2text, image_refer], [panel_image2text, ckb_words, txt_words], queue=False)
 
         opt_base_model.change(get_ref_types, opt_base_model, opt_type, queue=False) \
             .then(get_models, [opt_type, opt_base_model, opt_ctrl_model], opt_ctrl_model, queue=False)
         opt_ctrl_model.change(get_annotators, [opt_type, opt_ctrl_model, opt_annotator], [opt_annotator, panel_annotator], queue=False)
 
-        image_refer.change(lambda x: (gr.Slider(visible=x is not None), gr.Slider(visible=x is not None), gr.Slider(visible=x is not None), gr.Column(visible=x is not None)), image_refer, [sl_rate, sl_start_percent, sl_end_percent, panel_mask], queue=False) \
-            .then(get_tags, [opt_type, image_refer], [ckb_words], queue=False)
+        image_refer.change(image_refer_change, image_refer, [sl_rate, sl_start_percent, sl_end_percent, panel_mask], queue=False) \
+            .then(opt_type_change, [opt_type, opt_image2text, image_refer], [panel_image2text, panel_step_range, ckb_words], queue=False) \
+            .then(get_tags, [opt_type, opt_image2text, image_refer], [panel_image2text, ckb_words, txt_words], queue=False) \
 
         ckb_enable.change(lambda x: gr.Dropdown(interactive=x), ckb_enable, opt_type, queue=False)
         ckb_annotator.change(lambda x: gr.Dropdown(interactive=x), ckb_annotator, opt_annotator, queue=False)
@@ -278,7 +312,7 @@ def RefBlock(opt_base_model, opt_dict, refCount=5, showCount=3):
         ckb_mask.change(lambda x: gr.Image(visible=x), ckb_mask, image_attn_mask, queue=False)
 
         blocks.append(block)
-        ctrls += [opt_type, ckb_enable, image_refer, sl_rate, ckb_words, opt_ctrl_model, ckb_annotator, opt_annotator, ckb_mask, image_attn_mask, sl_start_percent, sl_end_percent]
+        ctrls += [opt_type, ckb_enable, image_refer, sl_rate, ckb_words, txt_words, opt_ctrl_model, ckb_annotator, opt_annotator, ckb_mask, image_attn_mask, sl_start_percent, sl_end_percent]
     
     return blocks, ctrls
 

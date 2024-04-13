@@ -32,9 +32,11 @@ clip_vision_models_path = get_path('clip_vision_models_path', '../models/clip_vi
 annotator_models_path = get_path('annotator_models_path', '../models/annotator/')
 face_models_path = get_path('face_models_path', '../models/faces/')
 wd14tagger_path = get_path('wd14tagger_path', '../models/wd14tagger/')
+image2text_path = get_path('image2text_path', '../models/image2text/')
 layerd_path = get_path('layerd_path', '../models/layerd/')
 
 temp_outputs_path = get_path('temp_outputs_path', '../outputs/')
+caches_path = get_path('caches_path', '../caches/')
 scripts_path = get_path('scripts_path', '../web/javascript/')
 css_path = get_path('css_path', '../web/css/')
 localization_path = get_path('localization_path', '../configs/localization/')
