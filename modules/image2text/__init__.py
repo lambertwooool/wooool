@@ -1,10 +1,9 @@
-import cv2
-import io
 import torch
 from PIL import Image
 from .image_text_base import Image2TextBase
 from .moondream import MoondreamModelV1, MoondreamModelV2
 from .qwen import QwenModel
+from .wd14_v3 import Wd14V3Model
 from typing import Union
 
 __all__ = [
@@ -17,7 +16,10 @@ MODELS = {
     'moondream_v1': { 'class': MoondreamModelV1 },
     'moondream_v2': { 'class': MoondreamModelV2 },
     'qwen': { 'class': QwenModel },
+    'wd14_v3': { 'class': Wd14V3Model, 'cache': True },
 }
+
+CACHE_MODELS = {}
 
 class Image2TextProcessor:
     def __init__(self, processor_id: str) -> None:
@@ -40,10 +42,17 @@ class Image2TextProcessor:
 
         """
 
-        self.processor = MODELS[self.processor_id]['class']()
+        if self.processor_id in CACHE_MODELS:
+            self.processor = CACHE_MODELS[self.processor_id]
+        else:
+            model = MODELS[self.processor_id]
+            self.processor = model['class']()
+            if model.get('cache', False):
+                CACHE_MODELS[self.processor_id] = self.processor
+        # self.processor = MODELS[self.processor_id]['class']()
     
     @torch.inference_mode()
-    def __call__(self, image: Union[Image.Image, bytes], question: str=None, max_new_tokens=256) -> str:
+    def __call__(self, image: Union[Image.Image, bytes], **kwargs) -> str:
         """processes an image with a image to text processor
 
         Args:
@@ -61,11 +70,6 @@ class Image2TextProcessor:
         if self.processor is None:
             self.load_processor()
         
-        question = [    "Describe this photograph.",
-                        "What is this?",
-                        "Please describe this image in detail."
-                    ][0]
-        
-        answer = self.processor.answer_question(image, question, max_new_tokens=max_new_tokens, use_vision_cache=True)
+        answer = self.processor.answer_question(image, use_vision_cache=True, **kwargs)
         
         return answer

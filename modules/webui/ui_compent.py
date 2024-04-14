@@ -185,12 +185,12 @@ def RefBlock(opt_base_model, opt_dict, refCount=5, showCount=3):
         words, text = [], ""
 
         if img_refer is not None and opt_type == "Ref Content":
+            process_name = image2texts.get(opt_image2text)
+            process = Image2TextProcessor(process_name)
             if "wd14" in opt_image2text.lower():
                 words = wd14tagger.tag(img_refer)[:15]
                 text = ""
             else:
-                process_name = image2texts.get(opt_image2text)
-                process = Image2TextProcessor(process_name)
                 words = []
                 text = process(img_refer, max_new_tokens=256)
         
@@ -255,7 +255,7 @@ def RefBlock(opt_base_model, opt_dict, refCount=5, showCount=3):
     ctrl_models, default_model = ui_process.GetControlnets(default_ref_mode, "sdxl")
     ctrl_annotators, default_annotator = get_annotators_inner(default_ref_mode, default_model)
     image2texts, default_image2text = {
-            "Wd14 Tagger": "wd14",
+            "Wd14 Tagger v3": "wd14_v3",
             "Moondream v1": "moondream_v1",
             "Moondream v2": "moondream_v2",
             "QianWen": "qwen",

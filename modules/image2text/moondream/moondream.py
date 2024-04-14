@@ -1,7 +1,7 @@
 import os
 import torch
 from huggingface_hub import snapshot_download
-from ..image_text_base import Image2TextBase
+from ..image_text_base import Image2TextLLM
 from .vision_encoder import VisionEncoder
 from .text_model import TextModel
 from .modeling_phi import PhiForCausalLM
@@ -11,7 +11,7 @@ from transformers import CodeGenTokenizerFast as Tokenizer
 import modules.paths
 from modules.model import model_helper, ops
 
-class MoondreamModelV1(Image2TextBase):
+class MoondreamModelV1(Image2TextLLM):
     def __init__(self, name="moondream1", dtype=None):
         super().__init__(name, dtype=dtype)
         
@@ -67,8 +67,9 @@ class MoondreamModelV1(Image2TextBase):
     
     def image_embeds_to_text(self,
                              image_embeds: torch.Tensor,
-                             question: str,
-                             generate_config: dict = {} ):
+                             question: str = "",
+                             generate_config: dict = {},
+                             **kwargs) -> str:
         chat_history = ""
         prompt = f"<image>\n\n{chat_history}Question: {question}\n\nAnswer:"
         

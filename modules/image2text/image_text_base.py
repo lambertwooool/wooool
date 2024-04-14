@@ -1,4 +1,5 @@
 import hashlib
+import time
 import numpy as np
 import torch
 import torch.nn as nn
@@ -21,11 +22,10 @@ class Image2TextBase():
         self.manual_cast_dtype = manual_cast_dtype
         
         self.model_path, self.tokenizer, self.vision_encoder_model, self.text_model = self.load_model()
-        self.vision_encoder_model.to(self.dtype).eval()
-        self.text_model.to(self.dtype).eval()
-        self.vision_encoder_wrap = model_patcher.ModelPatcher(self.vision_encoder_model, load_device=self.load_device, offload_device=self.offload_device)
-        self.text_model_wrap = model_patcher.ModelPatcher(self.text_model, load_device=self.load_device, offload_device=self.offload_device)
-    
+        
+        self.vision_encoder_wrap = self.model_patcher(self.vision_encoder_model)
+        self.text_model_wrap = self.model_patcher(self.text_model)
+
     def load_model(self) -> tuple[str, Tokenizer, nn.Module, nn.Module]:
         raise NotImplementedError()
     
@@ -38,32 +38,29 @@ class Image2TextBase():
                              generate_config: dict = {} ) -> str:
         raise NotImplementedError()
     
+    def model_patcher(self, model) -> model_patcher.ModelPatcher:
+        patch_model = None
+        if isinstance(model, nn.Module):
+            model.to(self.dtype).eval()
+            patch_model = model_patcher.ModelPatcher(model, load_device=self.load_device, offload_device=self.offload_device)
+        return patch_model
+            
     def answer_question(self,
                         image,
-                        question: str,
-                        max_new_tokens: int = 256,
-                        use_vision_cache=False):
+                        use_vision_cache: bool = False,
+                        **kwargs):
         
-        generate_config = {
-            "do_sample": False,
-            "use_cache": True,
-            "eos_token_id": self.tokenizer.eos_token_id,
-            "bos_token_id": self.tokenizer.bos_token_id,
-            "pad_token_id": self.tokenizer.pad_token_id,
-            "max_new_tokens": max_new_tokens,
-        }
+        start_time = time.time()
         
         with torch.inference_mode():
             image_embeds = self._vision_encoder(image, use_vision_cache=use_vision_cache)
-            counter_wrap = GenerateWrapper(self.text_model, max_new_tokens)
             
-            try:                
+            if isinstance(self.text_model_wrap, model_patcher.ModelPatcher):
                 model_loader.load_model_gpu(self.text_model_wrap)
-                output = self.image_embeds_to_text(image_embeds, question, generate_config)
-            finally:
-                counter_wrap.reset()
+            output = self.image_embeds_to_text(image_embeds, **kwargs)
+        
+        print(f"answer_question: {time.time()-start_time:.2f}s")
 
-        model_loader.unload_all_models()
         return output
     
     def _vision_encoder(self, image, use_vision_cache=False) -> torch.Tensor:
@@ -78,12 +75,47 @@ class Image2TextBase():
         if use_vision_cache and os.path.exists(cache_path):
             return torch.load(cache_path).to(device=self.device, dtype=self.dtype)
         else:
-            model_loader.load_model_gpu(self.vision_encoder_wrap)
+            if isinstance(self.vision_encoder_wrap, model_patcher.ModelPatcher):
+                model_loader.load_model_gpu(self.vision_encoder_wrap)
             image_vec = self.vision_encoder(image)
             if use_vision_cache:
                 os.makedirs(cache_root, exist_ok=True)
                 torch.save(image_vec, cache_path)
             return image_vec.to(device=self.device, dtype=self.dtype)
+
+class Image2TextLLM(Image2TextBase):
+    def answer_question(self,
+                        image,
+                        question: str = None,
+                        max_new_tokens: int = 256,
+                        use_vision_cache: bool = False,
+                        **kwargs):
+
+        question = [    "Describe this photograph.",
+                        "What is this?",
+                        "Please describe this image in detail."
+                    ][0] if question is None else question
+        
+        tokenizer = self.tokenizer
+
+        generate_config = {
+                "do_sample": False,
+                "use_cache": True,
+                "eos_token_id": tokenizer.eos_token_id,
+                "bos_token_id": tokenizer.bos_token_id,
+                "pad_token_id": tokenizer.pad_token_id if tokenizer.pad_token_id else tokenizer.bos_token_id,
+                "max_new_tokens": max_new_tokens,
+            }
+        counter_wrap = GenerateWrapper(self.text_model, max_new_tokens)
+        
+        try:
+            output = super().answer_question(image=image, question=question, generate_config=generate_config,
+                                             use_vision_cache=use_vision_cache, **kwargs)
+        finally:
+            if counter_wrap is not None:
+                counter_wrap.reset()
+        
+        return output
 
 class GenerateWrapper(nn.Module):
     def __init__(self, model: nn.Module, max_new_tokens: int):

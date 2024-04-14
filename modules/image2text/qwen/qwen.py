@@ -3,7 +3,7 @@ import re
 import torch
 from numpy import ndarray
 from huggingface_hub import snapshot_download
-from ..image_text_base import Image2TextBase
+from ..image_text_base import Image2TextLLM
 from .vision_encoder import VisionEncoder
 from .configuration_uform_gen import VLMConfig
 from .modeling_uform_gen import VLMForCausalLM, ImageFeaturesPooler
@@ -16,11 +16,11 @@ import modules.paths
 from modules.model import model_patcher, model_loader, model_helper, ops
 
 
-class QwenModel(Image2TextBase):
+class QwenModel(Image2TextLLM):
     def __init__(self, name="uform-gen2-qwen-500m", dtype=None):
         super().__init__(name, dtype=dtype)
         
-    def load_model(self) -> tuple[str, Tokenizer, model_patcher.ModelPatcher, model_patcher.ModelPatcher]:
+    def load_model(self):
         model_path = os.path.join(modules.paths.image2text_path, self.name)
         state_dict_path = [os.path.join(model_path, x) for x in ["model-00001-of-00002.safetensors", "model-00002-of-00002.safetensors"]]
         if not all([os.path.exists(x) for x in state_dict_path]):
@@ -84,7 +84,11 @@ class QwenModel(Image2TextBase):
         
         return image_features
         
-    def image_embeds_to_text(self, image_embeds: torch.Tensor, question: str, generate_config: dict = ...) -> str:
+    def image_embeds_to_text(self,
+                             image_embeds: torch.Tensor,
+                             question: str = "",
+                             generate_config: dict = {},
+                             **kwargs) -> str:
         input_embeds = self.processor(text=[question], return_tensors="pt")
         input_embeds["images"] = image_embeds
         input_embeds = { name: tensor.to(device=self.device) for name, tensor in input_embeds.items() }
