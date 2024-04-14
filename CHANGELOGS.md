@@ -1,5 +1,8 @@
 # Change Logs
 
+## 0.9.1
+- Support new image to text model, moondream-v1/v2, qwen-5b and wd14-v3
+
 ## 0.9.0
 - When inference with low VRAM, you can set parts of VRAM to be converted to FP8 for faster inference
 - When low VRAM, split the model to load some parts into the VRAM and the rest into RAM, allowing the model to perform inference normally
