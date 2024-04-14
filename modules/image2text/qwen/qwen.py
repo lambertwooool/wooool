@@ -10,7 +10,7 @@ from .modeling_uform_gen import VLMForCausalLM, ImageFeaturesPooler
 from .processing_uform_gen import VLMProcessor
 from transformers.models.qwen2.configuration_qwen2 import Qwen2Config
 from transformers.models.qwen2.modeling_qwen2 import Qwen2ForCausalLM
-from transformers import CodeGenTokenizerFast as Tokenizer
+from transformers import Qwen2TokenizerFast as Tokenizer
 
 import modules.paths
 from modules.model import model_patcher, model_loader, model_helper, ops
@@ -44,7 +44,8 @@ class QwenModel(Image2TextLLM):
                 elif k.startswith("image_pooler."):
                     image_pooler_sd[k[len("image_pooler."):]] = v
 
-        vlm_config = VLMConfig.from_pretrained(model_path)
+        config_path = os.path.dirname(os.path.realpath(__file__))
+        vlm_config = VLMConfig.from_pretrained(config_path)
         text_config = Qwen2Config.from_pretrained(tokenizer_path)
         
         with ops.auto_ops():

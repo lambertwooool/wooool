@@ -3,11 +3,6 @@
     "architectures": [
       "VLMForCausalLM"
     ],
-    "auto_map": {
-      "AutoConfig": "configuration_uform_gen.VLMConfig",
-      "AutoModel": "modeling_uform_gen.VLMForCausalLM",
-      "AutoProcessor": "processing_uform_gen.VLMProcessor"
-    },
     "image_encoder_hidden_size": 1280,
     "image_encoder_name_or_path": "unum-cloud/uform-vl-english-big",
     "image_encoder_num_heads": 16,
