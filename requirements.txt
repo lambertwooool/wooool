@@ -22,4 +22,5 @@ fvcore
 omegaconf
 pytorch_lightning
 kornia==0.7.1
+pynvml
 trimesh[easy]

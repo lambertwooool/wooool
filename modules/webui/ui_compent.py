@@ -259,7 +259,7 @@ def RefBlock(opt_base_model, opt_dict, refCount=5, showCount=3):
             "Moondream v1": "moondream_v1",
             "Moondream v2": "moondream_v2",
             "QianWen": "qwen",
-        }, "Wd14 Tagger"
+        }, "Wd14 Tagger v3"
 
     for i in range(refCount):
         with gr.Column(min_width=100, visible=i < showCount, elem_classes="panel_ref_block") as block:

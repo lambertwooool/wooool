@@ -1,7 +1,6 @@
 import sys
 import numpy as np
 import psutil
-import pynvml
 import torch
 import torch.nn as nn
 from modules import mac_specific, xpu_specific
@@ -9,7 +8,11 @@ from modules import mac_specific, xpu_specific
 XFORMERS_ENABLE = None
 PYTORCH_ATTENTION_ENABLE = None
 
-pynvml.nvmlInit()
+try:
+    import pynvml
+    pynvml.nvmlInit()
+except:
+    pass
 
 def has_mps() -> bool:
     if sys.platform != "darwin":
