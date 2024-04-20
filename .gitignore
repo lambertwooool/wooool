@@ -1,5 +1,7 @@
 .vscode
+caches/
 configs/user_paths.json
+configs/translator/*.json
 models/embeddings/
 
 # Byte-compiled / optimized / DLL files

@@ -404,3 +404,6 @@ mul["upscale_origin"] = 0.01
 title["upscale_origin"] = "Origin Visibility %"
 default["upscale_origin"] = 0
 
+options["translator"] = load_ui_config("translator")
+title["translator"] = "Translator"
+default["translator"] = "Disable"

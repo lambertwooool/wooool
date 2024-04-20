@@ -78,6 +78,10 @@ def load_json(filename: str) -> str:
 
     return data
 
+def save_json(filename: str, data: dict):
+    with open(filename, 'w', encoding='utf8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
 def load_file_from_url(
         url: str,
         *,

@@ -17,6 +17,7 @@ import modules.options as opts
 import modules.worker as worker
 from modules import civitai, controlnet_helper, devices, lora, shared, util, wd14tagger
 from modules.model import model_helper
+from modules.translator import TranslatorProcessor, Lang
 
 progress_html = "<progress value='{}' max='100'></progress><div class='progress_text'>{}</div>"
 opt_dict = []
@@ -52,12 +53,22 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
     fixed_seed = gen_opts.pop("fixed_seed", False)
     seed = gen_opts.pop("seed") if fixed_seed else 0
 
-    prompt_negative = gen_opts.pop("prompt_negative")
     style_item = gen_opts.pop("style_item")
     loras = []
 
     if style_item == "random-style":
         style_item = f"__style_{gen_opts.get('style')}__"
+
+    prompt_main = gen_opts.pop("prompt_main")
+    prompt_negative = gen_opts.pop("prompt_negative")
+
+    translator_name = gen_opts.pop("translator")
+    if translator_name:
+        translator = TranslatorProcessor(translator_name)
+        to_lang = Lang.EN
+
+        prompt_main = translator(prompt_main, to_lang=to_lang)
+        prompt_negative = translator(prompt_negative, to_lang=to_lang)
 
     params = {
         "action": "generate",
@@ -65,7 +76,7 @@ def Generate(img_refer, ckb_pro, txt_setting, *args):
         "base_name": gen_opts.pop("base_model"),
         "refiner_name": refiner_model,
         "main_character": (radio_mc, gen_opts.pop("mc")) if radio_mc != "Other" else ("", gen_opts.pop("mc_other")),
-        "prompt_main": gen_opts.pop('prompt_main'),
+        "prompt_main": prompt_main,
         # "prompt_negative": ",".join(x for x in ([gen_opts.pop("negative")] + [v for n in gen_opts.pop("prompt_negative") for v in n.values() ]) if x != ""),
         "prompt_negative": prompt_negative,
         "cfg_scale": gen_opts.pop("cfg_scale"),
