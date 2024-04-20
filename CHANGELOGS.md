@@ -1,7 +1,7 @@
 # Change Logs
 
 ## 0.9.2
-- Support translator by Baidu, Tencent and DeepL
+- Support translator by Google, DeepL, Baidu, Tencent and Youdao
 
 ## 0.9.1
 - Support new image to text model, moondream-v1/v2, qwen-5b and wd14-v3
