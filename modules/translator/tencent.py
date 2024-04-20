@@ -57,7 +57,7 @@ class TencentTranslator(BaseTranslator):
 
             from_lang = self.get_lang(res["Source"])
             to_lang = self.get_lang(res["Target"])
-            res_text = [(text, res["TargetText"])]
+            res_text = [[(text, res["TargetText"])]]
         else:
             res_text = ""
 

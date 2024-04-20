@@ -1,5 +1,7 @@
 {
 	"Disable": "",
+	"Google Web": "google_web",
+	"Youdao Web": "youdao_web",
 	"Baidu Translator": "baidu",
 	"Tencent Translator": "tencent",
 	"DeepL": "deepl"

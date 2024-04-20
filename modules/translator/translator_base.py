@@ -66,9 +66,9 @@ class BaseTranslator(ABC):
                     **kwargs ) -> tuple[LangName, LangName, list[tuple[str, str]]]:
         return NotImplemented("You need to implement the translate method.")
 
-    def request_url(self, url: str, params: dict={}, headers: dict={}):
+    def request_url(self, url: str, params: dict={}, headers: dict={}, cookies=None, method="GET"):
         try:
-            response = requests.get(url, params=params, headers=headers)
+            response = requests.request(method, url, params=params, headers=headers, cookies=cookies)
         except Exception as e:
             print(e)
             return None
@@ -78,7 +78,15 @@ class BaseTranslator(ABC):
             print(f"Request failed with status code {response.status_code}: {response.text}")
             return None
 
-        res = response.json()
+        content_type = response.headers.get("Content-Type")
+        if "json" in content_type:
+            try:
+                res = response.json()
+            except:
+                res = response.text
+        else:
+            res = response.text
+
         if not res:
             res = None
 

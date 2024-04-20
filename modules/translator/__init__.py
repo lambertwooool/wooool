@@ -3,6 +3,8 @@ from .translator_base import BaseConfig, BaseTranslator
 from .baidu import BaiduTranslator, BaiduConfig
 from .tencent import TencentTranslator, TencentConfig
 from .deepl import DeepLTranslator, DeepLConfig, DeepLProConfig
+from .youdao_web import YoudaoWebTranslator, YoudaoWebConfig
+from .google_web import GoogleWebTranslator, GoogleWebConfig
 from .language_code import Lang, LangName
 
 __all__ = [
@@ -13,14 +15,21 @@ __all__ = [
     "DeepLTranslator",
     "DeepLConfig",
     "DeepLProConfig",
+    "YoudaoWebTranslator",
+    "YoudaoWebConfig",
+    "GoogleWebTranslator",
+    "GoogleWebConfig",
+
     "Lang",
     "LangName",
 ]
 
 MODELS = {
+    'google_web': { 'class': GoogleWebTranslator },
     'baidu': { 'class': BaiduTranslator },
     'tencent': { 'class': TencentTranslator },
     'deepl': { 'class': DeepLTranslator },
+    'youdao_web': { 'class': YoudaoWebTranslator },
 }
 
 class TranslatorProcessor:
@@ -60,5 +69,6 @@ class TranslatorProcessor:
         
         # from_lang, to_lang, trans_texts = self.processor.translate(text, from_lang=from_lang, to_lang=to_lang, **kwargs)
         from_lang, to_lang, trans_texts = self.processor(text, from_lang=from_lang, to_lang=to_lang, use_cache=True, **kwargs)
+        trans_text = ''.join([t_text[1] for t_line in trans_texts for t_text in t_line])
         
-        return trans_texts[0][1]
+        return trans_text

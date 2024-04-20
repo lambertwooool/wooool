@@ -41,7 +41,7 @@ class DeepLTranslator(BaseTranslator):
             res = res["translations"][0]
 
             from_lang = self.get_lang(source_lang or res["detected_source_language"])
-            res_text = [(text, res["text"])]
+            res_text = [[(text, res["text"])]]
         else:
             res_text = ""
 

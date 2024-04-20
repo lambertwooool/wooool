@@ -24,3 +24,5 @@ pytorch_lightning
 kornia==0.7.1
 pynvml
 trimesh[easy]
+pycryptodome
+beautifulsoup4

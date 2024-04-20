@@ -44,7 +44,7 @@ class BaiduTranslator(BaseTranslator):
         if res is not None:
             from_lang = self.get_lang(res["from"])
             to_lang = self.get_lang(res["to"])
-            res_text = [(item["src"], item["dst"]) for item in res["trans_result"]]
+            res_text = [[(item["src"], item["dst"]) for item in res["trans_result"]]]
         else:
             res_text = ""
 
